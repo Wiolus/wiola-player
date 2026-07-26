@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+
+if ! command -v gersemi >/dev/null 2>&1; then
+    echo "pre-commit: gersemi not found, skipping CMake format check." >&2
+    echo "            install with: pip install -r requirements.txt" >&2
+    exit 0
+fi
+
+if ! "$root/scripts/format-cmake.sh" --check; then
+    echo >&2
+    echo "pre-commit: CMake files above are not formatted. Fix with:" >&2
+    echo "    $root/scripts/format-cmake.sh" >&2
+    exit 1
+fi
