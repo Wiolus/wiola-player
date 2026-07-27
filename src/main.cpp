@@ -1,6 +1,14 @@
+/**
+ * @file
+ * @brief Program entry point.
+ */
+
+#include "cli.hpp"
+
 #include <iostream>
 #include <span>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -17,20 +25,23 @@ void print_usage(std::string_view program)
 
 int main(int argc, char** argv)
 {
-    const std::span args(argv, static_cast<std::size_t>(argc));
-    const std::string_view program = argc > 0 ? args[0] : "wiola-player";
+    const std::span raw(argv, static_cast<std::size_t>(argc));
+    const std::string_view program = raw.empty() ? "wiola-player" : raw[0];
 
-    for (std::size_t i = 1; i < args.size(); ++i) {
-        const std::string_view arg = args[i];
+    std::vector<std::string_view> args;
+    for (std::size_t i = 1; i < raw.size(); ++i) {
+        args.emplace_back(raw[i]);
+    }
 
-        if (arg == "-h" || arg == "--help") {
-            print_usage(program);
-            return 0;
-        }
-        if (arg == "-v" || arg == "--version") {
-            std::cout << "wiola-player " << WIOLA_VERSION << '\n';
-            return 0;
-        }
+    switch (wiola::parse_args(args)) {
+    case wiola::Action::Help:
+        print_usage(program);
+        return 0;
+    case wiola::Action::Version:
+        std::cout << "wiola-player " << WIOLA_VERSION << '\n';
+        return 0;
+    case wiola::Action::Run:
+        break;
     }
 
     std::cout << "wiola-player " << WIOLA_VERSION << " — nothing to play yet.\n";
