@@ -18,8 +18,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
+option(ENABLE_UNIT_TESTS "Build unit tests" ON)
+
 if(PROJECT_IS_TOP_LEVEL)
     include(CTest)
 endif()
 
 add_subdirectory(src)
+
+if(PROJECT_IS_TOP_LEVEL AND BUILD_TESTING AND ENABLE_UNIT_TESTS)
+    add_subdirectory(tests)
+endif()
