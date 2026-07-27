@@ -2,16 +2,26 @@
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
+status=0
 
-if ! command -v gersemi >/dev/null 2>&1; then
-    echo "pre-commit: gersemi not found, skipping CMake format check." >&2
-    echo "            install with: pip install -r requirements.txt" >&2
-    exit 0
-fi
+check() {
+    local tool="$1" script="$2"
 
-if ! "$root/scripts/format-cmake.sh" --check; then
-    echo >&2
-    echo "pre-commit: CMake files above are not formatted. Fix with:" >&2
-    echo "    $root/scripts/format-cmake.sh" >&2
-    exit 1
-fi
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "pre-commit: $tool not found, skipping its format check." >&2
+        echo "            install with: pip install -r requirements.txt" >&2
+        return 0
+    fi
+
+    if ! "$root/scripts/$script" --check; then
+        echo >&2
+        echo "pre-commit: files above are not formatted. Fix with:" >&2
+        echo "    $root/scripts/$script" >&2
+        status=1
+    fi
+}
+
+check gersemi format-cmake.sh
+check clang-format format-cpp.sh
+
+exit $status

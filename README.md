@@ -44,8 +44,9 @@ Options:
 
 ## Development
 
-CMake files are formatted with [gersemi](https://github.com/BlankSpruce/gersemi),
-pinned in `requirements.txt`:
+C++ sources are formatted with clang-format and CMake files with
+[gersemi](https://github.com/BlankSpruce/gersemi). Both are pinned in
+`requirements.txt`, so every contributor gets identical output:
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
@@ -59,12 +60,16 @@ Install the git hooks once per clone. This symlinks `scripts/hooks/*` into
 ./scripts/install-hooks.sh
 ```
 
-The `pre-commit` hook rejects commits when any tracked CMake file is
+The `pre-commit` hook rejects commits when any tracked source or CMake file is
 unformatted. Format everything with:
 
 ```bash
-./scripts/format-cmake.sh
+./scripts/format-cpp.sh      # C/C++ sources and headers
+./scripts/format-cmake.sh    # CMakeLists.txt and *.cmake
 ```
 
-Both scripts operate on files tracked by git, so generated CMake files under
-`build/` are never touched.
+Pass `--check` to either script to report without modifying anything, which is
+what the hook does.
+
+Styles are defined in `.clang-format` and `.gersemirc`. Both scripts operate on
+files tracked by git, so generated CMake files under `build/` are never touched.

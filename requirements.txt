@@ -1,1 +1,2 @@
+clang-format==22.1.8
 gersemi==0.28.0
