@@ -15,5 +15,12 @@ target_link_libraries(
     PRIVATE wiola_core wiola_warnings GTest::gtest_main
 )
 
+add_executable(cache_line_test core/cache_line_test.cpp)
+target_link_libraries(
+    cache_line_test
+    PRIVATE wiola_core wiola_warnings GTest::gtest_main
+)
+
 include(GoogleTest)
 gtest_discover_tests(cli_test)
+gtest_discover_tests(cache_line_test)
