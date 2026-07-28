@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Implementation of command-line option parsing.
+ * @brief Command-line option parsing.
  * @author Roman Glaz
  * @copyright © 2026, <vokerlee@gmail.com>
  *
@@ -18,22 +18,19 @@
  * along with Wiola.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <cli/cli.hpp>
+#pragma once
+
+#include <span>
+#include <string_view>
 
 namespace wiola {
 
-Action parse_args(std::span<const std::string_view> args)
-{
-    for (const std::string_view arg : args) {
-        if (arg == "-h" || arg == "--help") {
-            return Action::Help;
-        }
-        if (arg == "-v" || arg == "--version") {
-            return Action::Version;
-        }
-    }
+enum class Action {
+    Run,
+    Help,
+    Version,
+};
 
-    return Action::Run;
-}
+Action parse_args(std::span<const std::string_view> args);
 
 } // namespace wiola

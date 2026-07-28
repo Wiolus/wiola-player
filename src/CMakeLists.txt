@@ -5,11 +5,12 @@ target_compile_options(
         $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall
         -Wextra
         -Wpedantic>
+        $<$<CXX_COMPILER_ID:GNU>:-Wno-interference-size>
         $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
 add_library(wiola_core STATIC cli.cpp)
-target_include_directories(wiola_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(wiola_core PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(wiola_core PRIVATE wiola_warnings)
 
 add_executable(wiola-player main.cpp)
