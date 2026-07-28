@@ -8,10 +8,18 @@ if ! command -v gersemi >/dev/null 2>&1; then
     exit 127
 fi
 
-mapfile -d '' -t files < <(
+mapfile -d '' -t tracked < <(
     git ls-files -z -- \
         '*CMakeLists.txt' '*CMakeLists.txt.in' '*.cmake' '*.cmake.in'
 )
+
+# git lists index entries, so a file deleted in the working tree is still reported.
+files=()
+for file in "${tracked[@]}"; do
+    if [ -f "$file" ]; then
+        files+=("$file")
+    fi
+done
 
 if [ ${#files[@]} -eq 0 ]; then
     exit 0
