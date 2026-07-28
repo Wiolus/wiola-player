@@ -14,6 +14,7 @@ AllowShortLambdasOnASingleLine: Inline
 BreakBeforeBinaryOperators: None
 BreakBeforeCloseBracketFunction: true
 BreakInheritanceList: AfterComma
+BreakTemplateDeclarations: Yes
 ColumnLimit: 100
 SpaceAfterTemplateKeyword: false
 SpaceAroundPointerQualifiers: After
