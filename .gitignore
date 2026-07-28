@@ -64,6 +64,10 @@ vcpkg_installed/
 # debug information files
 *.dwo
 
+# LaTeX build artefacts
+*.aux
+*.toc
+
 # test output & cache
 Testing/
 .cache/
