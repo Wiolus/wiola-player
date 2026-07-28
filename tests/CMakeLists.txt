@@ -21,6 +21,13 @@ target_link_libraries(
     PRIVATE wiola_core wiola_warnings GTest::gtest_main
 )
 
+add_executable(spsc_ring_buffer_test lockfree/spsc_ring_buffer_test.cpp)
+target_link_libraries(
+    spsc_ring_buffer_test
+    PRIVATE wiola_core wiola_warnings GTest::gtest_main
+)
+
 include(GoogleTest)
 gtest_discover_tests(cli_test)
 gtest_discover_tests(cache_line_test)
+gtest_discover_tests(spsc_ring_buffer_test)
