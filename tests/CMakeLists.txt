@@ -9,25 +9,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-add_executable(cli_test cli_test.cpp)
-target_link_libraries(
-    cli_test
-    PRIVATE wiola_core wiola_warnings GTest::gtest_main
-)
-
-add_executable(cache_line_test core/cache_line_test.cpp)
-target_link_libraries(
-    cache_line_test
-    PRIVATE wiola_core wiola_warnings GTest::gtest_main
-)
-
-add_executable(spsc_ring_buffer_test lockfree/spsc_ring_buffer_test.cpp)
-target_link_libraries(
-    spsc_ring_buffer_test
-    PRIVATE wiola_core wiola_warnings GTest::gtest_main
-)
-
 include(GoogleTest)
-gtest_discover_tests(cli_test)
-gtest_discover_tests(cache_line_test)
-gtest_discover_tests(spsc_ring_buffer_test)
+
+function(wiola_add_test name)
+    add_executable(${name} ${ARGN})
+    target_link_libraries(${name} PRIVATE GTest::gtest_main)
+    set_target_properties(
+        ${name}
+        PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    )
+    gtest_discover_tests(${name})
+endfunction()
+
+add_subdirectory(cli)
+add_subdirectory(core)
+add_subdirectory(lockfree)
