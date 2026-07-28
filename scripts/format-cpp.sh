@@ -8,10 +8,18 @@ if ! command -v clang-format >/dev/null 2>&1; then
     exit 127
 fi
 
-mapfile -d '' -t files < <(
+mapfile -d '' -t tracked < <(
     git ls-files -z -- \
         '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hh' '*.hpp' '*.hxx' '*.ipp'
 )
+
+# git lists index entries, so a file deleted in the working tree is still reported.
+files=()
+for file in "${tracked[@]}"; do
+    if [ -f "$file" ]; then
+        files+=("$file")
+    fi
+done
 
 if [ ${#files[@]} -eq 0 ]; then
     exit 0
