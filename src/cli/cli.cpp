@@ -20,20 +20,43 @@
 
 #include <cli/cli.hpp>
 
+#include <CLI/CLI.hpp>
+
+#include <format>
+#include <memory>
+#include <vector>
+
 namespace wiola {
 
-Action parse_args(std::span<const std::string_view> args)
+namespace {
+
+std::unique_ptr<CLI::App> make_app()
 {
-    for (const std::string_view arg : args) {
-        if (arg == "-h" || arg == "--help") {
-            return Action::Help;
-        }
-        if (arg == "-v" || arg == "--version") {
-            return Action::Version;
-        }
+    auto app = std::make_unique<CLI::App>("Wiola media player", "wiola-player");
+    app->set_help_flag("-h,--help", "Show this help and exit");
+    app->set_version_flag("-v,--version", std::format("wiola-player {}", WIOLA_VERSION),
+        "Show version and exit");
+    app->allow_extras();
+
+    return app;
+}
+
+} // namespace
+
+std::optional<int> run_cli(std::span<const std::string_view> args)
+{
+    const auto app = make_app();
+
+    // CLI11 consumes the vector overload back to front.
+    std::vector<std::string> reversed(args.rbegin(), args.rend());
+
+    try {
+        app->parse(reversed);
+    } catch (const CLI::ParseError& error) {
+        return app->exit(error);
     }
 
-    return Action::Run;
+    return std::nullopt;
 }
 
 } // namespace wiola
