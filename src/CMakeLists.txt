@@ -9,12 +9,13 @@ target_compile_options(
         $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
-add_library(wiola_core STATIC cli.cpp)
-target_include_directories(wiola_core PUBLIC "${PROJECT_SOURCE_DIR}/include")
-target_link_libraries(wiola_core PRIVATE wiola_warnings)
+add_library(wiola_core INTERFACE)
+target_include_directories(wiola_core INTERFACE "${PROJECT_SOURCE_DIR}/include")
+
+add_subdirectory(cli)
 
 add_executable(wiola-player main.cpp)
-target_link_libraries(wiola-player PRIVATE wiola_core wiola_warnings)
+target_link_libraries(wiola-player PRIVATE wiola_cli wiola_warnings)
 target_compile_definitions(
     wiola-player
     PRIVATE WIOLA_VERSION="${PROJECT_VERSION}"
