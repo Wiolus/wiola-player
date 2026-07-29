@@ -23,48 +23,69 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <optional>
+#include <span>
+#include <string>
 #include <string_view>
 
 namespace {
 
-using wiola::Action;
-using wiola::parse_args;
+using wiola::run_cli;
 
-TEST(ParseArgs, NoArgumentsRuns)
+/// CLI11 prints help, version, and usage errors itself; keep that out of the test log.
+std::optional<int> run_quietly(std::span<const std::string_view> args)
 {
-    EXPECT_EQ(parse_args({}), Action::Run);
+    testing::internal::CaptureStdout();
+    testing::internal::CaptureStderr();
+
+    const std::optional<int> exit_code = run_cli(args);
+
+    testing::internal::GetCapturedStdout();
+    testing::internal::GetCapturedStderr();
+
+    return exit_code;
 }
 
-TEST(ParseArgs, RecognisesHelp)
+TEST(RunCli, NoArgumentsStartsThePlayer)
+{
+    EXPECT_FALSE(run_quietly({}).has_value());
+}
+
+TEST(RunCli, HandlesHelp)
 {
     const std::array<std::string_view, 1> short_form{"-h"};
     const std::array<std::string_view, 1> long_form{"--help"};
 
-    EXPECT_EQ(parse_args(short_form), Action::Help);
-    EXPECT_EQ(parse_args(long_form), Action::Help);
+    EXPECT_EQ(run_quietly(short_form), 0);
+    EXPECT_EQ(run_quietly(long_form), 0);
 }
 
-TEST(ParseArgs, RecognisesVersion)
+TEST(RunCli, HandlesVersion)
 {
     const std::array<std::string_view, 1> short_form{"-v"};
     const std::array<std::string_view, 1> long_form{"--version"};
 
-    EXPECT_EQ(parse_args(short_form), Action::Version);
-    EXPECT_EQ(parse_args(long_form), Action::Version);
+    EXPECT_EQ(run_quietly(short_form), 0);
+    EXPECT_EQ(run_quietly(long_form), 0);
 }
 
-TEST(ParseArgs, IgnoresUnknownArguments)
+TEST(RunCli, IgnoresUnknownArguments)
 {
     const std::array<std::string_view, 2> args{"song.mp3", "--unknown"};
 
-    EXPECT_EQ(parse_args(args), Action::Run);
+    EXPECT_FALSE(run_quietly(args).has_value());
 }
 
-TEST(ParseArgs, FirstRecognisedOptionWins)
+TEST(RunCli, PrintsHelpText)
 {
-    const std::array<std::string_view, 2> args{"--version", "--help"};
+    const std::array<std::string_view, 1> args{"--help"};
 
-    EXPECT_EQ(parse_args(args), Action::Version);
+    testing::internal::CaptureStdout();
+    EXPECT_EQ(run_cli(args), 0);
+    const std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(output.find("--version"), std::string::npos);
+    EXPECT_NE(output.find("wiola-player"), std::string::npos);
 }
 
 } // namespace

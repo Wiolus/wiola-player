@@ -16,6 +16,7 @@ BreakBeforeCloseBracketFunction: true
 BreakInheritanceList: AfterComma
 BreakTemplateDeclarations: Yes
 ColumnLimit: 100
+NamespaceIndentation: None
 SpaceAfterTemplateKeyword: false
 SpaceAroundPointerQualifiers: After
 SpaceBeforeCpp11BracedList: false

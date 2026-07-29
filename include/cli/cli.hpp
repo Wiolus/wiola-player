@@ -20,17 +20,14 @@
 
 #pragma once
 
+#include <optional>
 #include <span>
 #include <string_view>
 
 namespace wiola {
 
-enum class Action {
-    Run,
-    Help,
-    Version,
-};
-
-Action parse_args(std::span<const std::string_view> args);
+/// Runs the command line. Returns the process exit code when the CLI handled the invocation
+/// on its own (help, version, bad usage), or nothing when the player should start.
+std::optional<int> run_cli(std::span<const std::string_view> args);
 
 } // namespace wiola
