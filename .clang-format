@@ -22,6 +22,7 @@ SpaceAroundPointerQualifiers: After
 SpaceBeforeCpp11BracedList: false
 SpacesInContainerLiterals: false
 RemoveEmptyLinesInUnwrappedLines: true
+MaxEmptyLinesToKeep: 1
 SeparateDefinitionBlocks: Always
 WrapNamespaceBodyWithEmptyLines: Always
 EnumTrailingComma: Insert
