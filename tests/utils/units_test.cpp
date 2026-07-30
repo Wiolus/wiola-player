@@ -230,6 +230,19 @@ TEST(Units, DefaultsToZero)
     static_assert((Time{} + 250_ms) == 250_ms);
 }
 
+TEST(Units, BuildsFromIntegers)
+{
+    constexpr std::size_t rate{48000};
+    constexpr int count{440};
+
+    static_assert(Frequency{rate} == 48_kHz);
+    static_assert(Frequency{count} == 440_Hz);
+    static_assert(Time{std::size_t{2}} == 2_s);
+    static_assert(Time{2} == 2_s);
+
+    static_assert(Frequency{440.5} == Frequency{440.5});
+}
+
 TEST(Units, ScalesByAPlainNumber)
 {
     static_assert(2.0 * 440_Hz == 880_Hz);

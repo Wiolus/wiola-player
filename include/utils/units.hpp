@@ -24,6 +24,7 @@
 #include <chrono>
 #include <compare>
 #include <concepts>
+#include <cstddef>
 
 namespace wiola::units {
 
@@ -31,7 +32,7 @@ namespace detail {
 
 constexpr double pow10(int exponent) noexcept
 {
-    double result = 1.0;
+    double result{1.0};
 
     for (int i = 0; i < exponent; ++i) {
         result *= 10.0;
@@ -62,6 +63,12 @@ public:
 
     constexpr explicit Time(double seconds) noexcept
         : seconds_{seconds}
+    {
+    }
+
+    template<std::integral T>
+    constexpr explicit Time(T seconds) noexcept
+        : seconds_{static_cast<double>(seconds)}
     {
     }
 
@@ -166,6 +173,12 @@ public:
     {
     }
 
+    template<std::integral T>
+    constexpr explicit Frequency(T hz) noexcept
+        : hz_{static_cast<double>(hz)}
+    {
+    }
+
     [[nodiscard]] constexpr double hz() const noexcept { return hz_; }
 
     /// Value in frequency unit @p U.
@@ -243,43 +256,43 @@ private:
 struct Hz {
     using quantity = Frequency;
 
-    static constexpr int exp10 = 0;
+    static constexpr int exp10{0};
 };
 
 struct KHz {
     using quantity = Frequency;
 
-    static constexpr int exp10 = 3;
+    static constexpr int exp10{3};
 };
 
 struct MHz {
     using quantity = Frequency;
 
-    static constexpr int exp10 = 6;
+    static constexpr int exp10{6};
 };
 
 struct Sec {
     using quantity = Time;
 
-    static constexpr int exp10 = 0;
+    static constexpr int exp10{0};
 };
 
 struct Ms {
     using quantity = Time;
 
-    static constexpr int exp10 = -3;
+    static constexpr int exp10{-3};
 };
 
 struct Us {
     using quantity = Time;
 
-    static constexpr int exp10 = -6;
+    static constexpr int exp10{-6};
 };
 
 struct Ns {
     using quantity = Time;
 
-    static constexpr int exp10 = -9;
+    static constexpr int exp10{-9};
 };
 
 template<typename U>
