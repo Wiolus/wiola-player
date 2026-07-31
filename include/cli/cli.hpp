@@ -20,14 +20,22 @@
 
 #pragma once
 
+#include <utils/units.hpp>
+
 #include <optional>
 #include <span>
 #include <string_view>
 
 namespace wiola {
 
+/// Values parsed from the command line.
+struct Options {
+    units::Frequency tone{};
+    units::Time duration{2.0};
+};
+
 /// Runs the command line. Returns the process exit code when the CLI handled the invocation
 /// on its own (help, version, bad usage), or nothing when the player should start.
-std::optional<int> run_cli(std::span<const std::string_view> args);
+std::optional<int> run_cli(std::span<const std::string_view> args, Options& options);
 
 } // namespace wiola
