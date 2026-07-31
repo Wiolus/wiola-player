@@ -11,7 +11,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(miniaudio)
 
-set(SOURCES device.cpp)
+set(SOURCES device.cpp tone.cpp)
 
 add_library(wiola_audio STATIC ${SOURCES})
 target_include_directories(wiola_audio PUBLIC "${PROJECT_SOURCE_DIR}/include")
