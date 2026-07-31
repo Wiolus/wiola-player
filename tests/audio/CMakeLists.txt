@@ -10,3 +10,11 @@ target_link_libraries(
     audio_tone_test
     PRIVATE wiola_audio wiola_core wiola_warnings
 )
+
+set(SOURCES device_test.cpp)
+
+wiola_add_test(audio_device_test ${SOURCES})
+target_link_libraries(
+    audio_device_test
+    PRIVATE wiola_audio wiola_core wiola_warnings
+)
