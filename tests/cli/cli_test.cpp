@@ -35,10 +35,12 @@ using wiola::run_cli;
 /// CLI11 prints help, version, and usage errors itself; keep that out of the test log.
 std::optional<int> run_quietly(std::span<const std::string_view> args)
 {
+    wiola::Options options;
+
     testing::internal::CaptureStdout();
     testing::internal::CaptureStderr();
 
-    const std::optional<int> exit_code = run_cli(args);
+    const std::optional<int> exit_code = run_cli(args, options);
 
     testing::internal::GetCapturedStdout();
     testing::internal::GetCapturedStderr();
@@ -79,9 +81,10 @@ TEST(RunCli, IgnoresUnknownArguments)
 TEST(RunCli, PrintsHelpText)
 {
     const std::array<std::string_view, 1> args{"--help"};
+    wiola::Options options;
 
     testing::internal::CaptureStdout();
-    EXPECT_EQ(run_cli(args), 0);
+    EXPECT_EQ(run_cli(args, options), 0);
     const std::string output = testing::internal::GetCapturedStdout();
 
     EXPECT_NE(output.find("--version"), std::string::npos);

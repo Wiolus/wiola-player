@@ -30,12 +30,20 @@ namespace wiola {
 
 namespace {
 
-std::unique_ptr<CLI::App> make_app()
+/// What CLI11 writes into. Numbers become quantities once parsing succeeds.
+struct RawOptions {
+    double tone_hz{0.0};
+    double num_seconds{2.0};
+};
+
+std::unique_ptr<CLI::App> make_app(RawOptions& raw)
 {
     auto app = std::make_unique<CLI::App>("Wiola media player", "wiola-player");
     app->set_help_flag("-h,--help", "Show this help and exit");
     app->set_version_flag("-v,--version", std::format("wiola-player {}", WIOLA_VERSION),
         "Show version and exit");
+    app->add_option("--tone", raw.tone_hz, "Play a test tone at this frequency, in Hz");
+    app->add_option("--seconds", raw.num_seconds, "How long to play the test tone");
     app->allow_extras();
 
     return app;
@@ -43,9 +51,10 @@ std::unique_ptr<CLI::App> make_app()
 
 } // namespace
 
-std::optional<int> run_cli(std::span<const std::string_view> args)
+std::optional<int> run_cli(std::span<const std::string_view> args, Options& options)
 {
-    const auto app = make_app();
+    RawOptions raw;
+    const auto app = make_app(raw);
 
     // CLI11 consumes the vector overload back to front.
     std::vector<std::string> reversed(args.rbegin(), args.rend());
@@ -55,6 +64,9 @@ std::optional<int> run_cli(std::span<const std::string_view> args)
     } catch (const CLI::ParseError& error) {
         return app->exit(error);
     }
+
+    options.tone = units::Frequency{raw.tone_hz};
+    options.duration = units::Time{raw.num_seconds};
 
     return std::nullopt;
 }

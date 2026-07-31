@@ -36,6 +36,9 @@ namespace wiola::audio {
  *     [ L  R ]    [ L  R ]    [ L  R ]    [ L  R ]
  *       ^  ^
  *       2 samples = 1 frame
+ *
+ * The other layout is planar: one array per channel, [ L L L L ] [ R R R R ]. Codecs commonly
+ * decode that way. Everything here is interleaved, which is what a device callback takes.
  */
 struct StreamSpec {
     units::Frequency sample_rate{48000.0};
