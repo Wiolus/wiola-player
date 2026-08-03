@@ -5,6 +5,10 @@ target_link_libraries(
     codec_wav_reader_test
     PRIVATE wiola_codec wiola_core wiola_warnings
 )
+target_compile_definitions(
+    codec_wav_reader_test
+    PRIVATE WIOLA_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
+)
 
 set(SOURCES mp3_reader_test.cpp)
 
