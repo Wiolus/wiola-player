@@ -38,9 +38,10 @@ SineSource::SineSource(StreamSpec spec, units::Frequency frequency, float amplit
 {
 }
 
-void SineSource::render(std::span<float> interleaved) noexcept
+std::size_t SineSource::render(std::span<float> interleaved) noexcept
 {
     const std::size_t num_channels{spec_.num_channels};
+    std::size_t num_written{0};
 
     for (std::size_t i = 0; i + num_channels <= interleaved.size(); i += num_channels) {
         const auto value = static_cast<float>(amplitude_ * std::sin(phase_));
@@ -52,7 +53,11 @@ void SineSource::render(std::span<float> interleaved) noexcept
 
         if (phase_ >= two_pi)
             phase_ -= two_pi;
+
+        num_written += num_channels;
     }
+
+    return num_written;
 }
 
 StreamSpec SineSource::spec() const noexcept

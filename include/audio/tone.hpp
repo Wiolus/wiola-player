@@ -23,6 +23,7 @@
 #include <audio/stream_spec.hpp>
 #include <utils/units.hpp>
 
+#include <cstddef>
 #include <span>
 
 namespace wiola::audio {
@@ -33,8 +34,9 @@ public:
     SineSource(StreamSpec spec, units::Frequency frequency, float amplitude = 0.2F) noexcept;
 
     /// Writes whole frames only: channels alternate within a frame, never one array per channel
-    /// as a planar layout would. A partial trailing frame is left untouched.
-    void render(std::span<float> interleaved) noexcept;
+    /// as a planar layout would. A partial trailing frame is left untouched. Returns how many
+    /// samples were written, which for a tone is every whole frame the span holds.
+    std::size_t render(std::span<float> interleaved) noexcept;
     [[nodiscard]] StreamSpec spec() const noexcept;
 
 private:
