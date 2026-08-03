@@ -23,6 +23,7 @@ endfunction()
 
 add_subdirectory(audio)
 add_subdirectory(cli)
+add_subdirectory(codec)
 add_subdirectory(core)
 add_subdirectory(lockfree)
 add_subdirectory(utils)
