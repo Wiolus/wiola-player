@@ -22,6 +22,7 @@
 
 #include <utils/units.hpp>
 
+#include <filesystem>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -30,6 +31,7 @@ namespace wiola {
 
 /// Values parsed from the command line.
 struct Options {
+    std::filesystem::path file{};
     units::Frequency tone{};
     units::Time duration{2.0};
 };
