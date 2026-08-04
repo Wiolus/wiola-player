@@ -28,16 +28,20 @@
 namespace wiola::codec {
 
 /**
- * Turns a file into interleaved float frames.
+ * Turns a file into float frames.
  *
- * Implementations own whatever the format needs - a file handle, a parser, a decoder - and
- * expose only the two facts a producer requires: the shape of the stream, and the next frames.
- * Nothing here knows about playback; a decoder is equally usable for transcoding or analysis.
+ * Samples are interleaved - one per channel per frame, in channel order - which is the layout a
+ * device callback takes. A format that decodes its channels separately interleaves them on the
+ * way out, so nothing above this class ever meets another layout.
+ *
+ * Only the shape of the stream and the next frames are exposed. Nothing here knows about
+ * playback; a decoder is equally usable for transcoding or analysis.
+ *
+ * A subclass supplies one function, `decode`, and receives the counting, the clamping and the
+ * end-of-stream question already answered.
  */
 class Decoder {
 public:
-    Decoder() = default;
-
     Decoder(const Decoder&) = delete;
     Decoder& operator=(const Decoder&) = delete;
     Decoder(Decoder&&) = delete;
@@ -45,13 +49,35 @@ public:
     virtual ~Decoder() = default;
 
     /// Fills whole frames and returns how many samples were written. Short means end of file.
-    virtual std::size_t render(std::span<float> interleaved) = 0;
+    std::size_t render(std::span<float> output);
 
-    [[nodiscard]] virtual audio::StreamSpec spec() const noexcept = 0;
-    [[nodiscard]] virtual std::size_t num_frames() const noexcept = 0;
-    [[nodiscard]] virtual std::size_t num_frames_left() const noexcept = 0;
+    [[nodiscard]] audio::StreamSpec spec() const noexcept { return spec_; }
+
+    /// Total frames in the stream, and how many are still unread.
+    [[nodiscard]] std::size_t num_frames() const noexcept { return num_frames_; }
+
+    [[nodiscard]] std::size_t num_frames_left() const noexcept
+    {
+        return num_frames_ - num_frames_read_;
+    }
 
     [[nodiscard]] bool exhausted() const noexcept { return num_frames_left() == 0; }
+
+protected:
+    Decoder(audio::StreamSpec spec, std::size_t num_frames) noexcept
+        : spec_{spec}
+        , num_frames_{num_frames}
+    {
+    }
+
+    /// Writes at most `num_frames` whole frames into `output`, and returns how many it wrote.
+    /// Never asked for more frames than remain, nor for more than `output` can hold.
+    virtual std::size_t decode(std::span<float> output, std::size_t num_frames) = 0;
+
+private:
+    audio::StreamSpec spec_;
+    std::size_t num_frames_;
+    std::size_t num_frames_read_{0};
 };
 
 } // namespace wiola::codec

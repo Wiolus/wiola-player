@@ -40,25 +40,19 @@ namespace wiola::codec {
 class WavReader final : public Decoder {
 public:
     /// Opens `path`. Null when the file is missing or is not WAVE.
-    static std::unique_ptr<WavReader> open(const std::filesystem::path& path);
+    [[nodiscard]] static std::unique_ptr<WavReader> open(const std::filesystem::path& path);
 
     ~WavReader() override;
-
-    std::size_t render(std::span<float> interleaved) override;
-
-    [[nodiscard]] audio::StreamSpec spec() const noexcept override;
-    [[nodiscard]] std::size_t num_frames() const noexcept override;
-    [[nodiscard]] std::size_t num_frames_left() const noexcept override;
 
 private:
     struct Handle;
 
-    WavReader() = default;
+    WavReader(audio::StreamSpec spec, std::size_t num_frames,
+        std::unique_ptr<Handle> handle) noexcept;
+
+    std::size_t decode(std::span<float> output, std::size_t num_frames) override;
 
     std::unique_ptr<Handle> handle_;
-    audio::StreamSpec spec_{};
-    std::size_t num_frames_{0};
-    std::size_t num_frames_read_{0};
 };
 
 } // namespace wiola::codec

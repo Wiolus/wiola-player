@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Reader for MP3 files.
+ * @brief Interface every audio file reader implements.
  * @author Roman Glaz
  * @copyright © 2026, <vokerlee@gmail.com>
  *
@@ -18,35 +18,24 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
-
-#include <audio/stream_spec.hpp>
 #include <codec/decoder.hpp>
 
-#include <cstddef>
-#include <filesystem>
-#include <memory>
-#include <span>
+#include <algorithm>
 
 namespace wiola::codec {
 
-/// Decodes MP3 to float frames.
-class Mp3Reader final : public Decoder {
-public:
-    /// Opens `path`. Null when the file is missing or is not MP3.
-    [[nodiscard]] static std::unique_ptr<Mp3Reader> open(const std::filesystem::path& path);
+std::size_t Decoder::render(std::span<float> output)
+{
+    const std::size_t num_frames_wanted{
+        std::min(spec_.frames_per(output.size()), num_frames_left())};
 
-    ~Mp3Reader() override;
+    if (num_frames_wanted == 0)
+        return 0;
 
-private:
-    struct Handle;
+    const std::size_t num_frames_decoded{decode(output, num_frames_wanted)};
+    num_frames_read_ += num_frames_decoded;
 
-    Mp3Reader(audio::StreamSpec spec, std::size_t num_frames,
-        std::unique_ptr<Handle> handle) noexcept;
-
-    std::size_t decode(std::span<float> output, std::size_t num_frames) override;
-
-    std::unique_ptr<Handle> handle_;
-};
+    return spec_.samples_per(num_frames_decoded);
+}
 
 } // namespace wiola::codec
