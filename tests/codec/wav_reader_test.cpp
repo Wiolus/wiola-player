@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <codec/wav_reader.hpp>
+#include <wav_reader.hpp>
 
 #include <gtest/gtest.h>
 

@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <codec/mp3_reader.hpp>
+#include "mp3_reader.hpp"
 
 #define DR_MP3_IMPLEMENTATION
 #include <dr_mp3.h>

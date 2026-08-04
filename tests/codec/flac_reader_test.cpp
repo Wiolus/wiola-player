@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <codec/flac_reader.hpp>
+#include <flac_reader.hpp>
 
 #include <gtest/gtest.h>
 
