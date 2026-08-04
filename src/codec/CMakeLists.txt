@@ -8,7 +8,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(dr_libs)
 
-set(SOURCES flac_reader.cpp mp3_reader.cpp wav_reader.cpp)
+set(SOURCES decoder.cpp flac_reader.cpp mp3_reader.cpp wav_reader.cpp)
 
 add_library(wiola_codec STATIC ${SOURCES})
 target_include_directories(wiola_codec PUBLIC "${PROJECT_SOURCE_DIR}/include")

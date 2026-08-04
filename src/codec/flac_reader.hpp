@@ -34,25 +34,19 @@ namespace wiola::codec {
 class FlacReader final : public Decoder {
 public:
     /// Opens `path`. Null when the file is missing or is not FLAC.
-    static std::unique_ptr<FlacReader> open(const std::filesystem::path& path);
+    [[nodiscard]] static std::unique_ptr<FlacReader> open(const std::filesystem::path& path);
 
     ~FlacReader() override;
-
-    std::size_t render(std::span<float> interleaved) override;
-
-    [[nodiscard]] audio::StreamSpec spec() const noexcept override;
-    [[nodiscard]] std::size_t num_frames() const noexcept override;
-    [[nodiscard]] std::size_t num_frames_left() const noexcept override;
 
 private:
     struct Handle;
 
-    FlacReader() = default;
+    FlacReader(audio::StreamSpec spec, std::size_t num_frames,
+        std::unique_ptr<Handle> handle) noexcept;
+
+    std::size_t decode(std::span<float> output, std::size_t num_frames) override;
 
     std::unique_ptr<Handle> handle_;
-    audio::StreamSpec spec_{};
-    std::size_t num_frames_{0};
-    std::size_t num_frames_read_{0};
 };
 
 } // namespace wiola::codec

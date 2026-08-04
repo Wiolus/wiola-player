@@ -23,6 +23,8 @@
 #define DR_WAV_IMPLEMENTATION
 #include <dr_wav.h>
 
+#include <utility>
+
 namespace wiola::codec {
 
 struct WavReader::Handle {
@@ -36,6 +38,13 @@ struct WavReader::Handle {
     }
 };
 
+WavReader::WavReader(audio::StreamSpec spec, std::size_t num_frames,
+    std::unique_ptr<Handle> handle) noexcept
+    : Decoder{spec, num_frames}
+    , handle_{std::move(handle)}
+{
+}
+
 WavReader::~WavReader() = default;
 
 std::unique_ptr<WavReader> WavReader::open(const std::filesystem::path& path)
@@ -47,46 +56,19 @@ std::unique_ptr<WavReader> WavReader::open(const std::filesystem::path& path)
 
     handle->open = true;
 
-    std::unique_ptr<WavReader> reader{new WavReader};
-    reader->spec_ = audio::StreamSpec{.sample_rate = units::Frequency{handle->wav.sampleRate},
+    const audio::StreamSpec spec{.sample_rate = units::Frequency{handle->wav.sampleRate},
         .num_channels = handle->wav.channels};
-    reader->num_frames_ = static_cast<std::size_t>(handle->wav.totalPCMFrameCount);
-    reader->handle_ = std::move(handle);
+    const auto num_frames = static_cast<std::size_t>(handle->wav.totalPCMFrameCount);
 
-    return reader;
+    return std::unique_ptr<WavReader>{
+        new WavReader{spec, num_frames, std::move(handle)}
+    };
 }
 
-std::size_t WavReader::render(std::span<float> interleaved)
+std::size_t WavReader::decode(std::span<float> output, std::size_t num_frames)
 {
-    const std::size_t num_channels{spec_.num_channels};
-    const std::size_t num_frames_wanted{
-        std::min(interleaved.size() / num_channels, num_frames_left())};
-
-    if (num_frames_wanted == 0)
-        return 0;
-
-    const std::size_t num_frames_read{static_cast<std::size_t>(
-        drwav_read_pcm_frames_f32(&handle_->wav, num_frames_wanted, interleaved.data())
-    )};
-
-    num_frames_read_ += num_frames_read;
-
-    return num_frames_read * num_channels;
-}
-
-audio::StreamSpec WavReader::spec() const noexcept
-{
-    return spec_;
-}
-
-std::size_t WavReader::num_frames() const noexcept
-{
-    return num_frames_;
-}
-
-std::size_t WavReader::num_frames_left() const noexcept
-{
-    return num_frames_ - num_frames_read_;
+    return static_cast<std::size_t>(drwav_read_pcm_frames_f32(&handle_->wav, num_frames,
+        output.data()));
 }
 
 } // namespace wiola::codec

@@ -23,6 +23,8 @@
 #define DR_MP3_IMPLEMENTATION
 #include <dr_mp3.h>
 
+#include <utility>
+
 namespace wiola::codec {
 
 struct Mp3Reader::Handle {
@@ -36,6 +38,13 @@ struct Mp3Reader::Handle {
     }
 };
 
+Mp3Reader::Mp3Reader(audio::StreamSpec spec, std::size_t num_frames,
+    std::unique_ptr<Handle> handle) noexcept
+    : Decoder{spec, num_frames}
+    , handle_{std::move(handle)}
+{
+}
+
 Mp3Reader::~Mp3Reader() = default;
 
 std::unique_ptr<Mp3Reader> Mp3Reader::open(const std::filesystem::path& path)
@@ -47,46 +56,19 @@ std::unique_ptr<Mp3Reader> Mp3Reader::open(const std::filesystem::path& path)
 
     handle->open = true;
 
-    std::unique_ptr<Mp3Reader> reader{new Mp3Reader};
-    reader->spec_ = audio::StreamSpec{.sample_rate = units::Frequency{handle->mp3.sampleRate},
+    const audio::StreamSpec spec{.sample_rate = units::Frequency{handle->mp3.sampleRate},
         .num_channels = handle->mp3.channels};
-    reader->num_frames_ = static_cast<std::size_t>(drmp3_get_pcm_frame_count(&handle->mp3));
-    reader->handle_ = std::move(handle);
+    const auto num_frames = static_cast<std::size_t>(drmp3_get_pcm_frame_count(&handle->mp3));
 
-    return reader;
+    return std::unique_ptr<Mp3Reader>{
+        new Mp3Reader{spec, num_frames, std::move(handle)}
+    };
 }
 
-std::size_t Mp3Reader::render(std::span<float> interleaved)
+std::size_t Mp3Reader::decode(std::span<float> output, std::size_t num_frames)
 {
-    const std::size_t num_channels{spec_.num_channels};
-    const std::size_t num_frames_wanted{
-        std::min(interleaved.size() / num_channels, num_frames_left())};
-
-    if (num_frames_wanted == 0)
-        return 0;
-
-    const std::size_t num_frames_read{static_cast<std::size_t>(
-        drmp3_read_pcm_frames_f32(&handle_->mp3, num_frames_wanted, interleaved.data())
-    )};
-
-    num_frames_read_ += num_frames_read;
-
-    return num_frames_read * num_channels;
-}
-
-audio::StreamSpec Mp3Reader::spec() const noexcept
-{
-    return spec_;
-}
-
-std::size_t Mp3Reader::num_frames() const noexcept
-{
-    return num_frames_;
-}
-
-std::size_t Mp3Reader::num_frames_left() const noexcept
-{
-    return num_frames_ - num_frames_read_;
+    return static_cast<std::size_t>(drmp3_read_pcm_frames_f32(&handle_->mp3, num_frames,
+        output.data()));
 }
 
 } // namespace wiola::codec

@@ -23,6 +23,8 @@
 #define DR_FLAC_IMPLEMENTATION
 #include <dr_flac.h>
 
+#include <utility>
+
 namespace wiola::codec {
 
 struct FlacReader::Handle {
@@ -35,6 +37,13 @@ struct FlacReader::Handle {
     }
 };
 
+FlacReader::FlacReader(audio::StreamSpec spec, std::size_t num_frames,
+    std::unique_ptr<Handle> handle) noexcept
+    : Decoder{spec, num_frames}
+    , handle_{std::move(handle)}
+{
+}
+
 FlacReader::~FlacReader() = default;
 
 std::unique_ptr<FlacReader> FlacReader::open(const std::filesystem::path& path)
@@ -44,46 +53,19 @@ std::unique_ptr<FlacReader> FlacReader::open(const std::filesystem::path& path)
     if (flac == nullptr)
         return nullptr;
 
-    std::unique_ptr<FlacReader> reader{new FlacReader};
-    reader->handle_ = std::make_unique<Handle>(flac);
-    reader->spec_ = audio::StreamSpec{.sample_rate = units::Frequency{flac->sampleRate},
+    const audio::StreamSpec spec{.sample_rate = units::Frequency{flac->sampleRate},
         .num_channels = flac->channels};
-    reader->num_frames_ = static_cast<std::size_t>(flac->totalPCMFrameCount);
+    const auto num_frames = static_cast<std::size_t>(flac->totalPCMFrameCount);
 
-    return reader;
+    return std::unique_ptr<FlacReader>{
+        new FlacReader{spec, num_frames, std::make_unique<Handle>(flac)}
+    };
 }
 
-std::size_t FlacReader::render(std::span<float> interleaved)
+std::size_t FlacReader::decode(std::span<float> output, std::size_t num_frames)
 {
-    const std::size_t num_channels{spec_.num_channels};
-    const std::size_t num_frames_wanted{
-        std::min(interleaved.size() / num_channels, num_frames_left())};
-
-    if (num_frames_wanted == 0)
-        return 0;
-
-    const std::size_t num_frames_read{static_cast<std::size_t>(
-        drflac_read_pcm_frames_f32(handle_->flac, num_frames_wanted, interleaved.data())
-    )};
-
-    num_frames_read_ += num_frames_read;
-
-    return num_frames_read * num_channels;
-}
-
-audio::StreamSpec FlacReader::spec() const noexcept
-{
-    return spec_;
-}
-
-std::size_t FlacReader::num_frames() const noexcept
-{
-    return num_frames_;
-}
-
-std::size_t FlacReader::num_frames_left() const noexcept
-{
-    return num_frames_ - num_frames_read_;
+    return static_cast<std::size_t>(drflac_read_pcm_frames_f32(handle_->flac, num_frames,
+        output.data()));
 }
 
 } // namespace wiola::codec
