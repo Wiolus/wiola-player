@@ -5,6 +5,10 @@ target_link_libraries(
     codec_wav_reader_test
     PRIVATE wiola_codec wiola_core wiola_warnings
 )
+target_include_directories(
+    codec_wav_reader_test
+    PRIVATE "${PROJECT_SOURCE_DIR}/src/codec"
+)
 target_compile_definitions(
     codec_wav_reader_test
     PRIVATE WIOLA_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
@@ -17,6 +21,10 @@ target_link_libraries(
     codec_flac_reader_test
     PRIVATE wiola_codec wiola_core wiola_warnings
 )
+target_include_directories(
+    codec_flac_reader_test
+    PRIVATE "${PROJECT_SOURCE_DIR}/src/codec"
+)
 target_compile_definitions(
     codec_flac_reader_test
     PRIVATE WIOLA_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
@@ -28,6 +36,10 @@ wiola_add_test(codec_mp3_reader_test ${SOURCES})
 target_link_libraries(
     codec_mp3_reader_test
     PRIVATE wiola_codec wiola_core wiola_warnings
+)
+target_include_directories(
+    codec_mp3_reader_test
+    PRIVATE "${PROJECT_SOURCE_DIR}/src/codec"
 )
 target_compile_definitions(
     codec_mp3_reader_test
