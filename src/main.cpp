@@ -21,7 +21,7 @@
 #include <audio/stream_spec.hpp>
 #include <cli/cli.hpp>
 #include <codec/open.hpp>
-#include <engine/play.hpp>
+#include <engine/player.hpp>
 #include <utils/units.hpp>
 
 #include <cstdlib>
@@ -32,20 +32,6 @@
 #include <vector>
 
 namespace {
-
-/// Turns what playback reported into an exit code, saying only what is worth hearing about.
-int report(std::optional<std::size_t> num_underruns)
-{
-    if (!num_underruns) {
-        std::cerr << "wiola-player: no playback device available\n";
-        return EXIT_FAILURE;
-    }
-
-    if (*num_underruns > 0)
-        std::cout << "underruns: " << *num_underruns << '\n';
-
-    return EXIT_SUCCESS;
-}
 
 int play_file(const wiola::Options& options)
 {
@@ -62,9 +48,19 @@ int play_file(const wiola::Options& options)
               << ", " << spec.sample_rate.get<wiola::units::Hz>() << " Hz, " << spec.num_channels
               << " ch\n";
 
-    const std::optional<std::size_t> num_underruns{wiola::engine::play(*reader)};
+    wiola::engine::Player player{*reader};
 
-    return report(num_underruns);
+    if (!player.start()) {
+        std::cerr << "wiola-player: no playback device available\n";
+        return EXIT_FAILURE;
+    }
+
+    player.wait();
+
+    if (player.num_underruns() > 0)
+        std::cout << "underruns: " << player.num_underruns() << '\n';
+
+    return EXIT_SUCCESS;
 }
 
 } // namespace
