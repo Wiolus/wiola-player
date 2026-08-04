@@ -19,7 +19,6 @@
  */
 
 #include <audio/stream_spec.hpp>
-#include <audio/tone.hpp>
 #include <cli/cli.hpp>
 #include <codec/open.hpp>
 #include <engine/play.hpp>
@@ -68,20 +67,6 @@ int play_file(const wiola::Options& options)
     return report(num_underruns);
 }
 
-int play_tone(const wiola::Options& options)
-{
-    const wiola::audio::StreamSpec spec{};
-    wiola::audio::SineSource source{spec, options.tone};
-
-    std::cout << "wiola-player " << WIOLA_VERSION << " — " << options.tone.get<wiola::units::Hz>()
-              << " Hz for " << options.duration.get<wiola::units::Sec>() << " s\n";
-
-    const std::optional<std::size_t> num_underruns{
-        wiola::engine::play(source, spec, options.duration)};
-
-    return report(num_underruns);
-}
-
 } // namespace
 
 int main(int argc, char** argv)
@@ -99,9 +84,6 @@ int main(int argc, char** argv)
 
     if (!options.file.empty())
         return play_file(options);
-
-    if (options.tone > wiola::units::Frequency{})
-        return play_tone(options);
 
     std::cout << "wiola-player " << WIOLA_VERSION << " — nothing to play yet.\n";
     return 0;

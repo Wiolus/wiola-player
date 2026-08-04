@@ -20,8 +20,6 @@
 
 #pragma once
 
-#include <utils/units.hpp>
-
 #include <filesystem>
 #include <optional>
 #include <span>
@@ -32,8 +30,6 @@ namespace wiola {
 /// Values parsed from the command line.
 struct Options {
     std::filesystem::path file{};
-    units::Frequency tone{};
-    units::Time duration{2.0};
 };
 
 /// Runs the command line. Returns the process exit code when the CLI handled the invocation
