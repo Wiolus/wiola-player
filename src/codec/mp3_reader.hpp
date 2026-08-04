@@ -51,6 +51,8 @@ private:
 
     std::size_t decode(std::span<float> output, std::size_t num_frames) override;
 
+    bool seek_frame(std::size_t frame_index) override;
+
     std::unique_ptr<Handle> handle_;
 };
 

@@ -72,6 +72,11 @@ std::size_t Mp3Reader::decode(std::span<float> output, std::size_t num_frames)
         output.data()));
 }
 
+bool Mp3Reader::seek_frame(std::size_t frame_index)
+{
+    return drmp3_seek_to_pcm_frame(&handle_->mp3, frame_index) == DRMP3_TRUE;
+}
+
 const Format& Mp3Reader::format()
 {
     // No markers: an MP3 frame opens with eleven set bits, which arbitrary data lands on often
