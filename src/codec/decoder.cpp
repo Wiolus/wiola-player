@@ -38,4 +38,17 @@ std::size_t Decoder::render(std::span<float> output)
     return spec_.samples_per(num_frames_decoded);
 }
 
+bool Decoder::seek(std::size_t frame_index)
+{
+    if (frame_index > num_frames_)
+        return false;
+
+    if (!seek_frame(frame_index))
+        return false;
+
+    num_frames_read_ = frame_index;
+
+    return true;
+}
+
 } // namespace wiola::codec

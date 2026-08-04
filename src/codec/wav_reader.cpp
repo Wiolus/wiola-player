@@ -72,6 +72,11 @@ std::size_t WavReader::decode(std::span<float> output, std::size_t num_frames)
         output.data()));
 }
 
+bool WavReader::seek_frame(std::size_t frame_index)
+{
+    return drwav_seek_to_pcm_frame(&handle_->wav, frame_index) == DRWAV_TRUE;
+}
+
 const Format& WavReader::format()
 {
     static constexpr std::array markers{

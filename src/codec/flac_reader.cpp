@@ -69,6 +69,11 @@ std::size_t FlacReader::decode(std::span<float> output, std::size_t num_frames)
         output.data()));
 }
 
+bool FlacReader::seek_frame(std::size_t frame_index)
+{
+    return drflac_seek_to_pcm_frame(handle_->flac, frame_index) == DRFLAC_TRUE;
+}
+
 const Format& FlacReader::format()
 {
     static constexpr std::array markers{

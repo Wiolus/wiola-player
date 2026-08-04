@@ -63,6 +63,11 @@ public:
 
     [[nodiscard]] bool exhausted() const noexcept { return num_frames_left() == 0; }
 
+    /// Moves so that the next render starts at `frame_index`, counted from the beginning of the
+    /// stream. Seeking to `num_frames()` leaves nothing to read. False when the stream will not
+    /// move, in which case the position is where it was.
+    bool seek(std::size_t frame_index);
+
 protected:
     Decoder(audio::StreamSpec spec, std::size_t num_frames) noexcept
         : spec_{spec}
@@ -73,6 +78,9 @@ protected:
     /// Writes at most `num_frames` whole frames into `output`, and returns how many it wrote.
     /// Never asked for more frames than remain, nor for more than `output` can hold.
     virtual std::size_t decode(std::span<float> output, std::size_t num_frames) = 0;
+
+    /// Moves the stream itself to `frame_index`. Never asked for a frame past the end.
+    virtual bool seek_frame(std::size_t frame_index) = 0;
 
 private:
     audio::StreamSpec spec_;
