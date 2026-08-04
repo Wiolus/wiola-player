@@ -62,8 +62,7 @@ int play_file(const wiola::Options& options)
               << ", " << spec.sample_rate.get<wiola::units::Hz>() << " Hz, " << spec.num_channels
               << " ch\n";
 
-    const std::optional<std::size_t> num_underruns{
-        wiola::engine::play(*reader, spec, std::nullopt)};
+    const std::optional<std::size_t> num_underruns{wiola::engine::play(*reader)};
 
     return report(num_underruns);
 }
