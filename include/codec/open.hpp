@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Reader for FLAC files.
+ * @brief Picks a reader for a file.
  * @author Roman Glaz
  * @copyright © 2026, <vokerlee@gmail.com>
  *
@@ -20,38 +20,18 @@
 
 #pragma once
 
-#include "format.hpp"
-
-#include <audio/stream_spec.hpp>
 #include <codec/decoder.hpp>
 
-#include <cstddef>
 #include <filesystem>
 #include <memory>
-#include <span>
 
 namespace wiola::codec {
 
-/// Decodes FLAC to float frames.
-class FlacReader final : public Decoder {
-public:
-    /// How this format is recognized and opened.
-    [[nodiscard]] static const Format& format();
-
-    /// Opens `path`. Null when the file is missing or is not FLAC.
-    [[nodiscard]] static std::unique_ptr<FlacReader> open(const std::filesystem::path& path);
-
-    ~FlacReader() override;
-
-private:
-    struct Handle;
-
-    FlacReader(audio::StreamSpec spec, std::size_t num_frames,
-        std::unique_ptr<Handle> handle) noexcept;
-
-    std::size_t decode(std::span<float> output, std::size_t num_frames) override;
-
-    std::unique_ptr<Handle> handle_;
-};
+/// Opens `path` with whichever reader accepts it. Null when no reader does.
+///
+/// Whether a file can be decoded is settled by handing it to a reader, so the extension only
+/// decides which one is asked first. A misnamed file therefore still plays, at the cost of an
+/// attempt, and a corrupt one fails the same way a missing one does.
+std::unique_ptr<Decoder> open_file(const std::filesystem::path& path);
 
 } // namespace wiola::codec

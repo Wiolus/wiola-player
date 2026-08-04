@@ -23,6 +23,7 @@
 #define DR_FLAC_IMPLEMENTATION
 #include <dr_flac.h>
 
+#include <array>
 #include <utility>
 
 namespace wiola::codec {
@@ -66,6 +67,21 @@ std::size_t FlacReader::decode(std::span<float> output, std::size_t num_frames)
 {
     return static_cast<std::size_t>(drflac_read_pcm_frames_f32(handle_->flac, num_frames,
         output.data()));
+}
+
+const Format& FlacReader::format()
+{
+    static constexpr std::array markers{
+        Marker{0, "fLaC"}
+    };
+
+    static constexpr std::array<std::string_view, 1> extensions{".flac"};
+    static const Format format{"FLAC", markers, extensions,
+        [](const std::filesystem::path& path) -> std::unique_ptr<Decoder> {
+            return FlacReader::open(path);
+        }};
+
+    return format;
 }
 
 } // namespace wiola::codec

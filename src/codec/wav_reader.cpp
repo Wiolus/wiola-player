@@ -23,6 +23,7 @@
 #define DR_WAV_IMPLEMENTATION
 #include <dr_wav.h>
 
+#include <array>
 #include <utility>
 
 namespace wiola::codec {
@@ -69,6 +70,22 @@ std::size_t WavReader::decode(std::span<float> output, std::size_t num_frames)
 {
     return static_cast<std::size_t>(drwav_read_pcm_frames_f32(&handle_->wav, num_frames,
         output.data()));
+}
+
+const Format& WavReader::format()
+{
+    static constexpr std::array markers{
+        Marker{0, "RIFF"},
+        Marker{8, "WAVE"}
+    };
+
+    static constexpr std::array<std::string_view, 2> extensions{".wav", ".wave"};
+    static const Format format{"WAV", markers, extensions,
+        [](const std::filesystem::path& path) -> std::unique_ptr<Decoder> {
+            return WavReader::open(path);
+        }};
+
+    return format;
 }
 
 } // namespace wiola::codec
