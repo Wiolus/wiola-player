@@ -24,6 +24,7 @@
 #include <codec/decoder.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 
+#include <atomic>
 #include <cstddef>
 #include <thread>
 
@@ -47,14 +48,21 @@ public:
     Player(Player&&) = delete;
     Player& operator=(Player&&) = delete;
 
-    /// Waits for playback to finish, so a player is never destroyed while its thread still runs.
+    /// Stops playback and waits for the thread, so a player is never destroyed while it runs.
     ~Player();
 
     /// Begins playing. False when no device could be started, in which case nothing was played
     /// and the player must not be waited on.
     [[nodiscard]] bool start();
 
-    /// Blocks until the source has been played to its end.
+    /// Ends playback at once, without playing out what is already buffered. Does nothing if
+    /// playback has already finished, and may be called from any thread.
+    void stop() noexcept;
+
+    /// Whether playback has ended, either by reaching the end of the source or by being stopped.
+    [[nodiscard]] bool finished() const noexcept;
+
+    /// Blocks until playback has ended.
     void wait();
 
     /// Callbacks that found the buffer short and had to emit silence.
@@ -68,6 +76,8 @@ private:
     void run();
 
     codec::Decoder* source_;
+    std::atomic<bool> stopping_{false};
+    std::atomic<bool> finished_{false};
     lockfree::SPSCRingBuffer<float> buffer_;
     audio::Device device_;
     std::jthread thread_;

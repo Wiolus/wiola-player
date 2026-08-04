@@ -52,7 +52,11 @@ Player::Player(codec::Decoder& source)
 {
 }
 
-Player::~Player() = default;
+Player::~Player()
+{
+    stop();
+    wait();
+}
 
 bool Player::start()
 {
@@ -64,6 +68,16 @@ bool Player::start()
     thread_ = std::jthread{[this] { run(); }};
 
     return true;
+}
+
+void Player::stop() noexcept
+{
+    stopping_.store(true, std::memory_order_relaxed);
+}
+
+bool Player::finished() const noexcept
+{
+    return finished_.load(std::memory_order_acquire);
 }
 
 void Player::wait()
@@ -93,11 +107,14 @@ void Player::prime()
 
 void Player::run()
 {
+    const auto stopping = [this] {
+        return stopping_.load(std::memory_order_relaxed);
+    };
     std::array<float, block_size> chunk{};
 
-    for (std::size_t num_rendered{source_->render(chunk)}; num_rendered > 0;
+    for (std::size_t num_rendered{source_->render(chunk)}; num_rendered > 0 && !stopping();
         num_rendered = source_->render(chunk)) {
-        for (std::size_t num_written = 0; num_written < num_rendered;) {
+        for (std::size_t num_written = 0; num_written < num_rendered && !stopping();) {
             num_written +=
                 buffer_.push(std::span{chunk}.subspan(num_written, num_rendered - num_written));
 
@@ -106,11 +123,12 @@ void Player::run()
         }
     }
 
-    // The source is finished, but what is already buffered has not been heard yet.
-    while (buffer_.size_approx() > 0)
+    // Reaching the end of the source leaves the buffer still to be heard; being stopped does not.
+    while (!stopping() && buffer_.size_approx() > 0)
         std::this_thread::sleep_for(poll_interval);
 
     device_.stop();
+    finished_.store(true, std::memory_order_release);
 }
 
 } // namespace wiola::engine
