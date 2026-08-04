@@ -24,6 +24,7 @@
 #include <engine/play.hpp>
 #include <utils/units.hpp>
 
+#include <cstdlib>
 #include <iostream>
 #include <optional>
 #include <span>
@@ -37,13 +38,13 @@ int report(std::optional<std::size_t> num_underruns)
 {
     if (!num_underruns) {
         std::cerr << "wiola-player: no playback device available\n";
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (*num_underruns > 0)
         std::cout << "underruns: " << *num_underruns << '\n';
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int play_file(const wiola::Options& options)
@@ -52,7 +53,7 @@ int play_file(const wiola::Options& options)
 
     if (!reader) {
         std::cerr << "wiola-player: cannot read " << options.file << '\n';
-        return 1;
+        return EXIT_FAILURE;
     }
 
     const wiola::audio::StreamSpec spec{reader->spec()};
@@ -86,5 +87,6 @@ int main(int argc, char** argv)
         return play_file(options);
 
     std::cout << "wiola-player " << WIOLA_VERSION << " — nothing to play yet.\n";
-    return 0;
+
+    return EXIT_SUCCESS;
 }
