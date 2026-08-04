@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "format.hpp"
+
 #include <audio/stream_spec.hpp>
 #include <codec/decoder.hpp>
 
@@ -39,6 +41,9 @@ namespace wiola::codec {
  */
 class WavReader final : public Decoder {
 public:
+    /// How this format is recognized and opened.
+    [[nodiscard]] static const Format& format();
+
     /// Opens `path`. Null when the file is missing or is not WAVE.
     [[nodiscard]] static std::unique_ptr<WavReader> open(const std::filesystem::path& path);
 

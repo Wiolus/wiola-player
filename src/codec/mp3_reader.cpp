@@ -23,6 +23,7 @@
 #define DR_MP3_IMPLEMENTATION
 #include <dr_mp3.h>
 
+#include <array>
 #include <utility>
 
 namespace wiola::codec {
@@ -69,6 +70,19 @@ std::size_t Mp3Reader::decode(std::span<float> output, std::size_t num_frames)
 {
     return static_cast<std::size_t>(drmp3_read_pcm_frames_f32(&handle_->mp3, num_frames,
         output.data()));
+}
+
+const Format& Mp3Reader::format()
+{
+    // No markers: an MP3 frame opens with eleven set bits, which arbitrary data lands on often
+    // enough that it identifies nothing. MP3 is recognized by being tried, not by being seen.
+    static constexpr std::array<std::string_view, 3> extensions{".mp3", ".mp2", ".mpga"};
+    static const Format format{"MP3", {}, extensions,
+        [](const std::filesystem::path& path) -> std::unique_ptr<Decoder> {
+            return Mp3Reader::open(path);
+        }};
+
+    return format;
 }
 
 } // namespace wiola::codec

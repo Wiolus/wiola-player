@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "format.hpp"
+
 #include <audio/stream_spec.hpp>
 #include <codec/decoder.hpp>
 
@@ -33,6 +35,9 @@ namespace wiola::codec {
 /// Decodes MP3 to float frames.
 class Mp3Reader final : public Decoder {
 public:
+    /// How this format is recognized and opened.
+    [[nodiscard]] static const Format& format();
+
     /// Opens `path`. Null when the file is missing or is not MP3.
     [[nodiscard]] static std::unique_ptr<Mp3Reader> open(const std::filesystem::path& path);
 
