@@ -1,4 +1,4 @@
-set(SOURCES play.cpp)
+set(SOURCES player.cpp)
 
 add_library(wiola_engine STATIC ${SOURCES})
 target_include_directories(wiola_engine PUBLIC "${PROJECT_SOURCE_DIR}/include")

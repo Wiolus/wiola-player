@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Drives a decoder through a device until it ends.
+ * @brief Plays one decoder through a device.
  * @author Roman Glaz
  * @copyright © 2026, <vokerlee@gmail.com>
  *
@@ -18,17 +18,14 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <engine/play.hpp>
+#include <engine/player.hpp>
 
-#include <audio/device.hpp>
 #include <audio/stream_spec.hpp>
-#include <lockfree/spsc_ring_buffer.hpp>
 #include <utils/units.hpp>
 
 #include <array>
 #include <chrono>
 #include <span>
-#include <thread>
 
 namespace wiola::engine {
 
@@ -40,36 +37,69 @@ using namespace units::literals;
 /// How long to wait when the buffer is full, or when it is draining at the end.
 constexpr auto poll_interval{2ms};
 
+/// A quarter second of slack between the producer and the callback.
+constexpr auto buffered{250_ms};
+
+/// Frames handed from the decoder to the buffer at a time.
+constexpr std::size_t block_size{1024};
+
 } // namespace
 
-std::optional<std::size_t> play(codec::Decoder& source)
+Player::Player(codec::Decoder& source)
+    : source_{&source}
+    , buffer_{source.spec().samples_per(buffered)}
+    , device_{source.spec(), buffer_}
 {
-    const audio::StreamSpec spec{source.spec()};
+}
 
-    // A quarter second of slack between the producer and the callback.
-    lockfree::SPSCRingBuffer<float> buffer{spec.samples_per(250_ms)};
-    audio::Device device{spec, buffer};
+Player::~Player() = default;
 
-    // Prime the buffer so the first callbacks find frames waiting for them.
-    std::array<float, 1024> chunk{};
+bool Player::start()
+{
+    prime();
 
-    while (buffer.size_approx() + chunk.size() <= buffer.capacity()) {
-        const std::size_t num_rendered{source.render(chunk)};
+    if (!device_.start())
+        return false;
+
+    thread_ = std::jthread{[this] { run(); }};
+
+    return true;
+}
+
+void Player::wait()
+{
+    if (thread_.joinable())
+        thread_.join();
+}
+
+std::size_t Player::num_underruns() const noexcept
+{
+    return device_.num_underruns();
+}
+
+void Player::prime()
+{
+    std::array<float, block_size> chunk{};
+
+    while (buffer_.size_approx() + chunk.size() <= buffer_.capacity()) {
+        const std::size_t num_rendered{source_->render(chunk)};
 
         if (num_rendered == 0)
             break;
 
-        buffer.push(std::span{chunk}.first(num_rendered));
+        buffer_.push(std::span{chunk}.first(num_rendered));
     }
+}
 
-    if (!device.start())
-        return std::nullopt;
+void Player::run()
+{
+    std::array<float, block_size> chunk{};
 
-    for (std::size_t num_rendered{source.render(chunk)}; num_rendered > 0;
-        num_rendered = source.render(chunk)) {
+    for (std::size_t num_rendered{source_->render(chunk)}; num_rendered > 0;
+        num_rendered = source_->render(chunk)) {
         for (std::size_t num_written = 0; num_written < num_rendered;) {
             num_written +=
-                buffer.push(std::span{chunk}.subspan(num_written, num_rendered - num_written));
+                buffer_.push(std::span{chunk}.subspan(num_written, num_rendered - num_written));
 
             if (num_written < num_rendered)
                 std::this_thread::sleep_for(poll_interval);
@@ -77,12 +107,10 @@ std::optional<std::size_t> play(codec::Decoder& source)
     }
 
     // The source is finished, but what is already buffered has not been heard yet.
-    while (buffer.size_approx() > 0)
+    while (buffer_.size_approx() > 0)
         std::this_thread::sleep_for(poll_interval);
 
-    device.stop();
-
-    return device.num_underruns();
+    device_.stop();
 }
 
 } // namespace wiola::engine
