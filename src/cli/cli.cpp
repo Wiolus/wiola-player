@@ -32,6 +32,7 @@ namespace {
 
 /// What CLI11 writes into. Numbers become quantities once parsing succeeds.
 struct RawOptions {
+    std::string file;
     double tone_hz{0.0};
     double num_seconds{2.0};
 };
@@ -42,7 +43,11 @@ std::unique_ptr<CLI::App> make_app(RawOptions& raw)
     app->set_help_flag("-h,--help", "Show this help and exit");
     app->set_version_flag("-v,--version", std::format("wiola-player {}", WIOLA_VERSION),
         "Show version and exit");
-    app->add_option("--tone", raw.tone_hz, "Play a test tone at this frequency, in Hz");
+    CLI::Option* file{app->add_option("--file", raw.file, "Play an audio file")};
+    CLI::Option* tone{
+        app->add_option("--tone", raw.tone_hz, "Play a test tone at this frequency, in Hz")};
+
+    tone->excludes(file);
     app->add_option("--seconds", raw.num_seconds, "How long to play the test tone");
     app->allow_extras();
 
@@ -65,6 +70,7 @@ std::optional<int> run_cli(std::span<const std::string_view> args, Options& opti
         return app->exit(error);
     }
 
+    options.file = raw.file;
     options.tone = units::Frequency{raw.tone_hz};
     options.duration = units::Time{raw.num_seconds};
 

@@ -22,6 +22,7 @@
 #include <audio/stream_spec.hpp>
 #include <audio/tone.hpp>
 #include <cli/cli.hpp>
+#include <codec/open.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 #include <utils/units.hpp>
 
@@ -39,22 +40,25 @@ namespace {
 using namespace std::chrono_literals;
 using namespace wiola::units::literals;
 
-/// Feeds a sine into the ring buffer from this thread while the device drains it from its own.
-int play_tone(const wiola::Options& options)
+/// Feeds a source into the ring buffer from this thread while the device drains it from its own.
+/// Stops at `limit` when there is one, otherwise when the source runs out and the buffer empties.
+template<typename Source>
+int play(Source& source, wiola::audio::StreamSpec spec, std::optional<wiola::units::Time> limit)
 {
-    const wiola::audio::StreamSpec spec{};
-
     // A quarter second of slack between the producer and the callback.
     wiola::lockfree::SPSCRingBuffer<float> buffer{spec.samples_per(250_ms)};
     wiola::audio::Device device{spec, buffer};
-    wiola::audio::SineSource source{spec, options.tone};
 
     // Prime the buffer so the first callbacks find frames waiting for them.
     std::array<float, 1024> chunk{};
 
     while (buffer.size_approx() + chunk.size() <= buffer.capacity()) {
-        source.render(chunk);
-        buffer.push(chunk);
+        const std::size_t num_rendered{source.render(chunk)};
+
+        if (num_rendered == 0)
+            break;
+
+        buffer.push(std::span{chunk}.first(num_rendered));
     }
 
     if (!device.start()) {
@@ -62,18 +66,24 @@ int play_tone(const wiola::Options& options)
         return 1;
     }
 
-    std::cout << "wiola-player " << WIOLA_VERSION << " — " << options.tone.get<wiola::units::Hz>()
-              << " Hz for " << options.duration.get<wiola::units::Sec>() << " s\n";
+    const auto deadline = std::chrono::steady_clock::now() +
+        (limit ? limit->chrono() : std::chrono::duration<double>{0.0});
 
-    const auto deadline = std::chrono::steady_clock::now() + options.duration.chrono();
+    while (!limit || std::chrono::steady_clock::now() < deadline) {
+        const std::size_t num_rendered{source.render(chunk)};
 
-    while (std::chrono::steady_clock::now() < deadline) {
-        source.render(chunk);
+        if (num_rendered == 0) {
+            while (buffer.size_approx() > 0)
+                std::this_thread::sleep_for(2ms);
 
-        for (std::size_t num_written = 0; num_written < chunk.size();) {
-            num_written += buffer.push(std::span{chunk}.subspan(num_written));
+            break;
+        }
 
-            if (num_written < chunk.size())
+        for (std::size_t num_written = 0; num_written < num_rendered;) {
+            num_written +=
+                buffer.push(std::span{chunk}.subspan(num_written, num_rendered - num_written));
+
+            if (num_written < num_rendered)
                 std::this_thread::sleep_for(2ms);
         }
     }
@@ -84,6 +94,35 @@ int play_tone(const wiola::Options& options)
         std::cout << "underruns: " << device.num_underruns() << '\n';
 
     return 0;
+}
+
+int play_file(const wiola::Options& options)
+{
+    const std::unique_ptr<wiola::codec::Decoder> reader{wiola::codec::open_file(options.file)};
+
+    if (!reader) {
+        std::cerr << "wiola-player: cannot read " << options.file << '\n';
+        return 1;
+    }
+
+    const wiola::audio::StreamSpec spec{reader->spec()};
+
+    std::cout << "wiola-player " << WIOLA_VERSION << " — " << options.file.filename().string()
+              << ", " << spec.sample_rate.get<wiola::units::Hz>() << " Hz, " << spec.num_channels
+              << " ch\n";
+
+    return play(*reader, spec, std::nullopt);
+}
+
+int play_tone(const wiola::Options& options)
+{
+    const wiola::audio::StreamSpec spec{};
+    wiola::audio::SineSource source{spec, options.tone};
+
+    std::cout << "wiola-player " << WIOLA_VERSION << " — " << options.tone.get<wiola::units::Hz>()
+              << " Hz for " << options.duration.get<wiola::units::Sec>() << " s\n";
+
+    return play(source, spec, options.duration);
 }
 
 } // namespace
@@ -100,6 +139,9 @@ int main(int argc, char** argv)
 
     if (const std::optional<int> exit_code = wiola::run_cli(args, options))
         return *exit_code;
+
+    if (!options.file.empty())
+        return play_file(options);
 
     if (options.tone > wiola::units::Frequency{})
         return play_tone(options);
