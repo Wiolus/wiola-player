@@ -33,6 +33,7 @@
 namespace {
 
 using wiola::audio::Device;
+using wiola::audio::DeviceState;
 using wiola::audio::SineSource;
 using namespace wiola::units;
 using wiola::audio::StreamSpec;
@@ -46,8 +47,31 @@ TEST(Device, ReportsItsSpecBeforeStarting)
     Device device{stereo, buffer};
 
     EXPECT_EQ(device.spec(), stereo);
+    EXPECT_EQ(device.state(), DeviceState::closed);
     EXPECT_FALSE(device.running());
     EXPECT_EQ(device.num_underruns(), 0u);
+}
+
+/// Stopping gives back the callback, not the output, so starting again does not reopen anything.
+TEST(Device, KeepsTheOutputBetweenStops)
+{
+    SPSCRingBuffer<float> buffer{stereo.samples_per(100_ms)};
+    Device device{stereo, buffer};
+
+    if (!device.start())
+        GTEST_SKIP() << "no playback device on this machine";
+
+    EXPECT_EQ(device.state(), DeviceState::running);
+
+    device.stop();
+    EXPECT_EQ(device.state(), DeviceState::stopped);
+
+    ASSERT_TRUE(device.start());
+    EXPECT_EQ(device.state(), DeviceState::running);
+
+    device.stop();
+    device.stop();
+    EXPECT_EQ(device.state(), DeviceState::stopped);
 }
 
 TEST(Device, DrainsTheRingBufferWhileRunning)

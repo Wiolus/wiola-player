@@ -93,14 +93,18 @@ void Device::stop() noexcept
         ma_device_stop(&backend_->handle);
 }
 
-bool Device::running() const noexcept
+DeviceState Device::state() const noexcept
 {
-    return backend_->initialized && ma_device_is_started(&backend_->handle) == MA_TRUE;
+    if (!backend_->initialized)
+        return DeviceState::closed;
+
+    return ma_device_is_started(&backend_->handle) == MA_TRUE ? DeviceState::running
+                                                              : DeviceState::stopped;
 }
 
-StreamSpec Device::spec() const noexcept
+bool Device::running() const noexcept
 {
-    return spec_;
+    return state() == DeviceState::running;
 }
 
 std::size_t Device::frames_played() const noexcept
@@ -116,6 +120,11 @@ void Device::reset_frames_played() noexcept
 std::size_t Device::num_underruns() const noexcept
 {
     return num_underruns_.load(std::memory_order_relaxed);
+}
+
+StreamSpec Device::spec() const noexcept
+{
+    return spec_;
 }
 
 } // namespace wiola::audio

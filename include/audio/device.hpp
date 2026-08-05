@@ -31,6 +31,19 @@
 namespace wiola::audio {
 
 /**
+ * What the output is doing.
+ *
+ * This is observed rather than remembered: whether a device is still running is the audio stack's
+ * answer, not ours, and it can change without anyone here asking for it. A device that fails
+ * under us therefore shows up as `stopped` on the next look.
+ */
+enum class DeviceState {
+    closed,
+    stopped,
+    running,
+};
+
+/**
  * Default system output.
  *
  * The device callback runs on a real-time thread owned by the backend: it only pops from the
@@ -55,6 +68,12 @@ public:
     /// output itself is only given back when the device is destroyed.
     void stop() noexcept;
 
+    /// What the output is doing, asked of the audio stack each time.
+    [[nodiscard]] DeviceState state() const noexcept;
+
+    /// Whether the callback is being called. Shorthand for `state() == DeviceState::running`.
+    [[nodiscard]] bool running() const noexcept;
+
     /// Frames handed to the output since the last reset. This is what has been heard; a decoder's
     /// own position runs ahead of it by whatever the buffer is holding.
     [[nodiscard]] std::size_t frames_played() const noexcept;
@@ -64,7 +83,7 @@ public:
 
     /// Callbacks that found the buffer short and had to emit silence.
     [[nodiscard]] std::size_t num_underruns() const noexcept;
-    [[nodiscard]] bool running() const noexcept;
+
     [[nodiscard]] StreamSpec spec() const noexcept;
 
 private:
