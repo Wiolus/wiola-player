@@ -20,6 +20,8 @@
 
 #include "flac_reader.hpp"
 
+#include "file_stream.hpp"
+
 #define DR_FLAC_IMPLEMENTATION
 #include <dr_flac.h>
 
@@ -29,6 +31,7 @@
 namespace wiola::codec {
 
 struct FlacReader::Handle {
+    std::unique_ptr<FileStream> stream;
     drflac* flac{nullptr};
 
     ~Handle()
@@ -37,6 +40,13 @@ struct FlacReader::Handle {
             drflac_close(flac);
     }
 };
+
+namespace {
+
+using Callbacks =
+    StreamCallbacks<drflac_seek_origin, DRFLAC_SEEK_SET, DRFLAC_SEEK_CUR, drflac_int64>;
+
+} // namespace
 
 FlacReader::FlacReader(audio::StreamSpec spec, std::size_t num_frames,
     std::unique_ptr<Handle> handle) noexcept
@@ -49,17 +59,26 @@ FlacReader::~FlacReader() = default;
 
 std::unique_ptr<FlacReader> FlacReader::open(const std::filesystem::path& path)
 {
-    drflac* flac{drflac_open_file(path.c_str(), nullptr)};
+    auto handle = std::make_unique<Handle>();
+    handle->stream = FileStream::open(path);
 
-    if (flac == nullptr)
+    if (!handle->stream)
         return nullptr;
+
+    handle->flac = drflac_open(Callbacks::read, Callbacks::seek, Callbacks::tell,
+        handle->stream.get(), nullptr);
+
+    if (handle->flac == nullptr)
+        return nullptr;
+
+    const drflac* flac{handle->flac};
 
     const audio::StreamSpec spec{.sample_rate = units::Frequency{flac->sampleRate},
         .num_channels = flac->channels};
     const auto num_frames = static_cast<std::size_t>(flac->totalPCMFrameCount);
 
     return std::unique_ptr<FlacReader>{
-        new FlacReader{spec, num_frames, std::make_unique<Handle>(flac)}
+        new FlacReader{spec, num_frames, std::move(handle)}
     };
 }
 
