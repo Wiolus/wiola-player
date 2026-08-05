@@ -3,7 +3,9 @@ include(FetchContent)
 FetchContent_Declare(
     dr_libs
     GIT_REPOSITORY https://github.com/mackron/dr_libs.git
-    GIT_TAG master
+    # The repository tags each decoder on its own and holds all three in one tree, so any one
+    # tag pins the other two as they stood beside it.
+    GIT_TAG wav-0.14.5
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(dr_libs)
