@@ -23,6 +23,7 @@
 #include <audio/device.hpp>
 #include <codec/decoder.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
+#include <utils/units.hpp>
 
 #include <atomic>
 #include <cstddef>
@@ -55,6 +56,11 @@ public:
     /// and the player must not be waited on.
     [[nodiscard]] bool start();
 
+    /// Moves playback to `position`, measured from the start of the source. Takes effect on the
+    /// decoding thread rather than at once, and a position beyond the end is ignored. Whether
+    /// sound is being produced is unchanged: seeking while paused stays paused.
+    void seek(units::Time position) noexcept;
+
     /// Silences playback, keeping the position and everything already decoded, so that resuming
     /// is immediate. Doing this twice is the same as doing it once.
     void pause() noexcept;
@@ -85,8 +91,13 @@ private:
     /// The decoding thread: keeps the buffer fed until the source is spent.
     void run();
 
+    /// Performs a requested seek, discarding what was decoded for the old position.
+    void apply_seek();
+
     codec::Decoder* source_;
     std::atomic<bool> stopping_{false};
+    std::atomic<bool> seek_pending_{false};
+    std::atomic<std::size_t> seek_target_{0};
     std::atomic<bool> finished_{false};
     lockfree::SPSCRingBuffer<float> buffer_;
     audio::Device device_;
