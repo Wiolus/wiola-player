@@ -55,6 +55,13 @@ public:
     /// output itself is only given back when the device is destroyed.
     void stop() noexcept;
 
+    /// Frames handed to the output since the last reset. This is what has been heard; a decoder's
+    /// own position runs ahead of it by whatever the buffer is holding.
+    [[nodiscard]] std::size_t frames_played() const noexcept;
+
+    /// Sets that count back to zero. Only legal while the device is stopped.
+    void reset_frames_played() noexcept;
+
     /// Callbacks that found the buffer short and had to emit silence.
     [[nodiscard]] std::size_t num_underruns() const noexcept;
     [[nodiscard]] bool running() const noexcept;
@@ -68,6 +75,7 @@ private:
     StreamSpec spec_{};
     lockfree::SPSCRingBuffer<float>* buffer_;
     std::atomic<std::size_t> num_underruns_{0};
+    std::atomic<std::size_t> frames_played_{0};
     std::unique_ptr<Backend> backend_;
 };
 
