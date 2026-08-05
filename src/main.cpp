@@ -21,6 +21,7 @@
 #include <audio/stream_spec.hpp>
 #include <cli/cli.hpp>
 #include <codec/open.hpp>
+#include <core/version.hpp>
 #include <engine/player.hpp>
 #include <utils/units.hpp>
 
@@ -44,7 +45,7 @@ int play_file(const wiola::Options& options)
 
     const wiola::audio::StreamSpec spec{reader->spec()};
 
-    std::cout << "wiola-player " << WIOLA_VERSION << " - " << options.file.filename().string()
+    std::cout << "wiola-player " << wiola::version << " - " << options.file.filename().string()
               << ", " << spec.sample_rate.get<wiola::units::Hz>() << " Hz, " << spec.num_channels
               << " ch\n";
 
@@ -81,7 +82,7 @@ int main(int argc, char** argv)
     if (!options.file.empty())
         return play_file(options);
 
-    std::cout << "wiola-player " << WIOLA_VERSION << " - nothing to play yet.\n";
+    std::cout << "wiola-player " << wiola::version << " - nothing to play yet.\n";
 
     return EXIT_SUCCESS;
 }

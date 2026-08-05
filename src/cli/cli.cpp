@@ -20,6 +20,8 @@
 
 #include <cli/cli.hpp>
 
+#include <core/version.hpp>
+
 #include <CLI/CLI.hpp>
 
 #include <format>
@@ -39,7 +41,7 @@ std::unique_ptr<CLI::App> make_app(RawOptions& raw)
 {
     auto app = std::make_unique<CLI::App>("Wiola media player", "wiola-player");
     app->set_help_flag("-h,--help", "Show this help and exit");
-    app->set_version_flag("-v,--version", std::format("wiola-player {}", WIOLA_VERSION),
+    app->set_version_flag("-v,--version", std::format("wiola-player {}", version),
         "Show version and exit");
     app->add_option("--file", raw.file, "Play an audio file");
     app->allow_extras();
