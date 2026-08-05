@@ -21,6 +21,7 @@
 #pragma once
 
 #include <audio/stream_spec.hpp>
+#include <core/macros.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 
 #include <atomic>
@@ -54,10 +55,8 @@ class Device {
 public:
     Device(StreamSpec spec, lockfree::SPSCRingBuffer<float>& buffer);
 
-    Device(const Device&) = delete;
-    Device& operator=(const Device&) = delete;
-    Device(Device&&) = delete;
-    Device& operator=(Device&&) = delete;
+    NO_COPY_SEMANTIC(Device);
+    NO_MOVE_SEMANTIC(Device);
     ~Device();
 
     /// Starts the callback, opening the output the first time. False when no device is

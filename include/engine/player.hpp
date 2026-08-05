@@ -22,6 +22,7 @@
 
 #include <audio/device.hpp>
 #include <codec/decoder.hpp>
+#include <core/macros.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 #include <utils/units.hpp>
 
@@ -62,10 +63,8 @@ class Player final {
 public:
     explicit Player(codec::Decoder& source);
 
-    Player(const Player&) = delete;
-    Player& operator=(const Player&) = delete;
-    Player(Player&&) = delete;
-    Player& operator=(Player&&) = delete;
+    NO_COPY_SEMANTIC(Player);
+    NO_MOVE_SEMANTIC(Player);
 
     /// Stops playback and waits for the thread, so a player is never destroyed while it runs.
     ~Player();

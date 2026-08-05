@@ -21,6 +21,7 @@
 #pragma once
 
 #include <core/cache_line.hpp>
+#include <core/macros.hpp>
 
 #include <algorithm>
 #include <atomic>
@@ -65,10 +66,8 @@ public:
 
     explicit SPSCRingBuffer(std::size_t minimum_capacity);
 
-    SPSCRingBuffer(const SPSCRingBuffer&) = delete;
-    SPSCRingBuffer& operator=(const SPSCRingBuffer&) = delete;
-    SPSCRingBuffer(SPSCRingBuffer&&) = delete;
-    SPSCRingBuffer& operator=(SPSCRingBuffer&&) = delete;
+    NO_COPY_SEMANTIC(SPSCRingBuffer);
+    NO_MOVE_SEMANTIC(SPSCRingBuffer);
     ~SPSCRingBuffer() = default;
 
     [[nodiscard]] std::size_t capacity() const noexcept;
