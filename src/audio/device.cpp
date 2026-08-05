@@ -42,6 +42,9 @@ Device::Device(StreamSpec spec, lockfree::SPSCRingBuffer<float>& buffer)
 Device::~Device()
 {
     stop();
+
+    if (backend_->initialized)
+        ma_device_uninit(&backend_->handle);
 }
 
 void Device::render(std::span<float> output) noexcept
@@ -57,7 +60,7 @@ void Device::render(std::span<float> output) noexcept
 bool Device::start() noexcept
 {
     if (backend_->initialized)
-        return true;
+        return ma_device_start(&backend_->handle) == MA_SUCCESS;
 
     ma_device_config config{ma_device_config_init(ma_device_type_playback)};
     config.playback.format = ma_format_f32;
@@ -84,16 +87,13 @@ bool Device::start() noexcept
 
 void Device::stop() noexcept
 {
-    if (!backend_->initialized)
-        return;
-
-    ma_device_uninit(&backend_->handle);
-    backend_->initialized = false;
+    if (running())
+        ma_device_stop(&backend_->handle);
 }
 
 bool Device::running() const noexcept
 {
-    return backend_->initialized;
+    return backend_->initialized && ma_device_is_started(&backend_->handle) == MA_TRUE;
 }
 
 StreamSpec Device::spec() const noexcept
