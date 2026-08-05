@@ -89,6 +89,14 @@ bool Player::resume() noexcept
     return device_.start();
 }
 
+units::Time Player::position() const noexcept
+{
+    const std::size_t frames{
+        position_base_.load(std::memory_order_relaxed) + device_.frames_played()};
+
+    return units::Time{static_cast<double>(frames) / source_->spec().sample_rate.get<units::Hz>()};
+}
+
 bool Player::playing() const noexcept
 {
     return device_.running();
@@ -142,6 +150,11 @@ void Player::apply_seek()
     buffer_.clear();
 
     source_->seek(frame_index);
+
+    // Playback restarts from the new place, so what was counted before it no longer applies.
+    position_base_.store(frame_index, std::memory_order_relaxed);
+    device_.reset_frames_played();
+
     prime();
 
     if (was_playing && !device_.start())

@@ -25,8 +25,13 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <cmath>
+#include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <memory>
+#include <numbers>
+#include <string>
 #include <thread>
 
 namespace {
@@ -36,14 +41,61 @@ using namespace wiola::units::literals;
 using wiola::engine::Player;
 namespace units = wiola::units;
 
+/// Seconds of audio a test source holds. It has to exceed what the player buffers ahead, or
+/// priming swallows the whole source before playback even starts and nothing can be observed.
+constexpr double source_seconds{1.5};
+constexpr std::uint32_t source_rate{44100};
+constexpr std::uint16_t source_channels{2};
+
+void append(std::string& out, std::uint32_t value, std::size_t num_bytes)
+{
+    for (std::size_t i = 0; i < num_bytes; ++i)
+        out += static_cast<char>((value >> (8 * i)) & 0xFFU);
+}
+
+/// Writes a few seconds of tone as a WAV file and opens it.
 std::unique_ptr<wiola::codec::Decoder> fixture()
 {
-    return wiola::codec::open_file(std::filesystem::path{WIOLA_TEST_DATA_DIR} / "tone.flac");
+    const auto num_frames{static_cast<std::size_t>(source_seconds * source_rate)};
+
+    std::string samples;
+    for (std::size_t i = 0; i < num_frames; ++i) {
+        const auto value = static_cast<std::uint32_t>(static_cast<std::int16_t>(12000 *
+            std::sin(2 * std::numbers::pi * 440 * i / source_rate)));
+
+        for (std::uint16_t channel = 0; channel < source_channels; ++channel)
+            append(samples, value, 2);
+    }
+
+    std::string fmt;
+    append(fmt, 1, 2);
+    append(fmt, source_channels, 2);
+    append(fmt, source_rate, 4);
+    append(fmt, source_rate * source_channels * 2, 4);
+    append(fmt, source_channels * 2, 2);
+    append(fmt, 16, 2);
+
+    std::string body{"WAVEfmt "};
+    append(body, static_cast<std::uint32_t>(fmt.size()), 4);
+    body += fmt + "data";
+    append(body, static_cast<std::uint32_t>(samples.size()), 4);
+    body += samples;
+
+    std::string file{"RIFF"};
+    append(file, static_cast<std::uint32_t>(body.size()), 4);
+    file += body;
+
+    const std::filesystem::path path{std::filesystem::temp_directory_path() / "wiola_player.wav"};
+    std::ofstream out{path, std::ios::binary};
+    out.write(file.data(), static_cast<std::streamsize>(file.size()));
+    out.close();
+
+    return wiola::codec::open_file(path);
 }
 
 /// Waits for `predicate`, so a test never depends on how fast a device happens to run.
 template<typename Predicate>
-bool eventually(Predicate predicate, std::chrono::milliseconds limit = 2s)
+bool eventually(Predicate predicate, std::chrono::milliseconds limit = 5s)
 {
     for (auto waited = 0ms; waited < limit; waited += 10ms) {
         if (predicate())
@@ -166,8 +218,9 @@ TEST(Player, SeekMovesTheSource)
         GTEST_SKIP() << "no playback device on this machine";
 
     player.pause();
-    player.seek(200_ms);
+    player.seek(1300_ms);
 
+    // Seeking near the end leaves the decoder with little left to read.
     EXPECT_TRUE(eventually([&source, total] { return source->num_frames_left() < total / 4; }));
 
     // Seeking does not start a paused player.
@@ -190,4 +243,51 @@ TEST(Player, SeekBeyondTheEndIsIgnored)
     // The request is refused by the decoder, so playback is left where it was rather than ended.
     std::this_thread::sleep_for(100ms);
     EXPECT_FALSE(player.finished());
+}
+
+TEST(Player, PositionStartsAtTheBeginning)
+{
+    const auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    Player player{*source};
+
+    EXPECT_EQ(player.position(), units::Time{});
+}
+
+TEST(Player, PositionReachesTheEndOfTheSource)
+{
+    const auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    const double length{static_cast<double>(source->num_frames()) /
+        source->spec().sample_rate.get<wiola::units::Hz>()};
+    Player player{*source};
+
+    if (!player.start())
+        GTEST_SKIP() << "no playback device on this machine";
+
+    player.wait();
+
+    EXPECT_NEAR(player.position().get<wiola::units::Sec>(), length, 0.02);
+}
+
+/// Position follows the device, so a seek moves it even though nothing has been played since.
+TEST(Player, PositionFollowsASeek)
+{
+    const auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    Player player{*source};
+
+    if (!player.start())
+        GTEST_SKIP() << "no playback device on this machine";
+
+    player.pause();
+    player.seek(200_ms);
+
+    EXPECT_TRUE(eventually([&player] {
+        return player.position().get<wiola::units::Sec>() > 0.19;
+    }));
+    EXPECT_LT(player.position().get<wiola::units::Sec>(), 0.22);
 }

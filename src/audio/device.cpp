@@ -51,6 +51,8 @@ void Device::render(std::span<float> output) noexcept
 {
     const std::size_t num_popped{buffer_->pop(output)};
 
+    frames_played_.fetch_add(spec_.frames_per(num_popped), std::memory_order_relaxed);
+
     if (num_popped < output.size()) {
         std::ranges::fill(output.subspan(num_popped), 0.0F);
         num_underruns_.fetch_add(1, std::memory_order_relaxed);
@@ -99,6 +101,16 @@ bool Device::running() const noexcept
 StreamSpec Device::spec() const noexcept
 {
     return spec_;
+}
+
+std::size_t Device::frames_played() const noexcept
+{
+    return frames_played_.load(std::memory_order_relaxed);
+}
+
+void Device::reset_frames_played() noexcept
+{
+    frames_played_.store(0, std::memory_order_relaxed);
 }
 
 std::size_t Device::num_underruns() const noexcept

@@ -68,6 +68,10 @@ public:
     /// Plays on from where `pause` left off. False when the output could not be started again.
     [[nodiscard]] bool resume() noexcept;
 
+    /// How far playback has reached, measured from the start of the source. Follows what is
+    /// being heard rather than what has been decoded, so it moves with the device.
+    [[nodiscard]] units::Time position() const noexcept;
+
     /// Whether sound is being produced. False while paused, and once playback has ended.
     [[nodiscard]] bool playing() const noexcept;
 
@@ -98,6 +102,7 @@ private:
     std::atomic<bool> stopping_{false};
     std::atomic<bool> seek_pending_{false};
     std::atomic<std::size_t> seek_target_{0};
+    std::atomic<std::size_t> position_base_{0};
     std::atomic<bool> finished_{false};
     lockfree::SPSCRingBuffer<float> buffer_;
     audio::Device device_;
