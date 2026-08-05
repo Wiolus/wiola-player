@@ -1,14 +1,3 @@
-include(FetchContent)
-
-FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.17.0
-    GIT_SHALLOW TRUE
-    FIND_PACKAGE_ARGS NAMES GTest
-)
-FetchContent_MakeAvailable(googletest)
-
 include(GoogleTest)
 
 function(wiola_add_test name)
