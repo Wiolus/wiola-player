@@ -90,6 +90,14 @@ public:
     [[nodiscard]] ReadRegion acquire_read() noexcept;
     void commit_read(std::size_t num_elements) noexcept;
 
+    /// Discards everything unread.
+    ///
+    /// Only legal while nothing is consuming. Clearing writes both indices and both caches, and
+    /// a consumer running concurrently would compute how much is ready by subtracting an index
+    /// that has moved out from under it - unsigned, so the answer is not a small number but an
+    /// enormous one, and the read runs off into whatever the buffer last held.
+    void clear() noexcept;
+
     /// Observers. Stale the instant they return; for metering and sizing, not for control flow.
     [[nodiscard]] std::size_t size_approx() const noexcept;
     [[nodiscard]] bool empty_approx() const noexcept;
@@ -224,6 +232,16 @@ template<RingElement T>
 void SPSCRingBuffer<T>::commit_read(std::size_t num_elements) noexcept
 {
     read_.store(read_.load(std::memory_order_relaxed) + num_elements, std::memory_order_release);
+}
+
+template<RingElement T>
+void SPSCRingBuffer<T>::clear() noexcept
+{
+    const std::size_t w = write_.load(std::memory_order_acquire);
+
+    read_.store(w, std::memory_order_release);
+    producer_read_cache_ = w;
+    consumer_write_cache_ = w;
 }
 
 template<RingElement T>

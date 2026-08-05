@@ -89,3 +89,26 @@ TEST(SPSCRingBuffer, WrapsAroundTheEndOfStorage)
 }
 
 } // namespace
+
+TEST(SPSCRingBuffer, ClearDiscardsWhatWasNotRead)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+    const std::array<int, 4> written{1, 2, 3, 4};
+
+    EXPECT_EQ(buffer.push(written), written.size());
+    EXPECT_EQ(buffer.size_approx(), written.size());
+
+    buffer.clear();
+
+    EXPECT_EQ(buffer.size_approx(), 0u);
+    EXPECT_TRUE(buffer.empty_approx());
+
+    // The buffer is usable again, and gives back only what came after the clear.
+    const std::array<int, 2> again{5, 6};
+    EXPECT_EQ(buffer.push(again), again.size());
+
+    std::array<int, 4> read{};
+    EXPECT_EQ(buffer.pop(read), again.size());
+    EXPECT_EQ(read[0], 5);
+    EXPECT_EQ(read[1], 6);
+}
