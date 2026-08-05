@@ -1,75 +1,54 @@
 # wiola-player
 
-> One-paragraph description of the player goes here — what it plays, what makes
-> it different, who it is for.
+> One-paragraph description of the player goes here - what it plays, what makes it different,
+> who it is for.
+
+Plays WAV, FLAC and MP3.
 
 ## Requirements
 
 | | Minimum | Notes |
 |---|---|---|
 | CMake | 3.28 | ships with Ubuntu 24.04 |
-| Compiler | GCC 14 or Clang 17 | C++26 is required |
+| Compiler | GCC 13 or Clang 17 | C++23 |
 
-GCC 13 and older cannot build this project — they do not accept `-std=c++26`.
+Nothing else needs installing. CMake fetches dr_libs, miniaudio, CLI11 and GoogleTest, all pinned
+in `cmake/dependencies.cmake`.
 
 ## Build
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-./build/bin/wiola-player
+cmake --preset linux
+cmake --build --preset linux
+ctest --preset linux
+
+./build/bin/wiola-player --file track.flac
 ```
 
-If your default compiler is too old, select one explicitly. The compiler is
-recorded in the CMake cache on first configure, so switching it needs a fresh
-build directory:
+Builds are `RelWithDebInfo` unless you ask for something else. The compiler is recorded in the
+cache on first configure, so switching it needs a fresh build directory.
+
+## Windows
+
+Cross-compiled from Linux. The result needs no DLLs beside it.
 
 ```bash
-rm -rf build
-cmake -B build -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug
-```
+sudo apt install g++-mingw-w64-x86-64-posix
 
-`CMAKE_BUILD_TYPE` has no default. Omitting it produces a binary with neither
-optimisation nor debug information.
+cmake --preset windows
+cmake --build --preset windows        # build-win/bin/wiola-player.exe
+```
 
 ## Usage
 
 ```
-Usage: wiola-player [options] [file...]
+wiola-player [OPTIONS]
 
-Options:
   -h, --help       Show this help and exit
   -v, --version    Show version and exit
+      --file TEXT  Play an audio file
 ```
 
-## Development
+## Contributing
 
-C++ sources are formatted with clang-format and CMake files with
-[gersemi](https://github.com/BlankSpruce/gersemi). Both are pinned in
-`requirements.txt`, so every contributor gets identical output:
-
-```bash
-python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Install the git hooks once per clone. This symlinks `scripts/hooks/*` into
-`.git/hooks/` and does not modify your git configuration:
-
-```bash
-./scripts/install-hooks.sh
-```
-
-The `pre-commit` hook rejects commits when any tracked source or CMake file is
-unformatted. Format everything with:
-
-```bash
-./scripts/format-cpp.sh      # C/C++ sources and headers
-./scripts/format-cmake.sh    # CMakeLists.txt and *.cmake
-```
-
-Pass `--check` to either script to report without modifying anything, which is
-what the hook does.
-
-Styles are defined in `.clang-format` and `.gersemirc`. Both scripts operate on
-files tracked by git, so generated CMake files under `build/` are never touched.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for formatting and commit names.
