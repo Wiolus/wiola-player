@@ -39,6 +39,7 @@ namespace {
 using namespace std::chrono_literals;
 using namespace wiola::units::literals;
 using wiola::engine::Player;
+using wiola::engine::PlayerState;
 namespace units = wiola::units;
 
 /// Seconds of audio a test source holds. It has to exceed what the player buffers ahead, or
@@ -190,13 +191,14 @@ TEST(Player, PauseSilencesAndResumeContinues)
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
 
-    player.pause();
+    ASSERT_TRUE(player.pause());
     EXPECT_FALSE(player.playing());
 
     // Pausing is not ending: the player is still there to be resumed.
     EXPECT_FALSE(player.finished());
 
-    player.pause();
+    // There is nothing left to silence, so the second one has nothing to report.
+    EXPECT_FALSE(player.pause());
     EXPECT_FALSE(player.playing());
 
     ASSERT_TRUE(player.resume());
@@ -217,7 +219,7 @@ TEST(Player, SeekMovesTheSource)
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
 
-    player.pause();
+    ASSERT_TRUE(player.pause());
     player.seek(1300_ms);
 
     // Seeking near the end leaves the decoder with little left to read.
@@ -237,7 +239,7 @@ TEST(Player, SeekBeyondTheEndIsIgnored)
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
 
-    player.pause();
+    ASSERT_TRUE(player.pause());
     player.seek(3600_s);
 
     // The request is refused by the decoder, so playback is left where it was rather than ended.
@@ -283,11 +285,90 @@ TEST(Player, PositionFollowsASeek)
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
 
-    player.pause();
+    ASSERT_TRUE(player.pause());
     player.seek(200_ms);
 
     EXPECT_TRUE(eventually([&player] {
         return player.position().get<wiola::units::Sec>() > 0.19;
     }));
     EXPECT_LT(player.position().get<wiola::units::Sec>(), 0.22);
+}
+
+TEST(Player, ResumeRefusesBeforeStart)
+{
+    const auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    Player player{*source};
+
+    EXPECT_EQ(player.state(), PlayerState::idle);
+    EXPECT_FALSE(player.resume());
+    EXPECT_FALSE(player.playing());
+}
+
+/// A source that ran out and a listener who pressed stop are both final, and a playlist has to
+/// tell them apart: one is the cue to play the next thing, the other is not.
+TEST(Player, DistinguishesEndingFromBeingStopped)
+{
+    const auto ended = fixture();
+    ASSERT_NE(ended, nullptr);
+
+    Player first{*ended};
+
+    if (!first.start())
+        GTEST_SKIP() << "no playback device on this machine";
+
+    first.wait();
+    EXPECT_EQ(first.state(), PlayerState::ended);
+    EXPECT_TRUE(first.finished());
+
+    const auto stopped = fixture();
+    Player second{*stopped};
+
+    ASSERT_TRUE(second.start());
+    second.stop();
+    second.wait();
+
+    EXPECT_EQ(second.state(), PlayerState::stopped);
+    EXPECT_TRUE(second.finished());
+}
+
+TEST(Player, PlaysAgainAfterEnding)
+{
+    const auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    Player player{*source};
+
+    if (!player.start())
+        GTEST_SKIP() << "no playback device on this machine";
+
+    player.wait();
+    ASSERT_EQ(player.state(), PlayerState::ended);
+
+    // Starting a finished player winds it back rather than refusing.
+    ASSERT_TRUE(player.start());
+    EXPECT_EQ(player.state(), PlayerState::playing);
+    EXPECT_LT(player.position().get<wiola::units::Sec>(), 0.5);
+
+    player.wait();
+    EXPECT_EQ(player.state(), PlayerState::ended);
+}
+
+TEST(Player, RefusesToStartWhilePlaying)
+{
+    const auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    Player player{*source};
+
+    if (!player.start())
+        GTEST_SKIP() << "no playback device on this machine";
+
+    EXPECT_FALSE(player.start());
+    EXPECT_EQ(player.state(), PlayerState::playing);
+
+    ASSERT_TRUE(player.pause());
+    EXPECT_FALSE(player.start());
+    EXPECT_EQ(player.state(), PlayerState::paused);
 }

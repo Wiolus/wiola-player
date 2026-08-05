@@ -61,11 +61,31 @@ Player::~Player()
 
 bool Player::start()
 {
+    const PlayerState previous{state()};
+
+    if (previous == PlayerState::playing || previous == PlayerState::paused)
+        return false;
+
+    // A player that has already run is wound back rather than thrown away, so playing a finished
+    // track again is the same call as playing it the first time.
+    if (thread_.joinable())
+        thread_.join();
+
+    if (previous != PlayerState::idle) {
+        buffer_.clear();
+        seek_pending_.store(false, std::memory_order_relaxed);
+        source_->seek(0);
+        position_base_.store(0, std::memory_order_relaxed);
+        device_.reset_frames_played();
+        num_pushed_ = 0;
+    }
+
     prime();
 
     if (!device_.start())
         return false;
 
+    state_.store(PlayerState::playing, std::memory_order_release);
     thread_ = std::jthread{[this] { run(); }};
 
     return true;
@@ -79,14 +99,28 @@ void Player::seek(units::Time position) noexcept
     seek_pending_.store(true, std::memory_order_release);
 }
 
-void Player::pause() noexcept
+bool Player::pause() noexcept
 {
+    if (state() != PlayerState::playing)
+        return false;
+
     device_.stop();
+    state_.store(PlayerState::paused, std::memory_order_release);
+
+    return true;
 }
 
 bool Player::resume() noexcept
 {
-    return device_.start();
+    if (state() != PlayerState::paused)
+        return false;
+
+    if (!device_.start())
+        return false;
+
+    state_.store(PlayerState::playing, std::memory_order_release);
+
+    return true;
 }
 
 units::Time Player::position() const noexcept
@@ -99,17 +133,35 @@ units::Time Player::position() const noexcept
 
 bool Player::playing() const noexcept
 {
-    return device_.running();
+    return state() == PlayerState::playing;
 }
 
 void Player::stop() noexcept
 {
-    stopping_.store(true, std::memory_order_relaxed);
+    finish(PlayerState::stopped);
+}
+
+void Player::finish(PlayerState reason) noexcept
+{
+    PlayerState current{state_.load(std::memory_order_relaxed)};
+
+    // Whoever reaches a final state first keeps it, so a stop during the last block is not undone
+    // by the source running out a moment later.
+    while (current != PlayerState::ended && current != PlayerState::stopped &&
+        !state_.compare_exchange_weak(current, reason, std::memory_order_acq_rel,
+            std::memory_order_relaxed)) { }
+}
+
+PlayerState Player::state() const noexcept
+{
+    return state_.load(std::memory_order_acquire);
 }
 
 bool Player::finished() const noexcept
 {
-    return finished_.load(std::memory_order_acquire);
+    const PlayerState current{state()};
+
+    return current == PlayerState::ended || current == PlayerState::stopped;
 }
 
 void Player::wait()
@@ -133,7 +185,7 @@ void Player::prime()
         if (num_rendered == 0)
             break;
 
-        buffer_.push(std::span{chunk}.first(num_rendered));
+        num_pushed_ += buffer_.push(std::span{chunk}.first(num_rendered));
     }
 }
 
@@ -144,7 +196,7 @@ void Player::apply_seek()
 
     // What is buffered belongs to the old position. The consumer has to be stopped before it can
     // be thrown away, since discarding it moves an index the consumer owns.
-    const bool was_playing{device_.running()};
+    const bool was_playing{state() == PlayerState::playing};
 
     device_.stop();
     buffer_.clear();
@@ -154,17 +206,18 @@ void Player::apply_seek()
     // Playback restarts from the new place, so what was counted before it no longer applies.
     position_base_.store(frame_index, std::memory_order_relaxed);
     device_.reset_frames_played();
+    num_pushed_ = 0;
 
     prime();
 
     if (was_playing && !device_.start())
-        stop();
+        finish(PlayerState::stopped);
 }
 
 void Player::run()
 {
     const auto stopping = [this] {
-        return stopping_.load(std::memory_order_relaxed);
+        return state() == PlayerState::stopped;
     };
     std::array<float, block_size> chunk{};
 
@@ -182,8 +235,11 @@ void Player::run()
             break;
 
         for (std::size_t num_written = 0; num_written < num_rendered && !stopping();) {
-            num_written +=
-                buffer_.push(std::span{chunk}.subspan(num_written, num_rendered - num_written));
+            const std::size_t num_taken{
+                buffer_.push(std::span{chunk}.subspan(num_written, num_rendered - num_written))};
+
+            num_written += num_taken;
+            num_pushed_ += num_taken;
 
             if (num_written < num_rendered) {
                 // A seek makes the rest of this block stale, so it is abandoned rather than
@@ -197,12 +253,17 @@ void Player::run()
         }
     }
 
-    // Reaching the end of the source leaves the buffer still to be heard; being stopped does not.
-    while (!stopping() && buffer_.size_approx() > 0)
+    // Reaching the end of the source leaves what is buffered still to be heard; being stopped does
+    // not. The device's own count says when it has been, and an output that has died says so by
+    // no longer running, which is the difference between waiting and hanging.
+    const audio::StreamSpec spec{source_->spec()};
+
+    while (
+        !stopping() && device_.running() && device_.frames_played() < spec.frames_per(num_pushed_))
         std::this_thread::sleep_for(poll_interval);
 
     device_.stop();
-    finished_.store(true, std::memory_order_release);
+    finish(PlayerState::ended);
 }
 
 } // namespace wiola::engine

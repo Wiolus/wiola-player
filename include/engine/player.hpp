@@ -32,6 +32,24 @@
 namespace wiola::engine {
 
 /**
+ * What the transport is doing.
+ *
+ * This is decided here rather than read back from the device. The device can stop on its own -
+ * an output can be lost, or an audio server can give up on a stream - and that is a fault to be
+ * noticed, not a change of what the listener asked for.
+ *
+ * `ended` and `stopped` are both final and differ in why: a source that ran out is the cue to
+ * play the next thing, while a listener who pressed stop is not.
+ */
+enum class PlayerState {
+    idle,
+    playing,
+    paused,
+    ended,
+    stopped,
+};
+
+/**
  * Plays one decoder, feeding it to a device from a thread of its own.
  *
  * Decoding may stall on a disk for as long as it likes, while the device wakes on a deadline and
@@ -52,38 +70,44 @@ public:
     /// Stops playback and waits for the thread, so a player is never destroyed while it runs.
     ~Player();
 
-    /// Begins playing. False when no device could be started, in which case nothing was played
-    /// and the player must not be waited on.
+    /// Begins playing, from the beginning of the source. A player that has already finished is
+    /// wound back, so playing a track again is this same call. False when no device could be
+    /// started, or when playback is already under way.
     [[nodiscard]] bool start();
+
+    /// Silences playback, keeping the position and everything already decoded, so that resuming
+    /// is immediate. False when there was nothing playing to silence.
+    [[nodiscard]] bool pause() noexcept;
+
+    /// Plays on from where `pause` left off. False unless the player is paused, or when the
+    /// output could not be started again. Resuming is not a way to begin.
+    [[nodiscard]] bool resume() noexcept;
+
+    /// Ends playback at once, without playing out what is already buffered. Does nothing if
+    /// playback has already finished, and may be called from any thread.
+    void stop() noexcept;
 
     /// Moves playback to `position`, measured from the start of the source. Takes effect on the
     /// decoding thread rather than at once, and a position beyond the end is ignored. Whether
     /// sound is being produced is unchanged: seeking while paused stays paused.
     void seek(units::Time position) noexcept;
 
-    /// Silences playback, keeping the position and everything already decoded, so that resuming
-    /// is immediate. Doing this twice is the same as doing it once.
-    void pause() noexcept;
+    /// Blocks until playback has ended.
+    void wait();
 
-    /// Plays on from where `pause` left off. False when the output could not be started again.
-    [[nodiscard]] bool resume() noexcept;
+    /// What the transport is doing.
+    [[nodiscard]] PlayerState state() const noexcept;
+
+    /// Whether the transport is playing. Says nothing about whether the device agrees; when the
+    /// two disagree the output has failed underneath us.
+    [[nodiscard]] bool playing() const noexcept;
+
+    /// Whether playback is over, however it ended. `state()` says which.
+    [[nodiscard]] bool finished() const noexcept;
 
     /// How far playback has reached, measured from the start of the source. Follows what is
     /// being heard rather than what has been decoded, so it moves with the device.
     [[nodiscard]] units::Time position() const noexcept;
-
-    /// Whether sound is being produced. False while paused, and once playback has ended.
-    [[nodiscard]] bool playing() const noexcept;
-
-    /// Ends playback at once, without playing out what is already buffered. Does nothing if
-    /// playback has already finished, and may be called from any thread.
-    void stop() noexcept;
-
-    /// Whether playback has ended, either by reaching the end of the source or by being stopped.
-    [[nodiscard]] bool finished() const noexcept;
-
-    /// Blocks until playback has ended.
-    void wait();
 
     /// Callbacks that found the buffer short and had to emit silence.
     [[nodiscard]] std::size_t num_underruns() const noexcept;
@@ -98,12 +122,19 @@ private:
     /// Performs a requested seek, discarding what was decoded for the old position.
     void apply_seek();
 
+    /// Settles on a final state. A listener who asked to stop outranks a source that ran out, so
+    /// whichever happened first is what stays.
+    void finish(PlayerState reason) noexcept;
+
     codec::Decoder* source_;
-    std::atomic<bool> stopping_{false};
+    std::atomic<PlayerState> state_{PlayerState::idle};
     std::atomic<bool> seek_pending_{false};
     std::atomic<std::size_t> seek_target_{0};
     std::atomic<std::size_t> position_base_{0};
-    std::atomic<bool> finished_{false};
+
+    /// Samples handed to the buffer since the device last had its count reset. Playback is over
+    /// when the device has played all of them, which is a fact rather than a buffer level.
+    std::size_t num_pushed_{0};
     lockfree::SPSCRingBuffer<float> buffer_;
     audio::Device device_;
     std::jthread thread_;
