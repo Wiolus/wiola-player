@@ -33,6 +33,7 @@ if(PROJECT_IS_TOP_LEVEL AND BUILD_TESTING AND ENABLE_UNIT_TESTS)
     set(WIOLA_BUILD_TESTS ON)
 endif()
 
+include(build)
 include(dependencies)
 
 add_subdirectory(src)
