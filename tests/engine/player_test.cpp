@@ -32,7 +32,9 @@
 namespace {
 
 using namespace std::chrono_literals;
+using namespace wiola::units::literals;
 using wiola::engine::Player;
+namespace units = wiola::units;
 
 std::unique_ptr<wiola::codec::Decoder> fixture()
 {
@@ -149,4 +151,43 @@ TEST(Player, PauseSilencesAndResumeContinues)
     EXPECT_TRUE(player.playing());
 
     EXPECT_TRUE(eventually([&player] { return player.finished(); }));
+}
+
+/// The fixture is a quarter second, so seeking past halfway leaves very little to play.
+TEST(Player, SeekMovesTheSource)
+{
+    const auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    const std::size_t total{source->num_frames()};
+    Player player{*source};
+
+    if (!player.start())
+        GTEST_SKIP() << "no playback device on this machine";
+
+    player.pause();
+    player.seek(200_ms);
+
+    EXPECT_TRUE(eventually([&source, total] { return source->num_frames_left() < total / 4; }));
+
+    // Seeking does not start a paused player.
+    EXPECT_FALSE(player.playing());
+}
+
+TEST(Player, SeekBeyondTheEndIsIgnored)
+{
+    const auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    Player player{*source};
+
+    if (!player.start())
+        GTEST_SKIP() << "no playback device on this machine";
+
+    player.pause();
+    player.seek(3600_s);
+
+    // The request is refused by the decoder, so playback is left where it was rather than ended.
+    std::this_thread::sleep_for(100ms);
+    EXPECT_FALSE(player.finished());
 }

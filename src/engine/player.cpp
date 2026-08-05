@@ -23,6 +23,7 @@
 #include <audio/stream_spec.hpp>
 #include <utils/units.hpp>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <span>
@@ -68,6 +69,14 @@ bool Player::start()
     thread_ = std::jthread{[this] { run(); }};
 
     return true;
+}
+
+void Player::seek(units::Time position) noexcept
+{
+    const double frames{source_->spec().sample_rate * std::max(position, units::Time{})};
+
+    seek_target_.store(static_cast<std::size_t>(frames), std::memory_order_relaxed);
+    seek_pending_.store(true, std::memory_order_release);
 }
 
 void Player::pause() noexcept
@@ -120,6 +129,25 @@ void Player::prime()
     }
 }
 
+void Player::apply_seek()
+{
+    const std::size_t frame_index{seek_target_.load(std::memory_order_relaxed)};
+    seek_pending_.store(false, std::memory_order_release);
+
+    // What is buffered belongs to the old position. The consumer has to be stopped before it can
+    // be thrown away, since discarding it moves an index the consumer owns.
+    const bool was_playing{device_.running()};
+
+    device_.stop();
+    buffer_.clear();
+
+    source_->seek(frame_index);
+    prime();
+
+    if (was_playing && !device_.start())
+        stop();
+}
+
 void Player::run()
 {
     const auto stopping = [this] {
@@ -127,14 +155,32 @@ void Player::run()
     };
     std::array<float, block_size> chunk{};
 
-    for (std::size_t num_rendered{source_->render(chunk)}; num_rendered > 0 && !stopping();
-        num_rendered = source_->render(chunk)) {
+    const auto seeking = [this] {
+        return seek_pending_.load(std::memory_order_acquire);
+    };
+
+    while (!stopping()) {
+        if (seeking())
+            apply_seek();
+
+        const std::size_t num_rendered{source_->render(chunk)};
+
+        if (num_rendered == 0)
+            break;
+
         for (std::size_t num_written = 0; num_written < num_rendered && !stopping();) {
             num_written +=
                 buffer_.push(std::span{chunk}.subspan(num_written, num_rendered - num_written));
 
-            if (num_written < num_rendered)
+            if (num_written < num_rendered) {
+                // A seek makes the rest of this block stale, so it is abandoned rather than
+                // waited out - the buffer is full precisely when a listener is most likely to
+                // be moving around in the track.
+                if (seeking())
+                    break;
+
                 std::this_thread::sleep_for(poll_interval);
+            }
         }
     }
 
