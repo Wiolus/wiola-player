@@ -47,8 +47,12 @@ public:
     Device& operator=(Device&&) = delete;
     ~Device();
 
-    /// Opens the default output and starts the callback. False when no device is available.
+    /// Starts the callback, opening the output the first time. False when no device is
+    /// available. Starting an already running device does nothing.
     [[nodiscard]] bool start() noexcept;
+
+    /// Halts the callback, keeping the output open so that starting again is immediate. The
+    /// output itself is only given back when the device is destroyed.
     void stop() noexcept;
 
     /// Callbacks that found the buffer short and had to emit silence.

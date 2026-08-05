@@ -70,6 +70,21 @@ bool Player::start()
     return true;
 }
 
+void Player::pause() noexcept
+{
+    device_.stop();
+}
+
+bool Player::resume() noexcept
+{
+    return device_.start();
+}
+
+bool Player::playing() const noexcept
+{
+    return device_.running();
+}
+
 void Player::stop() noexcept
 {
     stopping_.store(true, std::memory_order_relaxed);

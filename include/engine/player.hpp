@@ -55,6 +55,16 @@ public:
     /// and the player must not be waited on.
     [[nodiscard]] bool start();
 
+    /// Silences playback, keeping the position and everything already decoded, so that resuming
+    /// is immediate. Doing this twice is the same as doing it once.
+    void pause() noexcept;
+
+    /// Plays on from where `pause` left off. False when the output could not be started again.
+    [[nodiscard]] bool resume() noexcept;
+
+    /// Whether sound is being produced. False while paused, and once playback has ended.
+    [[nodiscard]] bool playing() const noexcept;
+
     /// Ends playback at once, without playing out what is already buffered. Does nothing if
     /// playback has already finished, and may be called from any thread.
     void stop() noexcept;
