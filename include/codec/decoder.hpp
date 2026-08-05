@@ -21,6 +21,7 @@
 #pragma once
 
 #include <audio/stream_spec.hpp>
+#include <core/macros.hpp>
 
 #include <cstddef>
 #include <span>
@@ -42,10 +43,8 @@ namespace wiola::codec {
  */
 class Decoder {
 public:
-    Decoder(const Decoder&) = delete;
-    Decoder& operator=(const Decoder&) = delete;
-    Decoder(Decoder&&) = delete;
-    Decoder& operator=(Decoder&&) = delete;
+    NO_COPY_SEMANTIC(Decoder);
+    NO_MOVE_SEMANTIC(Decoder);
     virtual ~Decoder() = default;
 
     /// Fills whole frames and returns how many samples were written. Short means end of file.
