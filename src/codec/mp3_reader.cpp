@@ -20,6 +20,8 @@
 
 #include "mp3_reader.hpp"
 
+#include "file_stream.hpp"
+
 #define DR_MP3_IMPLEMENTATION
 #include <dr_mp3.h>
 
@@ -29,6 +31,7 @@
 namespace wiola::codec {
 
 struct Mp3Reader::Handle {
+    std::unique_ptr<FileStream> stream;
     drmp3 mp3{};
     bool open{false};
 
@@ -38,6 +41,12 @@ struct Mp3Reader::Handle {
             drmp3_uninit(&mp3);
     }
 };
+
+namespace {
+
+using Callbacks = StreamCallbacks<drmp3_seek_origin, DRMP3_SEEK_SET, DRMP3_SEEK_CUR, drmp3_int64>;
+
+} // namespace
 
 Mp3Reader::Mp3Reader(audio::StreamSpec spec, std::size_t num_frames,
     std::unique_ptr<Handle> handle) noexcept
@@ -51,8 +60,13 @@ Mp3Reader::~Mp3Reader() = default;
 std::unique_ptr<Mp3Reader> Mp3Reader::open(const std::filesystem::path& path)
 {
     auto handle = std::make_unique<Handle>();
+    handle->stream = FileStream::open(path);
 
-    if (drmp3_init_file(&handle->mp3, path.c_str(), nullptr) == DRMP3_FALSE)
+    if (!handle->stream)
+        return nullptr;
+
+    if (drmp3_init(&handle->mp3, Callbacks::read, Callbacks::seek, Callbacks::tell, nullptr,
+            handle->stream.get(), nullptr) == DRMP3_FALSE)
         return nullptr;
 
     handle->open = true;

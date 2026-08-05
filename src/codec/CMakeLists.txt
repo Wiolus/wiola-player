@@ -10,6 +10,7 @@ FetchContent_MakeAvailable(dr_libs)
 
 set(SOURCES
     decoder.cpp
+    file_stream.cpp
     flac_reader.cpp
     format.cpp
     mp3_reader.cpp
