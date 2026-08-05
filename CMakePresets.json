@@ -1,0 +1,38 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "linux",
+            "displayName": "Linux",
+            "binaryDir": "${sourceDir}/build"
+        },
+        {
+            "name": "windows",
+            "displayName": "Windows, cross-compiled with MinGW-w64",
+            "binaryDir": "${sourceDir}/build-win",
+            "toolchainFile": "${sourceDir}/cmake/mingw-w64.cmake",
+            "cacheVariables": {
+                "ENABLE_UNIT_TESTS": "OFF"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "linux",
+            "configurePreset": "linux"
+        },
+        {
+            "name": "windows",
+            "configurePreset": "windows"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "linux",
+            "configurePreset": "linux",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ]
+}
