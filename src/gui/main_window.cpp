@@ -22,6 +22,7 @@
 
 #include "tuning.hpp"
 
+#include <codec/decoder.hpp>
 #include <codec/open.hpp>
 
 #include <QFileDialog>
@@ -88,20 +89,18 @@ MainWindow::~MainWindow() = default;
 
 bool MainWindow::load(const std::filesystem::path& path)
 {
-    // The player borrows the decoder, so it has to go before the decoder is replaced.
-    player_.reset();
-    source_ = codec::open_file(path);
+    std::unique_ptr<codec::Decoder> source{codec::open_file(path)};
 
-    if (source_)
-        player_ = std::make_unique<engine::Player>(*source_);
+    // Replacing the player stops whatever it was playing, and takes the old source with it.
+    player_ = source ? std::make_unique<engine::Player>(std::move(source)) : nullptr;
 
-    show_status(source_ ? QString{} : QString{"cannot read that file"});
-    setWindowTitle(source_ ? QString::fromStdString(path.filename().string())
-                           : QString{"Wiola Player"});
+    show_status(loaded() ? QString{} : QString{"cannot read that file"});
+    setWindowTitle(loaded() ? QString::fromStdString(path.filename().string())
+                            : QString{"Wiola Player"});
     position_slider_->setValue(0);
     refresh();
 
-    return source_ != nullptr;
+    return loaded();
 }
 
 void MainWindow::choose_track()
@@ -114,15 +113,6 @@ void MainWindow::choose_track()
 
     // Whether the file could be read is said by loading it.
     load(std::filesystem::path{chosen.toStdString()});
-}
-
-units::Time MainWindow::length() const
-{
-    if (!source_)
-        return units::Time{};
-
-    return units::Time{
-        static_cast<double>(source_->num_frames()) / source_->spec().sample_rate.get<units::Hz>()};
 }
 
 void MainWindow::toggle_playback()
@@ -173,7 +163,7 @@ void MainWindow::seek_to_slider()
 
     const double fraction{static_cast<double>(position_slider_->value()) / tuning::slider_range};
 
-    player_->seek(length() * fraction);
+    player_->seek(player_->total_time() * fraction);
 }
 
 void MainWindow::refresh()
@@ -189,16 +179,16 @@ void MainWindow::refresh()
         return;
     }
 
-    const units::Time position{player_->position()};
-    const units::Time total{length()};
+    const units::Time played{player_->time_played()};
+    const units::Time total{player_->total_time()};
 
     play_button_->setText(player_->playing() ? "Pause" : "Play");
-    time_label_->setText(as_clock(position) + " / " + as_clock(total));
+    time_label_->setText(as_clock(played) + " / " + as_clock(total));
 
     if (scrubbing_ || total == units::Time{})
         return;
 
-    const double fraction{position.get<units::Sec>() / total.get<units::Sec>()};
+    const double fraction{played.get<units::Sec>() / total.get<units::Sec>()};
 
     position_slider_->setValue(static_cast<int>(fraction * tuning::slider_range));
 }
