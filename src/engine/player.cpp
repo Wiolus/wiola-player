@@ -57,11 +57,19 @@ bool Player::start()
     if (thread_.joinable())
         thread_.join();
 
-    if (previous != PlayerState::idle) {
+    // A seek asked for while nothing was decoding has no thread to take it up, so it waits here
+    // instead of being thrown away: a listener who moves the slider before pressing play means
+    // to begin there.
+    const bool seek_requested{seek_pending_.exchange(false, std::memory_order_acq_rel)};
+
+    if (previous != PlayerState::idle || seek_requested) {
+        const std::size_t start_frame{seek_requested
+                ? std::min(seek_target_.load(std::memory_order_relaxed), source_->num_frames())
+                : 0};
+
         buffer_.clear();
-        seek_pending_.store(false, std::memory_order_relaxed);
-        source_->seek(0);
-        position_base_.store(0, std::memory_order_relaxed);
+        source_->seek(start_frame);
+        position_base_.store(start_frame, std::memory_order_relaxed);
         device_.reset_frames_played();
         num_pushed_ = 0;
     }
@@ -111,8 +119,12 @@ bool Player::resume() noexcept
 
 units::Time Player::position() const noexcept
 {
-    const std::size_t frames{
-        position_base_.load(std::memory_order_relaxed) + device_.frames_played()};
+    // A seek nobody has taken up yet is already where playback is: what follows it, whenever it
+    // is applied, starts there. Reporting the old place until then would move the slider back
+    // under a listener who has just let go of it.
+    const std::size_t frames{seek_pending_.load(std::memory_order_acquire)
+            ? seek_target_.load(std::memory_order_relaxed)
+            : position_base_.load(std::memory_order_relaxed) + device_.frames_played()};
 
     return units::Time{static_cast<double>(frames) / source_->spec().sample_rate.get<units::Hz>()};
 }

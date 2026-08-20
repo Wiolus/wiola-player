@@ -71,6 +71,10 @@ private:
     /// Reads the engine and refreshes what is shown.
     void refresh();
 
+    /// Says `message`, or clears what was said when it is empty. Refreshing leaves this alone,
+    /// so a message stays readable rather than lasting until the next poll.
+    void show_status(const QString& message);
+
     /// Length of the loaded track, or nothing when none is loaded.
     [[nodiscard]] units::Time length() const;
 
@@ -84,6 +88,7 @@ private:
     QPushButton* stop_button_{nullptr};
     QSlider* position_slider_{nullptr};
     QLabel* time_label_{nullptr};
+    QLabel* status_label_{nullptr};
     QTimer* refresh_timer_{nullptr};
 
     /// Dragging the slider must not fight with the timer moving it.

@@ -69,9 +69,10 @@ public:
     /// Stops playback and waits for the thread, so a player is never destroyed while it runs.
     ~Player();
 
-    /// Begins playing, from the beginning of the source. A player that has already finished is
-    /// wound back, so playing a track again is this same call. False when no device could be
-    /// started, or when playback is already under way.
+    /// Begins playing, from the beginning of the source or from wherever `seek` was last asked
+    /// for while nothing was playing. A player that has already finished is wound back, so
+    /// playing a track again is this same call. False when no device could be started, or when
+    /// playback is already under way.
     [[nodiscard]] bool start();
 
     /// Silences playback, keeping the position and everything already decoded, so that resuming
@@ -88,7 +89,8 @@ public:
 
     /// Moves playback to `position`, measured from the start of the source. Takes effect on the
     /// decoding thread rather than at once, and a position beyond the end is ignored. Whether
-    /// sound is being produced is unchanged: seeking while paused stays paused.
+    /// sound is being produced is unchanged: seeking while paused stays paused, and seeking a
+    /// player that has stopped or finished waits for the next `start` rather than being lost.
     void seek(units::Time position) noexcept;
 
     /// Blocks until playback has ended.
@@ -105,7 +107,8 @@ public:
     [[nodiscard]] bool finished() const noexcept;
 
     /// How far playback has reached, measured from the start of the source. Follows what is
-    /// being heard rather than what has been decoded, so it moves with the device.
+    /// being heard rather than what has been decoded, so it moves with the device. A seek that
+    /// has been asked for but not yet applied reads as the position it asked for.
     [[nodiscard]] units::Time position() const noexcept;
 
     /// Callbacks that found the buffer short and had to emit silence.
