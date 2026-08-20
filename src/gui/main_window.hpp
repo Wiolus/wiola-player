@@ -20,7 +20,6 @@
 
 #pragma once
 
-#include <codec/decoder.hpp>
 #include <engine/player.hpp>
 #include <utils/units.hpp>
 
@@ -53,7 +52,8 @@ public:
     ~MainWindow() override;
 
     /// Loads `path`, replacing whatever was playing. False when the file cannot be read, in which
-    /// case what was playing is stopped and nothing takes its place.
+    /// case what was playing is stopped and nothing takes its place. Either way the window says
+    /// what happened.
     bool load(const std::filesystem::path& path);
 
 private:
@@ -75,12 +75,8 @@ private:
     /// so a message stays readable rather than lasting until the next poll.
     void show_status(const QString& message);
 
-    /// Length of the loaded track, or nothing when none is loaded.
-    [[nodiscard]] units::Time length() const;
-
     [[nodiscard]] bool loaded() const noexcept { return player_ != nullptr; }
 
-    std::unique_ptr<codec::Decoder> source_;
     std::unique_ptr<engine::Player> player_;
 
     QPushButton* open_button_{nullptr};

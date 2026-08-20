@@ -112,10 +112,11 @@ bool eventually(Predicate predicate, std::chrono::milliseconds limit = 5s)
 
 TEST(Player, PlaysToTheEndOnItsOwn)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    const wiola::codec::Decoder* played{source.get()};
+    Player player{std::move(source)};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -125,16 +126,16 @@ TEST(Player, PlaysToTheEndOnItsOwn)
     player.wait();
 
     EXPECT_TRUE(player.finished());
-    EXPECT_TRUE(source->exhausted());
+    EXPECT_TRUE(played->exhausted());
 }
 
 /// The point of the thread: the caller is free while the audio is still going.
 TEST(Player, StartReturnsBeforePlaybackEnds)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    Player player{std::move(source)};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -144,10 +145,10 @@ TEST(Player, StartReturnsBeforePlaybackEnds)
 
 TEST(Player, StopEndsPlaybackAtOnce)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    Player player{std::move(source)};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -166,10 +167,10 @@ TEST(Player, StopEndsPlaybackAtOnce)
 
 TEST(Player, StopIsHarmlessAfterPlaybackHasEnded)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    Player player{std::move(source)};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -183,10 +184,10 @@ TEST(Player, StopIsHarmlessAfterPlaybackHasEnded)
 
 TEST(Player, PauseSilencesAndResumeContinues)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    Player player{std::move(source)};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -210,11 +211,12 @@ TEST(Player, PauseSilencesAndResumeContinues)
 /// The fixture is a quarter second, so seeking past halfway leaves very little to play.
 TEST(Player, SeekMovesTheSource)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
     const std::size_t total{source->num_frames()};
-    Player player{*source};
+    const wiola::codec::Decoder* seeked{source.get()};
+    Player player{std::move(source)};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -223,7 +225,7 @@ TEST(Player, SeekMovesTheSource)
     player.seek(1300_ms);
 
     // Seeking near the end leaves the decoder with little left to read.
-    EXPECT_TRUE(eventually([&source, total] { return source->num_frames_left() < total / 4; }));
+    EXPECT_TRUE(eventually([seeked, total] { return seeked->num_frames_left() < total / 4; }));
 
     // Seeking does not start a paused player.
     EXPECT_FALSE(player.playing());
@@ -231,10 +233,10 @@ TEST(Player, SeekMovesTheSource)
 
 TEST(Player, SeekBeyondTheEndIsIgnored)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    Player player{std::move(source)};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -247,40 +249,40 @@ TEST(Player, SeekBeyondTheEndIsIgnored)
     EXPECT_FALSE(player.finished());
 }
 
-TEST(Player, PositionStartsAtTheBeginning)
+TEST(Player, TimePlayedStartsAtTheBeginning)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    Player player{std::move(source)};
 
-    EXPECT_EQ(player.position(), units::Time{});
+    EXPECT_EQ(player.time_played(), units::Time{});
 }
 
-TEST(Player, PositionReachesTheEndOfTheSource)
+TEST(Player, TimePlayedReachesTheEndOfTheSource)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
     const double length{static_cast<double>(source->num_frames()) /
         source->spec().sample_rate.get<wiola::units::Hz>()};
-    Player player{*source};
+    Player player{std::move(source)};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
 
     player.wait();
 
-    EXPECT_NEAR(player.position().get<wiola::units::Sec>(), length, 0.02);
+    EXPECT_NEAR(player.time_played().get<wiola::units::Sec>(), length, 0.02);
 }
 
 /// Position follows the device, so a seek moves it even though nothing has been played since.
-TEST(Player, PositionFollowsASeek)
+TEST(Player, TimePlayedFollowsASeek)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    Player player{std::move(source)};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -289,17 +291,17 @@ TEST(Player, PositionFollowsASeek)
     player.seek(200_ms);
 
     EXPECT_TRUE(eventually([&player] {
-        return player.position().get<wiola::units::Sec>() > 0.19;
+        return player.time_played().get<wiola::units::Sec>() > 0.19;
     }));
-    EXPECT_LT(player.position().get<wiola::units::Sec>(), 0.22);
+    EXPECT_LT(player.time_played().get<wiola::units::Sec>(), 0.22);
 }
 
 TEST(Player, ResumeRefusesBeforeStart)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    Player player{std::move(source)};
 
     EXPECT_EQ(player.state(), PlayerState::idle);
     EXPECT_FALSE(player.resume());
@@ -310,10 +312,10 @@ TEST(Player, ResumeRefusesBeforeStart)
 /// tell them apart: one is the cue to play the next thing, the other is not.
 TEST(Player, DistinguishesEndingFromBeingStopped)
 {
-    const auto ended = fixture();
+    auto ended = fixture();
     ASSERT_NE(ended, nullptr);
 
-    Player first{*ended};
+    Player first{std::move(ended)};
 
     if (!first.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -322,8 +324,8 @@ TEST(Player, DistinguishesEndingFromBeingStopped)
     EXPECT_EQ(first.state(), PlayerState::ended);
     EXPECT_TRUE(first.finished());
 
-    const auto stopped = fixture();
-    Player second{*stopped};
+    auto stopped = fixture();
+    Player second{std::move(stopped)};
 
     ASSERT_TRUE(second.start());
     second.stop();
@@ -333,26 +335,27 @@ TEST(Player, DistinguishesEndingFromBeingStopped)
     EXPECT_TRUE(second.finished());
 }
 
-TEST(Player, PositionReportsASeekThatHasNotBeenAppliedYet)
+TEST(Player, TimePlayedReportsASeekThatHasNotBeenAppliedYet)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    Player player{std::move(source)};
 
     // No device is needed: nothing has started, so nothing can apply the request.
     player.seek(1000_ms);
 
-    EXPECT_NEAR(player.position().get<units::Sec>(), 1.0, 0.01);
+    EXPECT_NEAR(player.time_played().get<units::Sec>(), 1.0, 0.01);
 }
 
 TEST(Player, StartsWhereASeekAskedForBeforeIt)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
     const std::size_t total{source->num_frames()};
-    Player player{*source};
+    const wiola::codec::Decoder* begun{source.get()};
+    Player player{std::move(source)};
 
     player.seek(1000_ms);
 
@@ -360,16 +363,16 @@ TEST(Player, StartsWhereASeekAskedForBeforeIt)
         GTEST_SKIP() << "no playback device on this machine";
 
     // Beginning a second into the source leaves the decoder with only the rest of it to read.
-    EXPECT_LT(source->num_frames_left(), total / 2);
-    EXPECT_GT(player.position().get<units::Sec>(), 0.9);
+    EXPECT_LT(begun->num_frames_left(), total / 2);
+    EXPECT_GT(player.time_played().get<units::Sec>(), 0.9);
 }
 
 TEST(Player, KeepsASeekAskedForAfterStopping)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    Player player{std::move(source)};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -379,18 +382,18 @@ TEST(Player, KeepsASeekAskedForAfterStopping)
 
     // A stopped player has no thread to take the request up, so start is what honors it.
     player.seek(1000_ms);
-    EXPECT_NEAR(player.position().get<units::Sec>(), 1.0, 0.01);
+    EXPECT_NEAR(player.time_played().get<units::Sec>(), 1.0, 0.01);
 
     ASSERT_TRUE(player.start());
-    EXPECT_GT(player.position().get<units::Sec>(), 0.9);
+    EXPECT_GT(player.time_played().get<units::Sec>(), 0.9);
 }
 
 TEST(Player, PlaysAgainAfterEnding)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    Player player{std::move(source)};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -401,7 +404,7 @@ TEST(Player, PlaysAgainAfterEnding)
     // Starting a finished player winds it back rather than refusing.
     ASSERT_TRUE(player.start());
     EXPECT_EQ(player.state(), PlayerState::playing);
-    EXPECT_LT(player.position().get<wiola::units::Sec>(), 0.5);
+    EXPECT_LT(player.time_played().get<wiola::units::Sec>(), 0.5);
 
     player.wait();
     EXPECT_EQ(player.state(), PlayerState::ended);
@@ -409,10 +412,10 @@ TEST(Player, PlaysAgainAfterEnding)
 
 TEST(Player, RefusesToStartWhilePlaying)
 {
-    const auto source = fixture();
+    auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{*source};
+    Player player{std::move(source)};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";

@@ -32,10 +32,10 @@
 
 namespace wiola::engine {
 
-Player::Player(codec::Decoder& source)
-    : source_{&source}
-    , buffer_{source.spec().samples_per(tuning::buffer_duration)}
-    , device_{source.spec(), buffer_}
+Player::Player(std::unique_ptr<codec::Decoder> source)
+    : source_{std::move(source)}
+    , buffer_{source_->spec().samples_per(tuning::buffer_duration)}
+    , device_{source_->spec(), buffer_}
 {
 }
 
@@ -117,7 +117,13 @@ bool Player::resume() noexcept
     return true;
 }
 
-units::Time Player::position() const noexcept
+units::Time Player::total_time() const noexcept
+{
+    return units::Time{
+        static_cast<double>(source_->num_frames()) / source_->spec().sample_rate.get<units::Hz>()};
+}
+
+units::Time Player::time_played() const noexcept
 {
     // A seek nobody has taken up yet is already where playback is: what follows it, whenever it
     // is applied, starts there. Reporting the old place until then would move the slider back

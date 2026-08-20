@@ -28,6 +28,7 @@
 
 #include <atomic>
 #include <cstddef>
+#include <memory>
 #include <thread>
 
 namespace wiola::engine {
@@ -57,11 +58,13 @@ enum class PlayerState {
  * must be answered at once. The two cannot share a thread, so the decoding happens here and the
  * caller's thread is left free to do something else - to notice a keypress, or to draw.
  *
- * `source` must outlive the player.
+ * The player owns its source and outlives nothing with it: the thread that reads the source is
+ * stopped before the source is destroyed, which is a promise no caller can be asked to keep.
  */
 class Player final {
 public:
-    explicit Player(codec::Decoder& source);
+    /// Takes the source it plays. It must not be null.
+    explicit Player(std::unique_ptr<codec::Decoder> source);
 
     NO_COPY_SEMANTIC(Player);
     NO_MOVE_SEMANTIC(Player);
@@ -106,10 +109,13 @@ public:
     /// Whether playback is over, however it ended. `state()` says which.
     [[nodiscard]] bool finished() const noexcept;
 
+    /// How long the source runs, from its beginning to its end.
+    [[nodiscard]] units::Time total_time() const noexcept;
+
     /// How far playback has reached, measured from the start of the source. Follows what is
     /// being heard rather than what has been decoded, so it moves with the device. A seek that
-    /// has been asked for but not yet applied reads as the position it asked for.
-    [[nodiscard]] units::Time position() const noexcept;
+    /// has been asked for but not yet applied reads as the place it asked for.
+    [[nodiscard]] units::Time time_played() const noexcept;
 
     /// Callbacks that found the buffer short and had to emit silence.
     [[nodiscard]] std::size_t num_underruns() const noexcept;
@@ -128,7 +134,7 @@ private:
     /// whichever happened first is what stays.
     void finish(PlayerState reason) noexcept;
 
-    codec::Decoder* source_;
+    std::unique_ptr<codec::Decoder> source_;
     std::atomic<PlayerState> state_{PlayerState::idle};
     std::atomic<bool> seek_pending_{false};
     std::atomic<std::size_t> seek_target_{0};
