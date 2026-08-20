@@ -13,6 +13,12 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
+# No distribution packages Qt for MinGW, so it is found through a locally built one named by
+# QT_MINGW_ROOT. See scripts/README.md.
+if(DEFINED ENV{QT_MINGW_ROOT})
+    list(APPEND CMAKE_FIND_ROOT_PATH "$ENV{QT_MINGW_ROOT}")
+endif()
+
 # Link the compiler's own runtimes into the binary, so it runs on a Windows machine that has
 # nothing installed beside it.
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-static")
