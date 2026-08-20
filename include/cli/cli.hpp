@@ -20,20 +20,15 @@
 
 #pragma once
 
-#include <filesystem>
 #include <optional>
 #include <span>
 #include <string_view>
 
 namespace wiola {
 
-/// Values parsed from the command line.
-struct Options {
-    std::filesystem::path file{};
-};
-
 /// Runs the command line. Returns the process exit code when the CLI handled the invocation
-/// on its own (help, version, bad usage), or nothing when the player should start.
-std::optional<int> run_cli(std::span<const std::string_view> args, Options& options);
+/// on its own (help, version, bad usage), or nothing when the window should open. There is
+/// nothing to ask for: the player is the window, and it takes no options.
+std::optional<int> run_cli(std::span<const std::string_view> args);
 
 } // namespace wiola

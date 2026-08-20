@@ -32,18 +32,12 @@ namespace wiola {
 
 namespace {
 
-/// What CLI11 writes into.
-struct RawOptions {
-    std::string file;
-};
-
-std::unique_ptr<CLI::App> make_app(RawOptions& raw)
+std::unique_ptr<CLI::App> make_app()
 {
     auto app = std::make_unique<CLI::App>("Wiola media player", "wiola-player");
     app->set_help_flag("-h,--help", "Show this help and exit");
     app->set_version_flag("-v,--version", std::format("wiola-player {}", version),
         "Show version and exit");
-    app->add_option("--file", raw.file, "Play an audio file");
     app->allow_extras();
 
     return app;
@@ -51,10 +45,9 @@ std::unique_ptr<CLI::App> make_app(RawOptions& raw)
 
 } // namespace
 
-std::optional<int> run_cli(std::span<const std::string_view> args, Options& options)
+std::optional<int> run_cli(std::span<const std::string_view> args)
 {
-    RawOptions raw;
-    const auto app = make_app(raw);
+    const auto app = make_app();
 
     // CLI11 consumes the vector overload back to front.
     std::vector<std::string> reversed(args.rbegin(), args.rend());
@@ -64,8 +57,6 @@ std::optional<int> run_cli(std::span<const std::string_view> args, Options& opti
     } catch (const CLI::ParseError& error) {
         return app->exit(error);
     }
-
-    options.file = raw.file;
 
     return std::nullopt;
 }

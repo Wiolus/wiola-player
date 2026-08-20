@@ -18,53 +18,16 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/stream_spec.hpp>
 #include <cli/cli.hpp>
-#include <codec/open.hpp>
-#include <core/version.hpp>
-#include <engine/player.hpp>
-#include <utils/units.hpp>
+#include <main_window.hpp>
 
-#include <cstdlib>
-#include <iostream>
+#include <QApplication>
+
+#include <cstddef>
 #include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
-
-namespace {
-
-int play_file(const wiola::Options& options)
-{
-    const std::unique_ptr<wiola::codec::Decoder> reader{wiola::codec::open_file(options.file)};
-
-    if (!reader) {
-        std::cerr << "wiola-player: cannot read " << options.file << '\n';
-        return EXIT_FAILURE;
-    }
-
-    const wiola::audio::StreamSpec spec{reader->spec()};
-
-    std::cout << "wiola-player " << wiola::version << " - " << options.file.filename().string()
-              << ", " << spec.sample_rate.get<wiola::units::Hz>() << " Hz, " << spec.num_channels
-              << " ch\n";
-
-    wiola::engine::Player player{*reader};
-
-    if (!player.start()) {
-        std::cerr << "wiola-player: no playback device available\n";
-        return EXIT_FAILURE;
-    }
-
-    player.wait();
-
-    if (player.num_underruns() > 0)
-        std::cout << "underruns: " << player.num_underruns() << '\n';
-
-    return EXIT_SUCCESS;
-}
-
-} // namespace
 
 int main(int argc, char** argv)
 {
@@ -74,15 +37,14 @@ int main(int argc, char** argv)
     for (std::size_t i = 1; i < raw.size(); ++i)
         args.emplace_back(raw[i]);
 
-    wiola::Options options;
-
-    if (const std::optional<int> exit_code = wiola::run_cli(args, options))
+    // Only help and version are answered here
+    if (const std::optional<int> exit_code = wiola::run_cli(args))
         return *exit_code;
 
-    if (!options.file.empty())
-        return play_file(options);
+    const QApplication app{argc, argv};
+    wiola::gui::MainWindow window;
 
-    std::cout << "wiola-player " << wiola::version << " - nothing to play yet.\n";
+    window.show();
 
-    return EXIT_SUCCESS;
+    return QApplication::exec();
 }
