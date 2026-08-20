@@ -20,6 +20,8 @@
 
 #include <engine/player.hpp>
 
+#include "tuning.hpp"
+
 #include <audio/stream_spec.hpp>
 #include <utils/units.hpp>
 
@@ -30,25 +32,9 @@
 
 namespace wiola::engine {
 
-namespace {
-
-using namespace std::chrono_literals;
-using namespace units::literals;
-
-/// How long to wait when the buffer is full, or when it is draining at the end.
-constexpr auto poll_interval{2ms};
-
-/// A quarter second of slack between the producer and the callback.
-constexpr auto buffered{250_ms};
-
-/// Frames handed from the decoder to the buffer at a time.
-constexpr std::size_t block_size{1024};
-
-} // namespace
-
 Player::Player(codec::Decoder& source)
     : source_{&source}
-    , buffer_{source.spec().samples_per(buffered)}
+    , buffer_{source.spec().samples_per(tuning::buffer_duration)}
     , device_{source.spec(), buffer_}
 {
 }
@@ -177,7 +163,7 @@ std::size_t Player::num_underruns() const noexcept
 
 void Player::prime()
 {
-    std::array<float, block_size> chunk{};
+    std::array<float, tuning::decode_chunk_samples> chunk{};
 
     while (buffer_.size_approx() + chunk.size() <= buffer_.capacity()) {
         const std::size_t num_rendered{source_->render(chunk)};
@@ -219,7 +205,7 @@ void Player::run()
     const auto stopping = [this] {
         return state() == PlayerState::stopped;
     };
-    std::array<float, block_size> chunk{};
+    std::array<float, tuning::decode_chunk_samples> chunk{};
 
     const auto seeking = [this] {
         return seek_pending_.load(std::memory_order_acquire);
@@ -248,7 +234,7 @@ void Player::run()
                 if (seeking())
                     break;
 
-                std::this_thread::sleep_for(poll_interval);
+                std::this_thread::sleep_for(tuning::decode_poll_interval);
             }
         }
     }
@@ -260,7 +246,7 @@ void Player::run()
 
     while (
         !stopping() && device_.running() && device_.frames_played() < spec.frames_per(num_pushed_))
-        std::this_thread::sleep_for(poll_interval);
+        std::this_thread::sleep_for(tuning::decode_poll_interval);
 
     device_.stop();
     finish(PlayerState::ended);
