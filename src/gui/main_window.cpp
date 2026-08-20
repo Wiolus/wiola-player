@@ -20,6 +20,8 @@
 
 #include "main_window.hpp"
 
+#include "tuning.hpp"
+
 #include <codec/open.hpp>
 
 #include <QFileDialog>
@@ -29,12 +31,6 @@
 namespace wiola::gui {
 
 namespace {
-
-/// How often the window asks the engine where playback is.
-constexpr int refresh_ms{100};
-
-/// Positions along the slider. Seconds would be too coarse for a short track.
-constexpr int slider_steps{1000};
 
 QString as_clock(units::Time time)
 {
@@ -57,7 +53,7 @@ MainWindow::MainWindow()
     time_label_ = new QLabel{this};
     refresh_timer_ = new QTimer{this};
 
-    position_slider_->setRange(0, slider_steps);
+    position_slider_->setRange(0, tuning::slider_range);
 
     auto* controls = new QHBoxLayout;
     controls->addWidget(open_button_);
@@ -79,7 +75,7 @@ MainWindow::MainWindow()
     connect(position_slider_, &QSlider::sliderReleased, this, &MainWindow::seek_to_slider);
 
     connect(refresh_timer_, &QTimer::timeout, this, &MainWindow::refresh);
-    refresh_timer_->start(refresh_ms);
+    refresh_timer_->start(tuning::engine_poll_interval);
 
     refresh();
 }
@@ -161,7 +157,7 @@ void MainWindow::seek_to_slider()
     if (!loaded())
         return;
 
-    const double fraction{static_cast<double>(position_slider_->value()) / slider_steps};
+    const double fraction{static_cast<double>(position_slider_->value()) / tuning::slider_range};
 
     player_->seek(length() * fraction);
 }
@@ -190,7 +186,7 @@ void MainWindow::refresh()
 
     const double fraction{position.get<units::Sec>() / total.get<units::Sec>()};
 
-    position_slider_->setValue(static_cast<int>(fraction * slider_steps));
+    position_slider_->setValue(static_cast<int>(fraction * tuning::slider_range));
 }
 
 } // namespace wiola::gui
