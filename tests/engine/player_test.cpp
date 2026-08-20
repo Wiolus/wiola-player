@@ -333,6 +333,58 @@ TEST(Player, DistinguishesEndingFromBeingStopped)
     EXPECT_TRUE(second.finished());
 }
 
+TEST(Player, PositionReportsASeekThatHasNotBeenAppliedYet)
+{
+    const auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    Player player{*source};
+
+    // No device is needed: nothing has started, so nothing can apply the request.
+    player.seek(1000_ms);
+
+    EXPECT_NEAR(player.position().get<units::Sec>(), 1.0, 0.01);
+}
+
+TEST(Player, StartsWhereASeekAskedForBeforeIt)
+{
+    const auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    const std::size_t total{source->num_frames()};
+    Player player{*source};
+
+    player.seek(1000_ms);
+
+    if (!player.start())
+        GTEST_SKIP() << "no playback device on this machine";
+
+    // Beginning a second into the source leaves the decoder with only the rest of it to read.
+    EXPECT_LT(source->num_frames_left(), total / 2);
+    EXPECT_GT(player.position().get<units::Sec>(), 0.9);
+}
+
+TEST(Player, KeepsASeekAskedForAfterStopping)
+{
+    const auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    Player player{*source};
+
+    if (!player.start())
+        GTEST_SKIP() << "no playback device on this machine";
+
+    player.stop();
+    player.wait();
+
+    // A stopped player has no thread to take the request up, so start is what honors it.
+    player.seek(1000_ms);
+    EXPECT_NEAR(player.position().get<units::Sec>(), 1.0, 0.01);
+
+    ASSERT_TRUE(player.start());
+    EXPECT_GT(player.position().get<units::Sec>(), 0.9);
+}
+
 TEST(Player, PlaysAgainAfterEnding)
 {
     const auto source = fixture();

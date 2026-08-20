@@ -51,6 +51,7 @@ MainWindow::MainWindow()
     stop_button_ = new QPushButton{"Stop", this};
     position_slider_ = new QSlider{Qt::Horizontal, this};
     time_label_ = new QLabel{this};
+    status_label_ = new QLabel{this};
     refresh_timer_ = new QTimer{this};
 
     position_slider_->setRange(0, tuning::slider_range);
@@ -64,6 +65,9 @@ MainWindow::MainWindow()
     auto* layout = new QVBoxLayout{this};
     layout->addWidget(position_slider_);
     layout->addLayout(controls);
+
+    // Kept in the layout while it says nothing, so a message appearing does not resize the window.
+    layout->addWidget(status_label_);
 
     connect(open_button_, &QPushButton::clicked, this, &MainWindow::choose_track);
     connect(play_button_, &QPushButton::clicked, this, &MainWindow::toggle_playback);
@@ -91,6 +95,7 @@ bool MainWindow::load(const std::filesystem::path& path)
     if (source_)
         player_ = std::make_unique<engine::Player>(*source_);
 
+    show_status(source_ ? QString{} : QString{"cannot read that file"});
     setWindowTitle(source_ ? QString::fromStdString(path.filename().string())
                            : QString{"Wiola Player"});
     position_slider_->setValue(0);
@@ -107,8 +112,8 @@ void MainWindow::choose_track()
     if (chosen.isEmpty())
         return;
 
-    if (!load(std::filesystem::path{chosen.toStdString()}))
-        time_label_->setText("cannot read that file");
+    // Whether the file could be read is said by loading it.
+    load(std::filesystem::path{chosen.toStdString()});
 }
 
 units::Time MainWindow::length() const
@@ -133,15 +138,18 @@ void MainWindow::toggle_playback()
         return;
 
     case engine::PlayerState::paused:
-        if (!player_->resume())
-            time_label_->setText("no playback device");
+        show_status(player_->resume() ? QString{} : QString{"no playback device"});
         return;
 
     default:
-        if (!player_->start())
-            time_label_->setText("no playback device");
+        show_status(player_->start() ? QString{} : QString{"no playback device"});
         return;
     }
+}
+
+void MainWindow::show_status(const QString& message)
+{
+    status_label_->setText(message);
 }
 
 void MainWindow::stop_playback()
