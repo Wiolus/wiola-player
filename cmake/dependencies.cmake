@@ -3,6 +3,8 @@
 
 include(FetchContent)
 
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+
 set(MINIAUDIO_NO_LIBVORBIS ON)
 set(MINIAUDIO_NO_LIBOPUS ON)
 
