@@ -154,8 +154,14 @@ void MainWindow::show_status(const QString& message)
 
 void MainWindow::stop_playback()
 {
-    if (loaded())
-        player_->stop();
+    if (!loaded())
+        return;
+
+    player_->stop();
+
+    // Stopping is not pausing, which the play button already does: the next play begins at the
+    // start of the track, so that is where the slider and the clock have to say playback is.
+    player_->seek(units::Time{});
 }
 
 void MainWindow::seek_to_slider()
