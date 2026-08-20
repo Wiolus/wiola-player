@@ -1,5 +1,72 @@
 # Contributing
 
+## Building
+
+| | Minimum | Where it comes from |
+|---|---|---|
+| CMake | 3.28 | `cmake` |
+| Compiler | GCC 13 or Clang 17 | `g++`, C++23 |
+| Qt | 6, Widgets | `qt6-base-dev` |
+
+Qt is the only dependency that has to be installed, and no build works without it. dr_libs,
+miniaudio, CLI11 and GoogleTest are fetched during configure, pinned in `cmake/dependencies.cmake`.
+
+### Linux
+
+```bash
+sudo apt install cmake g++ qt6-base-dev
+
+cmake --preset linux                   # configure into build/
+cmake --build --preset linux           # build/bin/wiola-player
+ctest --preset linux                   # run the tests
+```
+
+Builds are `RelWithDebInfo` unless a type is named. That is deliberate rather than a default: the
+decoder feeds a device callback that has to answer within a period, and unoptimized it runs several
+times slower than the deadline allows.
+
+`-DENABLE_UNIT_TESTS=OFF` skips the tests and GoogleTest with them. In-source builds are refused,
+so configure from the repository root as above.
+
+### Windows
+
+Cross-compiled from Linux. The result is one executable that needs no DLLs beside it.
+
+```bash
+sudo apt install g++-mingw-w64-x86-64-posix
+```
+
+The build also needs a Qt built for MinGW-w64, which no distribution packages. Build one once with
+`scripts/build-qt-mingw.sh`, described in [scripts/README.md](scripts/README.md); it compiles Qt
+from source, so expect it to take a while and to want several gigabytes. `QT_MINGW_ROOT` then
+points the toolchain file at it and has to be set in the shell that configures:
+
+```bash
+scripts/build-qt-mingw.sh ~/opt/qt6-mingw-static
+export QT_MINGW_ROOT=~/opt/qt6-mingw-static
+
+cmake --preset windows                 # configure into build-win/
+cmake --build --preset windows         # build-win/bin/wiola-player.exe
+```
+
+The tests are off in this preset: they are built for Windows and the host cannot run them. Run
+them under the linux preset instead.
+
+To confirm the executable stands alone, list what it imports. Every name should be a Windows
+system library:
+
+```bash
+x86_64-w64-mingw32-objdump -p build-win/bin/wiola-player.exe | grep "DLL Name"
+```
+
+### When configure fails
+
+`Could not find a package configuration file provided by "Qt6"` means Qt is missing: install
+`qt6-base-dev` for the linux preset, or set `QT_MINGW_ROOT` for the windows one.
+
+Changing the compiler or `QT_MINGW_ROOT` after a successful configure does nothing, because both
+are already recorded in the cache. Delete the build directory and configure again.
+
 ## Formatting
 
 Only the scripts. Never `clang-format` or `gersemi` by hand - they format what the scripts choose,
