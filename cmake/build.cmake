@@ -55,3 +55,24 @@ function(wiola_add_library name)
         PRIVATE wiola_warnings ${arg_LIBS}
     )
 endfunction()
+
+# Gives `target` the icon Windows shows for it. Does nothing elsewhere, where an executable carries
+# no resources of its own.
+function(wiola_set_icon target icon)
+    if(NOT WIN32)
+        return()
+    endif()
+
+    enable_language(RC)
+
+    set(resource "${PROJECT_BINARY_DIR}/generated/${target}.rc")
+
+    configure_file("${PROJECT_SOURCE_DIR}/cmake/icon.rc.in" "${resource}" @ONLY)
+
+    # The generated file does not change when the icon does, so the icon is named as a dependency.
+    set_source_files_properties(
+        "${resource}"
+        PROPERTIES OBJECT_DEPENDS "${icon}"
+    )
+    target_sources(${target} PRIVATE "${resource}")
+endfunction()

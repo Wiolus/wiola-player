@@ -1,0 +1,3 @@
+// Windows takes an executable's icon from its resources, and shows the one with the lowest id.
+// The path is written in at configure time by wiola_set_icon.
+IDI_ICON1 ICON "@icon@"
