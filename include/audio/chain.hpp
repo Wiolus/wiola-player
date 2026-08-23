@@ -20,43 +20,81 @@
 
 #pragma once
 
+#include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
+#include <utils/units.hpp>
 
 #include <atomic>
+#include <cstddef>
 #include <span>
 
 namespace wiola::audio {
 
 /**
+ * Where a chain's bands sit: `count` centers from `first`, each `ratio` times the one before it.
+ *
+ * A ratio of two is one band per octave, which is the default: ten of them from 31.25 Hz.
+ */
+struct BandLayout {
+    units::Frequency first{31.25};
+    std::size_t count{10};
+    double ratio{2.0};
+
+    /// Where band `index` sits. Indices past `count` continue the series.
+    [[nodiscard]] constexpr units::Frequency center(std::size_t index) const noexcept
+    {
+        units::Frequency value{first};
+
+        for (std::size_t i = 0; i < index; ++i)
+            value = value * ratio;
+
+        return value;
+    }
+};
+
+/**
  * Shapes samples on their way to the output.
  *
- * `process` is called from the thread that feeds the device: it does not allocate, lock or block,
- * and the work it does per sample is the same whatever the samples are. Settings are written from
- * another thread and are heard from the next call onwards, never partway through one.
+ * `process` is called from the thread that feeds the device: it does not allocate, lock or block.
+ * Settings are written from another thread and take effect on the next call, never partway
+ * through one.
  *
- * A chain outlives the track it is shaping. What a listener asked for is a property of the output
- * rather than of a file, so nothing here is reset by loading another one.
+ * A chain belongs to the output rather than to a track, so loading one resets nothing.
  */
 class Chain {
 public:
-    Chain() = default;
+    explicit Chain(StreamSpec spec, BandLayout layout = {});
 
     NO_COPY_SEMANTIC(Chain);
     NO_MOVE_SEMANTIC(Chain);
 
     ~Chain() = default;
 
-    /// Applies the current settings to `samples`, in place. Interleaved or not makes no difference
-    /// to what is applied now.
+    /// Takes the format the samples are in. Settings are kept.
+    void configure(StreamSpec spec);
+
+    [[nodiscard]] StreamSpec spec() const noexcept;
+
+    /// How many bands the format can carry, counting up from the lowest. At most `count`: a band
+    /// too close to half the sample rate cannot be given its width, and is left out.
+    [[nodiscard]] std::size_t num_bands() const noexcept;
+
+    /// Where band `index` sits. Indices at `num_bands()` and beyond have no band.
+    [[nodiscard]] units::Frequency band_center(std::size_t index) const noexcept;
+
+    /// Applies the current settings to `samples`, in place.
     void process(std::span<float> samples) noexcept;
 
-    /// How loud the output is: 0 is silence, 1 the samples as they arrived. Values outside that
-    /// range are clamped, so no setting can make the output louder than its source.
+    /// How loud the output is: 0 is silence, 1 the samples as they arrived. Clamped to that
+    /// range, so nothing here amplifies.
     void set_volume(float gain) noexcept;
 
     [[nodiscard]] float volume() const noexcept;
 
 private:
+    StreamSpec spec_{};
+    BandLayout layout_{};
+    std::size_t num_bands_{0};
     std::atomic<float> volume_{1.0F};
 };
 

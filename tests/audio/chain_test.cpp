@@ -28,7 +28,12 @@
 
 namespace {
 
+using wiola::audio::BandLayout;
 using wiola::audio::Chain;
+using wiola::audio::StreamSpec;
+using namespace wiola::units;
+
+constexpr StreamSpec stereo{.sample_rate = 48_kHz, .num_channels = 2};
 
 std::array<float, 4> samples()
 {
@@ -39,7 +44,7 @@ std::array<float, 4> samples()
 
 TEST(Chain, StartsAtFullVolume)
 {
-    const Chain chain;
+    const Chain chain{stereo};
 
     EXPECT_FLOAT_EQ(chain.volume(), 1.0F);
 }
@@ -47,7 +52,7 @@ TEST(Chain, StartsAtFullVolume)
 /// Full volume is the samples as they arrived, not something multiplied by one.
 TEST(Chain, LeavesSamplesUntouchedAtFullVolume)
 {
-    Chain chain;
+    Chain chain{stereo};
     auto buffer{samples()};
 
     chain.process(buffer);
@@ -57,7 +62,7 @@ TEST(Chain, LeavesSamplesUntouchedAtFullVolume)
 
 TEST(Chain, ScalesEverySample)
 {
-    Chain chain;
+    Chain chain{stereo};
     auto buffer{samples()};
 
     chain.set_volume(0.5F);
@@ -71,7 +76,7 @@ TEST(Chain, ScalesEverySample)
 
 TEST(Chain, SilencesAtZero)
 {
-    Chain chain;
+    Chain chain{stereo};
     auto buffer{samples()};
 
     chain.set_volume(0.0F);
@@ -83,7 +88,7 @@ TEST(Chain, SilencesAtZero)
 
 TEST(Chain, HoldsTheSettingAcrossCalls)
 {
-    Chain chain;
+    Chain chain{stereo};
     auto first{samples()};
     auto second{samples()};
 
@@ -97,7 +102,7 @@ TEST(Chain, HoldsTheSettingAcrossCalls)
 
 TEST(Chain, RefusesToAmplify)
 {
-    Chain chain;
+    Chain chain{stereo};
     auto buffer{samples()};
 
     chain.set_volume(4.0F);
@@ -111,7 +116,7 @@ TEST(Chain, RefusesToAmplify)
 
 TEST(Chain, TakesAnythingBelowZeroAsSilence)
 {
-    Chain chain;
+    Chain chain{stereo};
 
     chain.set_volume(-2.0F);
 
@@ -124,8 +129,90 @@ TEST(Chain, TakesAnythingBelowZeroAsSilence)
 
 TEST(Chain, AcceptsNothingToDo)
 {
-    Chain chain;
+    Chain chain{stereo};
 
     chain.set_volume(0.5F);
     chain.process(std::span<float>{});
+}
+
+TEST(Chain, KeepsTheFormatItWasGiven)
+{
+    const Chain chain{stereo};
+
+    EXPECT_EQ(chain.spec(), stereo);
+}
+
+TEST(Chain, LaysOutOneBandPerOctave)
+{
+    const Chain chain{stereo};
+
+    ASSERT_EQ(chain.num_bands(), 10u);
+    EXPECT_EQ(chain.band_center(0), 31.25_Hz);
+    EXPECT_EQ(chain.band_center(9), 16_kHz);
+
+    for (std::size_t i = 1; i < chain.num_bands(); ++i)
+        EXPECT_DOUBLE_EQ(chain.band_center(i) / chain.band_center(i - 1), 2.0);
+}
+
+/// A band that close to half the sample rate cannot be given its width, so it is not offered.
+TEST(Chain, DropsBandsTheFormatCannotCarry)
+{
+    const Chain chain{
+        StreamSpec{.sample_rate = 22050_Hz, .num_channels = 2}
+    };
+
+    EXPECT_EQ(chain.num_bands(), 9u);
+    EXPECT_EQ(chain.band_center(8), 8_kHz);
+}
+
+TEST(Chain, LeavesEveryBandWellBelowNyquist)
+{
+    for (const Frequency rate : {8_kHz, 22050_Hz, 44100_Hz, 48_kHz, 96_kHz}) {
+        const Chain chain{
+            StreamSpec{.sample_rate = rate, .num_channels = 2}
+        };
+
+        for (std::size_t i = 0; i < chain.num_bands(); ++i)
+            EXPECT_LT(chain.band_center(i), rate / 2.0) << "at " << rate.to<Hz>() << " Hz";
+    }
+}
+
+TEST(Chain, OffersNoBandsForAFormatItCannotUse)
+{
+    const Chain chain{
+        StreamSpec{.sample_rate = Frequency{}, .num_channels = 2}
+    };
+
+    EXPECT_EQ(chain.num_bands(), 0u);
+}
+
+/// The row of octave bands is a default, not the only layout a chain can be built with.
+TEST(Chain, TakesTheLayoutItIsGiven)
+{
+    const BandLayout thirds{.first = 20_Hz, .count = 31, .ratio = 1.2599210498948732};
+    const Chain chain{stereo, thirds};
+
+    EXPECT_EQ(chain.band_center(0), 20_Hz);
+    EXPECT_NEAR(chain.band_center(3).to<Hz>(), 40.0, 1e-9);
+
+    // Three of these to an octave, so the last of the 31 is ten octaves up, which is more than
+    // 48 kHz can carry: the cap answers the same way whatever the layout asks for.
+    EXPECT_NEAR(chain.band_center(30).to<Hz>(), 20480.0, 1e-6);
+    EXPECT_EQ(chain.num_bands(), 30u);
+}
+
+TEST(Chain, TakesANewFormatWithoutForgettingTheSetting)
+{
+    Chain chain{stereo};
+
+    chain.set_volume(0.5F);
+    chain.configure(StreamSpec{.sample_rate = 22050_Hz, .num_channels = 1});
+
+    EXPECT_FLOAT_EQ(chain.volume(), 0.5F);
+    EXPECT_EQ(chain.spec().num_channels, 1u);
+    EXPECT_EQ(chain.num_bands(), 9u);
+
+    chain.configure(stereo);
+
+    EXPECT_EQ(chain.num_bands(), 10u);
 }
