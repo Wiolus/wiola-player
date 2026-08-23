@@ -42,6 +42,15 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        },
+        {
+            "name": "coverage",
+            "displayName": "Linux, instrumented for coverage",
+            "inherits": "linux-debug",
+            "binaryDir": "${sourceDir}/build-coverage",
+            "cacheVariables": {
+                "ENABLE_COVERAGE": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -64,6 +73,10 @@
         {
             "name": "windows-release",
             "configurePreset": "windows-release"
+        },
+        {
+            "name": "coverage",
+            "configurePreset": "coverage"
         }
     ],
     "testPresets": [
@@ -77,6 +90,13 @@
         {
             "name": "linux-debug",
             "configurePreset": "linux-debug",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "coverage",
+            "configurePreset": "coverage",
             "output": {
                 "outputOnFailure": true
             }
