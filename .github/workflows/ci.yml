@@ -30,3 +30,24 @@ jobs:
       - run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++-18
       - run: cmake --build build -j
       - run: ctest --test-dir build --output-on-failure
+
+  coverage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y qt6-base-dev llvm-18
+      - run: ./scripts/coverage.sh
+        env:
+          CXX: clang++-18
+      # The numbers, on the run's own page.
+      - run: |
+          {
+            echo '### Coverage'
+            echo '```'
+            cat build-coverage/coverage/summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: build-coverage/coverage/html
