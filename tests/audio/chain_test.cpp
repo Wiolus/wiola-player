@@ -342,3 +342,75 @@ TEST(Chain, RemembersGainsOfBandsAFormatDrops)
 
     EXPECT_NEAR(response_db(chain, chain.band_center(9)), 6.0, 0.5);
 }
+
+TEST(Chain, StartsWithTheEqualizerOnAndNoPreamp)
+{
+    const Chain chain{stereo};
+
+    EXPECT_TRUE(chain.equalizer_enabled());
+    EXPECT_FLOAT_EQ(chain.preamp(), 0.0F);
+}
+
+TEST(Chain, CutsEverythingByThePreamp)
+{
+    Chain chain{stereo};
+
+    chain.set_preamp(-6.0F);
+
+    EXPECT_NEAR(response_db(chain, 1_kHz), -6.0, 0.1);
+    EXPECT_NEAR(response_db(chain, 8_kHz), -6.0, 0.1);
+}
+
+TEST(Chain, RefusesMoreThanAPreampMayDo)
+{
+    Chain chain{stereo};
+
+    chain.set_preamp(-40.0F);
+
+    EXPECT_FLOAT_EQ(chain.preamp(), -12.0F);
+}
+
+TEST(Chain, RunsNeitherBandsNorPreampWhileTurnedOff)
+{
+    Chain chain{stereo};
+    auto buffer{samples()};
+
+    chain.set_band_gain(5, 6.0F);
+    chain.set_preamp(-6.0F);
+    chain.set_equalizer_enabled(false);
+    chain.process(buffer);
+
+    EXPECT_EQ(buffer, samples());
+}
+
+TEST(Chain, KeepsTheVolumeWhileTurnedOff)
+{
+    Chain chain{stereo};
+    auto buffer{samples()};
+
+    chain.set_band_gain(5, 12.0F);
+    chain.set_equalizer_enabled(false);
+    chain.set_volume(0.5F);
+    chain.process(buffer);
+
+    EXPECT_FLOAT_EQ(buffer[0], 0.5F);
+    EXPECT_FLOAT_EQ(buffer[1], -0.25F);
+}
+
+/// A boosted band can ask for more than an output takes, and is not allowed to hand it over.
+TEST(Chain, KeepsBoostedSamplesInRange)
+{
+    Chain chain{stereo};
+    wiola::audio::SineSource source{stereo, 1_kHz, 0.95F};
+    std::vector<float> block(stereo.samples_per(512));
+
+    chain.set_band_gain(5, 12.0F);
+
+    for (int i = 0; i < 20; ++i) {
+        source.render(block);
+        chain.process(block);
+
+        for (const float sample : block)
+            EXPECT_LE(std::abs(sample), 1.0F);
+    }
+}

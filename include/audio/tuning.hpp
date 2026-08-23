@@ -46,4 +46,7 @@ inline constexpr double highest_band_share{0.4};
 /// The most a band may lift or cut, in decibels.
 inline constexpr double max_band_gain_db{12.0};
 
+/// The most the preamp may lift or cut, in decibels.
+inline constexpr double max_preamp_db{12.0};
+
 } // namespace wiola::audio::tuning
