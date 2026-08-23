@@ -1,38 +1,38 @@
-# wiola-player
+# Wiola Player
 
-> One-paragraph description of the player goes here - what it plays, what makes it different,
-> who it is for.
+A small desktop music player for WAV, FLAC and MP3. One window, three buttons, a seek bar. On
+Windows it is a single executable: nothing to install, no DLLs to place beside it.
 
-Plays WAV, FLAC and MP3.
+![wiola-player playing a track on Windows](assets/wiola-demo.png)
 
-## Build
+## Run it on Windows
 
-Needs CMake 3.28, GCC 13 or Clang 17, and Qt 6 Widgets. Everything else is fetched during
-configure.
+1. Download
+   [`wiola-player.exe`](https://github.com/Wiolus/wiola-player/releases/latest/download/wiola-player.exe)
+   from the [latest release](https://github.com/Wiolus/wiola-player/releases/latest).
+2. Double-click it.
+3. Press **Open** and pick a track.
 
-```bash
-sudo apt install cmake g++ qt6-base-dev
+There is no installer and no setup. Delete the file when you are done with it.
 
-cmake --preset linux
-cmake --build --preset linux
-ctest --preset linux
+## Run it on Linux
 
-./build/bin/wiola-player
-```
+There is no package yet, so it is built from source. [CONTRIBUTING.md](CONTRIBUTING.md) has the
+steps.
 
-A Windows executable is cross-compiled from Linux with the `windows` preset, which additionally
-needs a Qt built for MinGW-w64.
+## Using it
 
-[CONTRIBUTING.md](CONTRIBUTING.md) has the full guide for both, along with formatting and commit
-names.
+**Open** chooses a track, **Play** starts it and turns into **Pause**, **Stop** returns to the
+beginning. The title bar shows the file that is loaded, and the bar above the buttons shows where
+you are in it - click it to jump. Elapsed and total time sit to the right.
 
-## Usage
+Tracks are chosen in the window, so there is nothing to type.
 
-The window opens with no track loaded. Tracks are chosen in it rather than on the command line.
+## Contributing
 
-```
-wiola-player
+[CONTRIBUTING.md](CONTRIBUTING.md) is the one place the build is described, for both platforms,
+along with the test suite, coverage, formatting and commit names.
 
-  -h, --help     Show this help and exit
-  -v, --version  Show version and exit
-```
+## License
+
+GPL-3.0. See [LICENSE](LICENSE).
