@@ -130,13 +130,19 @@ private:
     /// Performs a requested seek, discarding what was decoded for the old position.
     void apply_seek();
 
+    /// Whether a seek has been asked for and not yet carried out.
+    [[nodiscard]] bool seek_outstanding() const noexcept;
+
     /// Settles on a final state. A listener who asked to stop outranks a source that ran out, so
     /// whichever happened first is what stays.
     void finish(PlayerState reason) noexcept;
 
     std::unique_ptr<codec::Decoder> source_;
     std::atomic<PlayerState> state_{PlayerState::idle};
-    std::atomic<bool> seek_pending_{false};
+    /// Seeks asked for, against seeks the decoding thread has carried out. While the two differ
+    /// a request is outstanding, and where it asked to go is where playback is taken to be.
+    std::atomic<std::size_t> seeks_requested_{0};
+    std::atomic<std::size_t> seeks_applied_{0};
     std::atomic<std::size_t> seek_target_{0};
     std::atomic<std::size_t> position_base_{0};
 

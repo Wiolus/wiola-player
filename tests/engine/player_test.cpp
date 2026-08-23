@@ -20,10 +20,13 @@
 
 #include <engine/player.hpp>
 
+#include <audio/stream_spec.hpp>
+#include <codec/decoder.hpp>
 #include <codec/open.hpp>
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -31,6 +34,7 @@
 #include <fstream>
 #include <memory>
 #include <numbers>
+#include <span>
 #include <string>
 #include <thread>
 
@@ -386,6 +390,57 @@ TEST(Player, KeepsASeekAskedForAfterStopping)
 
     ASSERT_TRUE(player.start());
     EXPECT_GT(player.time_played().get<units::Sec>(), 0.9);
+}
+
+/// A source that takes its time moving, so the gap between asking for a seek and it being carried
+/// out is wide enough to look into. Silence is enough: nothing here listens.
+class SlowSource final : public wiola::codec::Decoder {
+public:
+    SlowSource()
+        : Decoder{
+              wiola::audio::StreamSpec{units::Frequency{44100.0}, 2},
+              44100 * 4
+    }
+    {
+    }
+
+protected:
+    std::size_t decode(std::span<float> output, std::size_t num_frames) override
+    {
+        std::fill_n(output.begin(), num_frames * 2, 0.0F);
+
+        return num_frames;
+    }
+
+    bool seek_frame(std::size_t /*frame_index*/) override
+    {
+        std::this_thread::sleep_for(200ms);
+
+        return true;
+    }
+};
+
+/// Carrying a seek out takes time - a device to stop, a file to move through - and for all of it
+/// the place asked for is where playback is going. Reporting the old one meanwhile shows as a bar
+/// that springs back before it settles.
+TEST(Player, TimePlayedNeverFallsBackWhileASeekIsCarriedOut)
+{
+    Player player{std::make_unique<SlowSource>()};
+
+    if (!player.start())
+        GTEST_SKIP() << "no playback device on this machine";
+
+    player.seek(2000_ms);
+
+    // Watched from the moment it is asked for until well after the source has finished moving.
+    double lowest{player.time_played().get<units::Sec>()};
+
+    for (auto waited = 0ms; waited < 400ms; waited += 1ms) {
+        lowest = std::min(lowest, player.time_played().get<units::Sec>());
+        std::this_thread::sleep_for(1ms);
+    }
+
+    EXPECT_GT(lowest, 1.9);
 }
 
 TEST(Player, PlaysAgainAfterEnding)
