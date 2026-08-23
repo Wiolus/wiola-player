@@ -115,10 +115,10 @@ sudo apt install llvm-18               # the profile tools, one version per clan
 scripts/coverage.sh                    # build instrumented, run the tests, print the report
 ```
 
-The script builds in `build-coverage/`, leaving `build/` alone, and always as Debug: optimized
-code no longer sits on the lines it was written on, and the counts stop matching the source. It
-needs clang, and takes the one in `CXX` if that is set. The tools are looked up by the compiler's
-version, since a profile is not read by another.
+The build is the `coverage` preset, so `build-coverage/` and `build/` never meet. Debug, because
+optimized code no longer sits on the lines it was written on and the counts stop matching the
+source. The script needs clang, takes the one in `CXX` if that is set, and looks the profile tools
+up by the compiler's version, since a profile is not read by another.
 
 The report covers `include/` and `src/`, and nothing else can enter it. A header-only dependency
 is compiled into our translation units and instrumented with them, so leaving it out is a matter
