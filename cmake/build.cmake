@@ -27,6 +27,34 @@ target_compile_options(
         $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
+# Coverage instrumentation, carried by a target of its own so that only what links it is measured:
+# the project's code, never a fetched dependency. Empty unless asked for.
+add_library(wiola_coverage INTERFACE)
+
+if(ENABLE_COVERAGE)
+    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        message(
+            FATAL_ERROR
+            "ENABLE_COVERAGE needs Clang: the flags are LLVM's, not GCC's."
+        )
+    endif()
+
+    # Counts are per line, so the source has to still be laid out in lines: inlining and hoisting
+    # move them elsewhere and the report stops matching what was written.
+    if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(
+            WARNING
+            "ENABLE_COVERAGE outside a Debug build reports optimized line counts."
+        )
+    endif()
+
+    target_compile_options(
+        wiola_coverage
+        INTERFACE -fprofile-instr-generate -fcoverage-mapping
+    )
+    target_link_options(wiola_coverage INTERFACE -fprofile-instr-generate)
+endif()
+
 # Written at configure time, so the version is a typed constant rather than a macro handed to
 # every translation unit.
 configure_file(
@@ -52,7 +80,7 @@ function(wiola_add_library name)
     target_link_libraries(
         ${name}
         PUBLIC wiola_core
-        PRIVATE wiola_warnings ${arg_LIBS}
+        PRIVATE wiola_coverage wiola_warnings ${arg_LIBS}
     )
 endfunction()
 
