@@ -50,12 +50,10 @@ MainWindow::MainWindow()
     open_button_ = new QPushButton{"Open", this};
     play_button_ = new QPushButton{"Play", this};
     stop_button_ = new QPushButton{"Stop", this};
-    position_slider_ = new QSlider{Qt::Horizontal, this};
+    position_bar_ = new SeekBar{this};
     time_label_ = new QLabel{this};
     status_label_ = new QLabel{this};
     refresh_timer_ = new QTimer{this};
-
-    position_slider_->setRange(0, tuning::slider_range);
 
     auto* controls = new QHBoxLayout;
     controls->addWidget(open_button_);
@@ -64,7 +62,7 @@ MainWindow::MainWindow()
     controls->addWidget(time_label_);
 
     auto* layout = new QVBoxLayout{this};
-    layout->addWidget(position_slider_);
+    layout->addWidget(position_bar_);
     layout->addLayout(controls);
 
     // Kept in the layout while it says nothing, so a message appearing does not resize the window.
@@ -74,10 +72,10 @@ MainWindow::MainWindow()
     connect(play_button_, &QPushButton::clicked, this, &MainWindow::toggle_playback);
     connect(stop_button_, &QPushButton::clicked, this, &MainWindow::stop_playback);
 
-    // Seeking on every pixel of a drag would stop and start the device continuously, so the
-    // position is only taken once the slider is let go.
-    connect(position_slider_, &QSlider::sliderPressed, this, [this] { scrubbing_ = true; });
-    connect(position_slider_, &QSlider::sliderReleased, this, &MainWindow::seek_to_slider);
+    connect(position_bar_, &SeekBar::seek_requested, this, &MainWindow::seek_to);
+
+    // The clock follows the drag rather than waiting for the next poll.
+    connect(position_bar_, &SeekBar::dragged, this, &MainWindow::refresh);
 
     connect(refresh_timer_, &QTimer::timeout, this, &MainWindow::refresh);
     refresh_timer_->start(tuning::engine_poll_interval);
@@ -97,7 +95,7 @@ bool MainWindow::load(const std::filesystem::path& path)
     show_status(loaded() ? QString{} : QString{"cannot read that file"});
     setWindowTitle(loaded() ? QString::fromStdString(path.filename().string())
                             : QString{"Wiola Player"});
-    position_slider_->setValue(0);
+    position_bar_->set_fraction(0.0);
     refresh();
 
     return loaded();
@@ -154,23 +152,17 @@ void MainWindow::stop_playback()
     player_->seek(units::Time{});
 }
 
-void MainWindow::seek_to_slider()
+void MainWindow::seek_to(double fraction)
 {
-    scrubbing_ = false;
-
-    if (!loaded())
-        return;
-
-    const double fraction{static_cast<double>(position_slider_->value()) / tuning::slider_range};
-
-    player_->seek(player_->total_time() * fraction);
+    if (loaded())
+        player_->seek(player_->total_time() * fraction);
 }
 
 void MainWindow::refresh()
 {
     play_button_->setEnabled(loaded());
     stop_button_->setEnabled(loaded());
-    position_slider_->setEnabled(loaded());
+    position_bar_->setEnabled(loaded());
 
     if (!loaded()) {
         play_button_->setText("Play");
@@ -179,18 +171,21 @@ void MainWindow::refresh()
         return;
     }
 
-    const units::Time played{player_->time_played()};
     const units::Time total{player_->total_time()};
 
-    play_button_->setText(player_->playing() ? "Pause" : "Play");
-    time_label_->setText(as_clock(played) + " / " + as_clock(total));
+    // While the edge is being dragged it is a place being chosen, and that is the time worth
+    // showing: a listener aiming for somewhere needs to see where they are aiming.
+    const units::Time shown{
+        position_bar_->dragging() ? total * position_bar_->fraction() : player_->time_played()};
 
-    if (scrubbing_ || total == units::Time{})
+    play_button_->setText(player_->playing() ? "Pause" : "Play");
+    time_label_->setText(as_clock(shown) + " / " + as_clock(total));
+
+    if (total == units::Time{})
         return;
 
-    const double fraction{played.get<units::Sec>() / total.get<units::Sec>()};
-
-    position_slider_->setValue(static_cast<int>(fraction * tuning::slider_range));
+    // A drag in progress is left alone by the bar itself.
+    position_bar_->set_fraction(shown.get<units::Sec>() / total.get<units::Sec>());
 }
 
 } // namespace wiola::gui
