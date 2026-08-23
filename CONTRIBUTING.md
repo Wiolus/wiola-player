@@ -90,6 +90,28 @@ scripts/install-hooks.sh               # run both checks before every commit, fr
 `.clang-format` and `.gersemirc` decide everything. Do not argue with them in review, and do not
 restate their settings anywhere else.
 
+## Coverage
+
+```bash
+sudo apt install llvm-18               # the profile tools, one version per clang
+
+scripts/coverage.sh                    # build instrumented, run the tests, print the report
+```
+
+The script builds in `build-coverage/`, leaving `build/` alone, and always as Debug: optimized
+code no longer sits on the lines it was written on, and the counts stop matching the source. It
+needs clang, and takes the one in `CXX` if that is set. The tools are looked up by the compiler's
+version, since a profile is not read by another.
+
+The report covers `include/` and `src/`, and nothing else can enter it. A header-only dependency
+is compiled into our translation units and instrumented with them, so leaving it out is a matter
+of naming what is ours rather than of filtering out what is not. The player is measured beside
+the tests, so the GUI reads 0 until there are GUI tests. Line by line, open
+`build-coverage/coverage/html/index.html`.
+
+`warning: N functions have mismatched data` is expected. It is what one profile covering several
+test binaries looks like, and the numbers are unaffected.
+
 ## Commit names
 
 ```

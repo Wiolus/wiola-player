@@ -1,6 +1,6 @@
 # Scripts
 
-`format-cpp.sh`, `format-cmake.sh` and `install-hooks.sh` are described in
+`format-cpp.sh`, `format-cmake.sh`, `install-hooks.sh` and `coverage.sh` are described in
 [CONTRIBUTING.md](../CONTRIBUTING.md). This file covers `build-qt-mingw.sh`.
 
 ## build-qt-mingw.sh
