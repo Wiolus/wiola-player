@@ -20,12 +20,13 @@
 
 #pragma once
 
+#include "seek_bar.hpp"
+
 #include <engine/player.hpp>
 #include <utils/units.hpp>
 
 #include <QLabel>
 #include <QPushButton>
-#include <QSlider>
 #include <QTimer>
 #include <QWidget>
 
@@ -65,8 +66,8 @@ private:
 
     void stop_playback();
 
-    /// Moves playback to where the slider was let go.
-    void seek_to_slider();
+    /// Moves playback to `fraction` of the loaded track.
+    void seek_to(double fraction);
 
     /// Reads the engine and refreshes what is shown.
     void refresh();
@@ -82,13 +83,10 @@ private:
     QPushButton* open_button_{nullptr};
     QPushButton* play_button_{nullptr};
     QPushButton* stop_button_{nullptr};
-    QSlider* position_slider_{nullptr};
+    SeekBar* position_bar_{nullptr};
     QLabel* time_label_{nullptr};
     QLabel* status_label_{nullptr};
     QTimer* refresh_timer_{nullptr};
-
-    /// Dragging the slider must not fight with the timer moving it.
-    bool scrubbing_{false};
 };
 
 } // namespace wiola::gui

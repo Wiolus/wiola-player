@@ -28,8 +28,11 @@ namespace wiola::gui::tuning {
 /// longer reads as a slider that steps rather than slides.
 inline constexpr std::chrono::milliseconds engine_poll_interval{100};
 
-/// Largest value of the position slider. A track maps onto it as a fraction of its whole length,
-/// so this decides how finely any track can be scrubbed, short ones included.
-inline constexpr int slider_range{1000};
+/// How tall the seek bar is drawn. Enough to aim a mouse at, and no more: it is a readout, not
+/// the point of the window.
+inline constexpr int seek_bar_height{12};
+
+/// How wide the line marking the played edge of the seek bar is.
+inline constexpr int seek_bar_edge_width{2};
 
 } // namespace wiola::gui::tuning
