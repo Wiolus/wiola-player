@@ -20,16 +20,50 @@
 
 #include <audio/chain.hpp>
 
+#include "tuning.hpp"
+
 #include <algorithm>
 
 namespace wiola::audio {
+
+Chain::Chain(StreamSpec spec, BandLayout layout)
+    : layout_{layout}
+{
+    configure(spec);
+}
+
+void Chain::configure(StreamSpec spec)
+{
+    spec_ = spec;
+    num_bands_ = 0;
+
+    const units::Frequency highest{spec.sample_rate * tuning::highest_band_share};
+
+    // The series ascends, so the first center that does not fit ends it.
+    while (num_bands_ < layout_.count && layout_.center(num_bands_) <= highest)
+        ++num_bands_;
+}
+
+StreamSpec Chain::spec() const noexcept
+{
+    return spec_;
+}
+
+std::size_t Chain::num_bands() const noexcept
+{
+    return num_bands_;
+}
+
+units::Frequency Chain::band_center(std::size_t index) const noexcept
+{
+    return layout_.center(index);
+}
 
 void Chain::process(std::span<float> samples) noexcept
 {
     const float gain{volume_.load(std::memory_order_relaxed)};
 
-    // Not an optimization of the multiply, which is nothing. It is what keeps the samples the
-    // decoder produced from being touched at all while no one is asking for a change.
+    // Not for speed: at full volume the decoded samples pass through untouched.
     if (gain == 1.0F)
         return;
 
@@ -39,8 +73,7 @@ void Chain::process(std::span<float> samples) noexcept
 
 void Chain::set_volume(float gain) noexcept
 {
-    // Written as a bound on the low end rather than a clamp, so that a value that is not a number
-    // is silence rather than whatever a comparison against it happens to answer.
+    // A bound rather than a clamp, so that a value that is not a number falls to silence.
     const float bounded{gain >= 0.0F ? std::min(gain, 1.0F) : 0.0F};
 
     volume_.store(bounded, std::memory_order_relaxed);
