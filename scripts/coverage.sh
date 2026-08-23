@@ -3,7 +3,11 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
+preset=coverage
 cxx=${CXX:-clang++}
+
+# Where that preset builds. The profile and the report are written beside the binaries they were
+# taken from, so this script needs the path as well.
 build_dir=build-coverage
 
 # What the report covers, named rather than filtered. A header-only dependency is compiled into
@@ -30,19 +34,18 @@ for tool in llvm-profdata llvm-cov; do
     fi
 done
 
-cmake -B "$build_dir" \
-    -DCMAKE_BUILD_TYPE=Debug \
-    -DCMAKE_CXX_COMPILER="$cxx" \
-    -DENABLE_COVERAGE=ON
-cmake --build "$build_dir" -j
+# The compiler is not named by the preset, so it is handed over the way cmake takes it.
+export CXX="$cxx"
+
+cmake --preset "$preset"
+cmake --build --preset "$preset" -j
 
 # One profile per process, and a test binary is run once per case. Old ones are dropped: they were
 # written by a build that no longer exists.
 rm -rf "$build_dir/coverage"
 mkdir -p "$build_dir/coverage"
 
-LLVM_PROFILE_FILE="$PWD/$build_dir/coverage/%p.profraw" \
-    ctest --test-dir "$build_dir" --output-on-failure
+LLVM_PROFILE_FILE="$PWD/$build_dir/coverage/%p.profraw" ctest --preset "$preset"
 
 "$llvm_profdata" merge -sparse \
     "$build_dir"/coverage/*.profraw \
