@@ -59,6 +59,23 @@ system library:
 x86_64-w64-mingw32-objdump -p build-win/bin/wiola-player.exe | grep "DLL Name"
 ```
 
+### Releases
+
+What a published binary is built from, one preset per platform:
+
+```bash
+cmake --preset linux-release            # configure into build-release/
+cmake --build --preset linux-release    # build-release/bin/wiola-player
+
+cmake --preset windows-release          # configure into build-win-release/
+cmake --build --preset windows-release  # build-win-release/bin/wiola-player.exe
+```
+
+They differ from the presets above in build type only, `Release` rather than the `RelWithDebInfo`
+a plain preset leaves in place, and each has a directory of its own so that neither disturbs the
+build you develop in. Unit tests are off in both: nothing is shipped from them, and skipping them
+skips fetching GoogleTest.
+
 ### When configure fails
 
 `Could not find a package configuration file provided by "Qt6"` means Qt is missing: install
