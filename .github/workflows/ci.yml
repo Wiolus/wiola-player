@@ -24,12 +24,14 @@ jobs:
 
   test:
     runs-on: ubuntu-24.04
+    env:
+      CXX: clang++-18
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y qt6-base-dev
-      - run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++-18
-      - run: cmake --build build -j
-      - run: ctest --test-dir build --output-on-failure
+      - run: cmake --preset linux-debug
+      - run: cmake --build --preset linux-debug -j
+      - run: ctest --preset linux-debug
 
   coverage:
     runs-on: ubuntu-24.04
