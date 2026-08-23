@@ -19,12 +19,16 @@
  */
 
 #include <audio/chain.hpp>
+#include <audio/tone.hpp>
 
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cmath>
+#include <cstddef>
 #include <limits>
 #include <span>
+#include <vector>
 
 namespace {
 
@@ -215,4 +219,126 @@ TEST(Chain, TakesANewFormatWithoutForgettingTheSetting)
     chain.configure(stereo);
 
     EXPECT_EQ(chain.num_bands(), 10u);
+}
+
+namespace {
+
+/// Level of `chain`'s output for a sine at `tone`, in decibels against the sine's own level.
+double response_db(Chain& chain, Frequency tone)
+{
+    constexpr std::size_t num_blocks{40};
+    constexpr std::size_t num_frames{512};
+
+    const StreamSpec spec{chain.spec()};
+    wiola::audio::SineSource source{spec, tone, 0.5F};
+    std::vector<float> block(spec.samples_per(num_frames));
+
+    double energy{0.0};
+    double reference{0.0};
+
+    for (std::size_t i = 0; i < num_blocks; ++i) {
+        source.render(block);
+
+        double plain{0.0};
+
+        for (const float sample : block)
+            plain += static_cast<double>(sample) * sample;
+
+        chain.process(block);
+
+        double shaped{0.0};
+
+        for (const float sample : block)
+            shaped += static_cast<double>(sample) * sample;
+
+        // The first blocks are the filters filling up, and say nothing about the response.
+        if (i >= num_blocks / 2) {
+            reference += plain;
+            energy += shaped;
+        }
+    }
+
+    return 10.0 * std::log10(energy / reference);
+}
+
+} // namespace
+
+TEST(Chain, StartsWithEveryBandFlat)
+{
+    const Chain chain{stereo};
+
+    for (std::size_t i = 0; i < chain.num_bands(); ++i)
+        EXPECT_FLOAT_EQ(chain.band_gain(i), 0.0F);
+}
+
+TEST(Chain, LiftsWhatABandIsSetTo)
+{
+    Chain chain{stereo};
+
+    chain.set_band_gain(5, 6.0F);
+
+    EXPECT_NEAR(response_db(chain, chain.band_center(5)), 6.0, 0.2);
+}
+
+TEST(Chain, CutsWhatABandIsSetTo)
+{
+    Chain chain{stereo};
+
+    chain.set_band_gain(5, -6.0F);
+
+    EXPECT_NEAR(response_db(chain, chain.band_center(5)), -6.0, 0.2);
+}
+
+/// A band reaches its neighbors, but by much less than it lifts its own center.
+TEST(Chain, LeavesTheNextBandMostlyAlone)
+{
+    Chain chain{stereo};
+
+    chain.set_band_gain(5, 6.0F);
+
+    const double neighbor{response_db(chain, chain.band_center(6))};
+
+    EXPECT_GT(neighbor, 0.0);
+    EXPECT_LT(neighbor, 3.0);
+}
+
+TEST(Chain, LeavesSamplesUntouchedWhileFlat)
+{
+    Chain chain{stereo};
+    auto buffer{samples()};
+
+    chain.set_band_gain(3, 6.0F);
+    chain.set_band_gain(3, 0.0F);
+    chain.process(buffer);
+
+    EXPECT_EQ(buffer, samples());
+}
+
+TEST(Chain, RefusesMoreThanABandMayDo)
+{
+    Chain chain{stereo};
+
+    chain.set_band_gain(2, 40.0F);
+
+    EXPECT_FLOAT_EQ(chain.band_gain(2), 12.0F);
+
+    chain.set_band_gain(2, -40.0F);
+
+    EXPECT_FLOAT_EQ(chain.band_gain(2), -12.0F);
+}
+
+/// A gain outlives the format that could not carry its band.
+TEST(Chain, RemembersGainsOfBandsAFormatDrops)
+{
+    Chain chain{stereo};
+
+    chain.set_band_gain(9, 6.0F);
+    chain.configure(StreamSpec{.sample_rate = 22050_Hz, .num_channels = 2});
+
+    ASSERT_EQ(chain.num_bands(), 9u);
+    EXPECT_FLOAT_EQ(chain.band_gain(9), 6.0F);
+
+    chain.configure(stereo);
+
+    EXPECT_NEAR(response_db(chain, chain.band_center(9)), 6.0, 0.5);
 }

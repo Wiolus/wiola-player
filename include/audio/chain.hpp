@@ -21,11 +21,13 @@
 #pragma once
 
 #include <audio/stream_spec.hpp>
+#include <audio/tuning.hpp>
 #include <core/macros.hpp>
 #include <utils/units.hpp>
 
 #include <atomic>
 #include <cstddef>
+#include <memory>
 #include <span>
 
 namespace wiola::audio {
@@ -36,9 +38,10 @@ namespace wiola::audio {
  * A ratio of two is one band per octave, which is the default: ten of them from 31.25 Hz.
  */
 struct BandLayout {
-    units::Frequency first{31.25};
-    std::size_t count{10};
-    double ratio{2.0};
+    units::Frequency first{tuning::first_band_center};
+    std::size_t count{tuning::num_layout_bands};
+    double ratio{tuning::band_ratio};
+    double quality{tuning::band_quality};
 
     /// Where band `index` sits. Indices past `count` continue the series.
     [[nodiscard]] constexpr units::Frequency center(std::size_t index) const noexcept
@@ -68,9 +71,10 @@ public:
     NO_COPY_SEMANTIC(Chain);
     NO_MOVE_SEMANTIC(Chain);
 
-    ~Chain() = default;
+    ~Chain();
 
-    /// Takes the format the samples are in. Settings are kept.
+    /// Takes the format the samples are in. Settings are kept. Not to be called while the output
+    /// is running: it rebuilds what `process` reads.
     void configure(StreamSpec spec);
 
     [[nodiscard]] StreamSpec spec() const noexcept;
@@ -82,7 +86,13 @@ public:
     /// Where band `index` sits. Indices at `num_bands()` and beyond have no band.
     [[nodiscard]] units::Frequency band_center(std::size_t index) const noexcept;
 
-    /// Applies the current settings to `samples`, in place.
+    /// Lift or cut at band `index`, in decibels, clamped to what a band is allowed. An index
+    /// with no band is remembered but does nothing.
+    void set_band_gain(std::size_t index, float db) noexcept;
+
+    [[nodiscard]] float band_gain(std::size_t index) const noexcept;
+
+    /// Applies the current settings to whole frames of `samples`, in place.
     void process(std::span<float> samples) noexcept;
 
     /// How loud the output is: 0 is silence, 1 the samples as they arrived. Clamped to that
@@ -92,9 +102,15 @@ public:
     [[nodiscard]] float volume() const noexcept;
 
 private:
+    struct Bands;
+
+    /// Gives every band the coefficients its gain now asks for.
+    void retune() noexcept;
+
     StreamSpec spec_{};
     BandLayout layout_{};
     std::size_t num_bands_{0};
+    std::unique_ptr<Bands> bands_;
     std::atomic<float> volume_{1.0F};
 };
 
