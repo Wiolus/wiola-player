@@ -6,7 +6,12 @@ function(wiola_add_test name)
     add_executable(${name} ${arg_SOURCES})
     target_link_libraries(
         ${name}
-        PRIVATE GTest::gtest_main wiola_core wiola_warnings ${arg_LIBS}
+        PRIVATE
+            GTest::gtest_main
+            wiola_core
+            wiola_coverage
+            wiola_warnings
+            ${arg_LIBS}
     )
     set_target_properties(
         ${name}
