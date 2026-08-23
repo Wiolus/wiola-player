@@ -16,6 +16,15 @@
             }
         },
         {
+            "name": "linux-debug",
+            "displayName": "Linux, what CI builds and tests",
+            "inherits": "linux",
+            "binaryDir": "${sourceDir}/build-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
             "name": "linux-release",
             "displayName": "Linux, what a release is built from",
             "inherits": "linux",
@@ -45,6 +54,10 @@
             "configurePreset": "windows"
         },
         {
+            "name": "linux-debug",
+            "configurePreset": "linux-debug"
+        },
+        {
             "name": "linux-release",
             "configurePreset": "linux-release"
         },
@@ -57,6 +70,13 @@
         {
             "name": "linux",
             "configurePreset": "linux",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "linux-debug",
+            "configurePreset": "linux-debug",
             "output": {
                 "outputOnFailure": true
             }
