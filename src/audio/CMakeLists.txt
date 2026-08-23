@@ -1,1 +1,5 @@
-wiola_add_library(wiola_audio SOURCES device.cpp tone.cpp LIBS miniaudio)
+wiola_add_library(
+    wiola_audio
+    SOURCES chain.cpp device.cpp tone.cpp
+    LIBS miniaudio
+)
