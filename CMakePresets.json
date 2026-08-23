@@ -14,6 +14,25 @@
             "cacheVariables": {
                 "ENABLE_UNIT_TESTS": "OFF"
             }
+        },
+        {
+            "name": "linux-release",
+            "displayName": "Linux, what a release is built from",
+            "inherits": "linux",
+            "binaryDir": "${sourceDir}/build-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "ENABLE_UNIT_TESTS": "OFF"
+            }
+        },
+        {
+            "name": "windows-release",
+            "displayName": "Windows, what a release is built from",
+            "inherits": "windows",
+            "binaryDir": "${sourceDir}/build-win-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
         }
     ],
     "buildPresets": [
@@ -24,6 +43,14 @@
         {
             "name": "windows",
             "configurePreset": "windows"
+        },
+        {
+            "name": "linux-release",
+            "configurePreset": "linux-release"
+        },
+        {
+            "name": "windows-release",
+            "configurePreset": "windows-release"
         }
     ],
     "testPresets": [
