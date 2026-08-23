@@ -24,7 +24,9 @@
 #include <miniaudio.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <span>
 #include <vector>
 
 namespace wiola::audio {
@@ -35,13 +37,29 @@ struct Chain::Bands {
     std::vector<std::atomic<float>> gains;
     std::vector<ma_peak2> filters;
     std::vector<std::vector<unsigned char>> states;
+    std::atomic<float> preamp_db{0.0F};
+    std::atomic<bool> enabled{true};
     std::atomic<bool> changed{false};
 
-    /// Whether any band is doing anything. Only `process` reads or writes it.
-    bool active{false};
+    /// What `retune` left for `process`: the preamp as a factor, and whether anything here would
+    /// change a sample.
+    float preamp{1.0F};
+    bool shaping{false};
 };
 
 namespace {
+
+/// `db` as a factor to multiply a sample by.
+float amplitude(float db) noexcept
+{
+    return static_cast<float>(std::pow(10.0, static_cast<double>(db) / 20.0));
+}
+
+void apply_gain(std::span<float> samples, float gain) noexcept
+{
+    for (float& sample : samples)
+        sample *= gain;
+}
 
 ma_peak2_config band_config(StreamSpec spec, double quality, units::Frequency center,
     float gain_db) noexcept
@@ -99,7 +117,8 @@ void Chain::configure(StreamSpec spec)
 
 void Chain::retune() noexcept
 {
-    bands_->active = false;
+    bands_->preamp = amplitude(preamp());
+    bands_->shaping = bands_->preamp != 1.0F;
 
     for (std::size_t i = 0; i < num_bands_; ++i) {
         const ma_peak2_config config{
@@ -107,7 +126,7 @@ void Chain::retune() noexcept
 
         ma_peak2_reinit(&config, &bands_->filters[i]);
 
-        bands_->active = bands_->active || band_gain(i) != 0.0F;
+        bands_->shaping = bands_->shaping || band_gain(i) != 0.0F;
     }
 }
 
@@ -151,7 +170,11 @@ void Chain::process(std::span<float> samples) noexcept
     if (bands_->changed.exchange(false, std::memory_order_acquire))
         retune();
 
-    if (bands_->active) {
+    const bool shaping{bands_->shaping && bands_->enabled.load(std::memory_order_relaxed)};
+
+    if (shaping) {
+        apply_gain(samples, bands_->preamp);
+
         const auto num_frames = static_cast<ma_uint64>(spec_.frames_per(samples.size()));
 
         for (ma_peak2& filter : bands_->filters)
@@ -161,11 +184,38 @@ void Chain::process(std::span<float> samples) noexcept
     const float gain{volume_.load(std::memory_order_relaxed)};
 
     // Not for speed: at full volume the decoded samples pass through untouched.
-    if (gain == 1.0F)
+    if (gain != 1.0F)
+        apply_gain(samples, gain);
+
+    // A band is the only thing here that can lift a sample past what an output takes.
+    if (!shaping)
         return;
 
     for (float& sample : samples)
-        sample *= gain;
+        sample = std::clamp(sample, -1.0F, 1.0F);
+}
+
+void Chain::set_preamp(float db) noexcept
+{
+    const auto limit = static_cast<float>(tuning::max_preamp_db);
+
+    bands_->preamp_db.store(std::clamp(db, -limit, limit), std::memory_order_relaxed);
+    bands_->changed.store(true, std::memory_order_release);
+}
+
+float Chain::preamp() const noexcept
+{
+    return bands_->preamp_db.load(std::memory_order_relaxed);
+}
+
+void Chain::set_equalizer_enabled(bool enabled) noexcept
+{
+    bands_->enabled.store(enabled, std::memory_order_relaxed);
+}
+
+bool Chain::equalizer_enabled() const noexcept
+{
+    return bands_->enabled.load(std::memory_order_relaxed);
 }
 
 void Chain::set_volume(float gain) noexcept

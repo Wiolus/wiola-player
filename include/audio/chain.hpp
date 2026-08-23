@@ -92,6 +92,17 @@ public:
 
     [[nodiscard]] float band_gain(std::size_t index) const noexcept;
 
+    /// Cut applied before the bands, in decibels, making room for what they add. Clamped to what
+    /// a preamp is allowed.
+    void set_preamp(float db) noexcept;
+
+    [[nodiscard]] float preamp() const noexcept;
+
+    /// Whether the bands and the preamp run at all. Volume applies either way.
+    void set_equalizer_enabled(bool enabled) noexcept;
+
+    [[nodiscard]] bool equalizer_enabled() const noexcept;
+
     /// Applies the current settings to whole frames of `samples`, in place.
     void process(std::span<float> samples) noexcept;
 
