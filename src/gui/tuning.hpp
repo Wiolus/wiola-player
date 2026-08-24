@@ -35,4 +35,14 @@ inline constexpr int seek_bar_height{12};
 /// How wide the line marking the played edge of the seek bar is.
 inline constexpr int seek_bar_edge_width{2};
 
+/// How wide the volume slider is drawn.
+inline constexpr int volume_slider_width{70};
+
+/// Where the volume slider starts, out of a hundred.
+inline constexpr int full_volume{100};
+
+/// How the slider's position becomes a gain. Above one because hearing is not linear: without it
+/// the whole audible range would crowd into the bottom of the travel.
+inline constexpr double volume_curve{2.0};
+
 } // namespace wiola::gui::tuning

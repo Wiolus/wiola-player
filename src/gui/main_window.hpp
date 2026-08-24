@@ -28,6 +28,7 @@
 
 #include <QLabel>
 #include <QPushButton>
+#include <QSlider>
 #include <QTimer>
 #include <QWidget>
 
@@ -67,6 +68,9 @@ private:
 
     void stop_playback();
 
+    /// Sets how loud the output is, from a slider position out of a hundred.
+    void set_volume(int percent);
+
     /// Moves playback to `fraction` of the loaded track.
     void seek_to(double fraction);
 
@@ -87,6 +91,7 @@ private:
     QPushButton* play_button_{nullptr};
     QPushButton* stop_button_{nullptr};
     SeekBar* position_bar_{nullptr};
+    QSlider* volume_slider_{nullptr};
     QLabel* time_label_{nullptr};
     QLabel* status_label_{nullptr};
     QTimer* refresh_timer_{nullptr};
