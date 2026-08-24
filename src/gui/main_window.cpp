@@ -29,6 +29,8 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
+#include <cmath>
+
 namespace wiola::gui {
 
 namespace {
@@ -53,13 +55,20 @@ MainWindow::MainWindow()
     position_bar_ = new SeekBar{this};
     time_label_ = new QLabel{this};
     status_label_ = new QLabel{this};
+    volume_slider_ = new QSlider{Qt::Horizontal, this};
     refresh_timer_ = new QTimer{this};
+
+    volume_slider_->setRange(0, tuning::full_volume);
+    volume_slider_->setValue(tuning::full_volume);
+    volume_slider_->setFixedWidth(tuning::volume_slider_width);
+    volume_slider_->setToolTip("Volume");
 
     auto* controls = new QHBoxLayout;
     controls->addWidget(open_button_);
     controls->addWidget(play_button_);
     controls->addWidget(stop_button_);
     controls->addWidget(time_label_);
+    controls->addWidget(volume_slider_);
 
     auto* layout = new QVBoxLayout{this};
     layout->addWidget(position_bar_);
@@ -71,6 +80,8 @@ MainWindow::MainWindow()
     connect(open_button_, &QPushButton::clicked, this, &MainWindow::choose_track);
     connect(play_button_, &QPushButton::clicked, this, &MainWindow::toggle_playback);
     connect(stop_button_, &QPushButton::clicked, this, &MainWindow::stop_playback);
+
+    connect(volume_slider_, &QSlider::valueChanged, this, &MainWindow::set_volume);
 
     connect(position_bar_, &SeekBar::seek_requested, this, &MainWindow::seek_to);
 
@@ -135,6 +146,13 @@ void MainWindow::toggle_playback()
         show_status(player_->start() ? QString{} : QString{"no playback device"});
         return;
     }
+}
+
+void MainWindow::set_volume(int percent)
+{
+    const double position{static_cast<double>(percent) / tuning::full_volume};
+
+    chain_.set_volume(static_cast<float>(std::pow(position, tuning::volume_curve)));
 }
 
 void MainWindow::show_status(const QString& message)
