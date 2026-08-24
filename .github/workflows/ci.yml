@@ -1,7 +1,14 @@
 name: CI
 
 on:
+  # Nothing here builds prose, so a pull request that only writes it waits for nothing.
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - docs/**
+      - assets/**
+      - LICENSE
+      - .gitignore
   push:
     branches: [main]
 
