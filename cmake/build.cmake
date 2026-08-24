@@ -55,6 +55,26 @@ if(ENABLE_COVERAGE)
     target_link_options(wiola_coverage INTERFACE -fprofile-instr-generate)
 endif()
 
+# A sanitizer, carried the same way and for the same reason: what a fetched dependency does is not
+# what we are asking about. Empty unless asked for.
+add_library(wiola_sanitizer INTERFACE)
+
+if(ENABLE_SANITIZER)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        message(FATAL_ERROR "ENABLE_SANITIZER needs GCC or Clang.")
+    endif()
+
+    # Frame pointers, so a report names the calls that led there.
+    target_compile_options(
+        wiola_sanitizer
+        INTERFACE "-fsanitize=${ENABLE_SANITIZER}" -fno-omit-frame-pointer -g
+    )
+    target_link_options(
+        wiola_sanitizer
+        INTERFACE "-fsanitize=${ENABLE_SANITIZER}"
+    )
+endif()
+
 # Written at configure time, so the version is a typed constant rather than a macro handed to
 # every translation unit.
 configure_file(
@@ -80,7 +100,7 @@ function(wiola_add_library name)
     target_link_libraries(
         ${name}
         PUBLIC wiola_core
-        PRIVATE wiola_coverage wiola_warnings ${arg_LIBS}
+        PRIVATE wiola_coverage wiola_sanitizer wiola_warnings ${arg_LIBS}
     )
 endfunction()
 

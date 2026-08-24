@@ -10,6 +10,7 @@ function(wiola_add_test name)
             GTest::gtest_main
             wiola_core
             wiola_coverage
+            wiola_sanitizer
             wiola_warnings
             ${arg_LIBS}
     )
