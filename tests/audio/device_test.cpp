@@ -18,6 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <audio/chain.hpp>
 #include <audio/device.hpp>
 #include <audio/stream_spec.hpp>
 #include <audio/tone.hpp>
@@ -32,6 +33,7 @@
 
 namespace {
 
+using wiola::audio::Chain;
 using wiola::audio::Device;
 using wiola::audio::DeviceState;
 using wiola::audio::SineSource;
@@ -44,7 +46,8 @@ constexpr StreamSpec stereo{.sample_rate = 48_kHz, .num_channels = 2};
 TEST(Device, ReportsItsSpecBeforeStarting)
 {
     SPSCRingBuffer<float> buffer{stereo.samples_per(100_ms)};
-    Device device{stereo, buffer};
+    Chain chain{stereo};
+    Device device{stereo, buffer, chain};
 
     EXPECT_EQ(device.spec(), stereo);
     EXPECT_EQ(device.state(), DeviceState::closed);
@@ -56,7 +59,8 @@ TEST(Device, ReportsItsSpecBeforeStarting)
 TEST(Device, KeepsTheOutputBetweenStops)
 {
     SPSCRingBuffer<float> buffer{stereo.samples_per(100_ms)};
-    Device device{stereo, buffer};
+    Chain chain{stereo};
+    Device device{stereo, buffer, chain};
 
     if (!device.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -77,7 +81,8 @@ TEST(Device, KeepsTheOutputBetweenStops)
 TEST(Device, DrainsTheRingBufferWhileRunning)
 {
     SPSCRingBuffer<float> buffer{stereo.samples_per(250_ms)};
-    Device device{stereo, buffer};
+    Chain chain{stereo};
+    Device device{stereo, buffer, chain};
     SineSource source{stereo, 440_Hz};
 
     std::array<float, 1024> chunk{};

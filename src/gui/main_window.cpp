@@ -89,8 +89,10 @@ bool MainWindow::load(const std::filesystem::path& path)
 {
     std::unique_ptr<codec::Decoder> source{codec::open_file(path)};
 
-    // Replacing the player stops whatever it was playing, and takes the old source with it.
-    player_ = source ? std::make_unique<engine::Player>(std::move(source)) : nullptr;
+    // The old player is stopped before the new one is built: a running device reads the chain
+    // that building one reconfigures.
+    player_.reset();
+    player_ = source ? std::make_unique<engine::Player>(std::move(source), chain_) : nullptr;
 
     show_status(loaded() ? QString{} : QString{"cannot read that file"});
     setWindowTitle(loaded() ? QString::fromStdString(path.filename().string())

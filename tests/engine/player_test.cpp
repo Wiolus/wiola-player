@@ -20,6 +20,7 @@
 
 #include <engine/player.hpp>
 
+#include <audio/chain.hpp>
 #include <audio/stream_spec.hpp>
 #include <codec/decoder.hpp>
 #include <codec/open.hpp>
@@ -42,6 +43,8 @@ namespace {
 
 using namespace std::chrono_literals;
 using namespace wiola::units::literals;
+using wiola::audio::Chain;
+using wiola::audio::StreamSpec;
 using wiola::engine::Player;
 using wiola::engine::PlayerState;
 namespace units = wiola::units;
@@ -120,7 +123,8 @@ TEST(Player, PlaysToTheEndOnItsOwn)
     ASSERT_NE(source, nullptr);
 
     const wiola::codec::Decoder* played{source.get()};
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -139,7 +143,8 @@ TEST(Player, StartReturnsBeforePlaybackEnds)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -152,7 +157,8 @@ TEST(Player, StopEndsPlaybackAtOnce)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -174,7 +180,8 @@ TEST(Player, StopIsHarmlessAfterPlaybackHasEnded)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -191,7 +198,8 @@ TEST(Player, PauseSilencesAndResumeContinues)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -220,7 +228,8 @@ TEST(Player, SeekMovesTheSource)
 
     const std::size_t total{source->num_frames()};
     const wiola::codec::Decoder* seeked{source.get()};
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -240,7 +249,8 @@ TEST(Player, SeekBeyondTheEndIsIgnored)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -258,7 +268,8 @@ TEST(Player, TimePlayedStartsAtTheBeginning)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     EXPECT_EQ(player.time_played(), units::Time{});
 }
@@ -270,7 +281,8 @@ TEST(Player, TimePlayedReachesTheEndOfTheSource)
 
     const double length{static_cast<double>(source->num_frames()) /
         source->spec().sample_rate.get<wiola::units::Hz>()};
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -286,7 +298,8 @@ TEST(Player, TimePlayedFollowsASeek)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -305,7 +318,8 @@ TEST(Player, ResumeRefusesBeforeStart)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     EXPECT_EQ(player.state(), PlayerState::idle);
     EXPECT_FALSE(player.resume());
@@ -319,7 +333,8 @@ TEST(Player, DistinguishesEndingFromBeingStopped)
     auto ended = fixture();
     ASSERT_NE(ended, nullptr);
 
-    Player first{std::move(ended)};
+    Chain chain{StreamSpec{}};
+    Player first{std::move(ended), chain};
 
     if (!first.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -329,7 +344,7 @@ TEST(Player, DistinguishesEndingFromBeingStopped)
     EXPECT_TRUE(first.finished());
 
     auto stopped = fixture();
-    Player second{std::move(stopped)};
+    Player second{std::move(stopped), chain};
 
     ASSERT_TRUE(second.start());
     second.stop();
@@ -344,7 +359,8 @@ TEST(Player, TimePlayedReportsASeekThatHasNotBeenAppliedYet)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     // No device is needed: nothing has started, so nothing can apply the request.
     player.seek(1000_ms);
@@ -359,7 +375,8 @@ TEST(Player, StartsWhereASeekAskedForBeforeIt)
 
     const std::size_t total{source->num_frames()};
     const wiola::codec::Decoder* begun{source.get()};
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     player.seek(1000_ms);
 
@@ -376,7 +393,8 @@ TEST(Player, KeepsASeekAskedForAfterStopping)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -425,7 +443,8 @@ protected:
 /// that springs back before it settles.
 TEST(Player, TimePlayedNeverFallsBackWhileASeekIsCarriedOut)
 {
-    Player player{std::make_unique<SlowSource>()};
+    Chain chain{StreamSpec{}};
+    Player player{std::make_unique<SlowSource>(), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -448,7 +467,8 @@ TEST(Player, PlaysAgainAfterEnding)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
@@ -470,7 +490,8 @@ TEST(Player, RefusesToStartWhilePlaying)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    Player player{std::move(source)};
+    Chain chain{StreamSpec{}};
+    Player player{std::move(source), chain};
 
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
