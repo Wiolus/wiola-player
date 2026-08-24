@@ -52,6 +52,7 @@ MainWindow::MainWindow()
     open_button_ = new QPushButton{"Open", this};
     play_button_ = new QPushButton{"Play", this};
     stop_button_ = new QPushButton{"Stop", this};
+    equalizer_button_ = new QPushButton{"EQ", this};
     position_bar_ = new SeekBar{this};
     time_label_ = new QLabel{this};
     status_label_ = new QLabel{this};
@@ -67,6 +68,7 @@ MainWindow::MainWindow()
     controls->addWidget(open_button_);
     controls->addWidget(play_button_);
     controls->addWidget(stop_button_);
+    controls->addWidget(equalizer_button_);
     controls->addWidget(time_label_);
     controls->addWidget(volume_slider_);
 
@@ -81,6 +83,7 @@ MainWindow::MainWindow()
     connect(play_button_, &QPushButton::clicked, this, &MainWindow::toggle_playback);
     connect(stop_button_, &QPushButton::clicked, this, &MainWindow::stop_playback);
 
+    connect(equalizer_button_, &QPushButton::clicked, this, &MainWindow::show_equalizer);
     connect(volume_slider_, &QSlider::valueChanged, this, &MainWindow::set_volume);
 
     connect(position_bar_, &SeekBar::seek_requested, this, &MainWindow::seek_to);
@@ -146,6 +149,15 @@ void MainWindow::toggle_playback()
         show_status(player_->start() ? QString{} : QString{"no playback device"});
         return;
     }
+}
+
+void MainWindow::show_equalizer()
+{
+    if (equalizer_ == nullptr)
+        equalizer_ = new EqualizerPanel{chain_, this};
+
+    equalizer_->show();
+    equalizer_->raise();
 }
 
 void MainWindow::set_volume(int percent)

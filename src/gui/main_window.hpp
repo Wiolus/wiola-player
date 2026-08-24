@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include "equalizer_panel.hpp"
 #include "seek_bar.hpp"
 
 #include <audio/chain.hpp>
@@ -68,6 +69,9 @@ private:
 
     void stop_playback();
 
+    /// Opens the equalizer, building it the first time it is asked for.
+    void show_equalizer();
+
     /// Sets how loud the output is, from a slider position out of a hundred.
     void set_volume(int percent);
 
@@ -92,6 +96,8 @@ private:
     QPushButton* stop_button_{nullptr};
     SeekBar* position_bar_{nullptr};
     QSlider* volume_slider_{nullptr};
+    QPushButton* equalizer_button_{nullptr};
+    EqualizerPanel* equalizer_{nullptr};
     QLabel* time_label_{nullptr};
     QLabel* status_label_{nullptr};
     QTimer* refresh_timer_{nullptr};
