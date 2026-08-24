@@ -90,7 +90,7 @@ Only the scripts. Never `clang-format` or `gersemi` by hand - they format what t
 which is every tracked file, not whatever happened to be edited.
 
 ```bash
-pip install -r requirements.txt        # the pinned clang-format and gersemi
+pip install -r requirements.txt        # the pinned python tools
 
 scripts/format-cpp.sh                  # rewrite every tracked C/C++ file
 scripts/format-cpp.sh --check          # report instead, and fail if anything differs
@@ -128,6 +128,13 @@ the tests, so the GUI reads 0 until there are GUI tests. Line by line, open
 
 `warning: N functions have mismatched data` is expected. It is what one profile covering several
 test binaries looks like, and the numbers are unaffected.
+
+The script also writes `coverage.lcov`, which is what CI hands to `diff-cover` to say how much of
+a pull request's own lines are covered. The same locally:
+
+```bash
+diff-cover build-coverage/coverage/coverage.lcov --compare-branch origin/main
+```
 
 ## Commit names
 

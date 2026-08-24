@@ -66,4 +66,8 @@ report=("$build_dir/bin/wiola-player" "${objects[@]}"
     -format=html -output-dir="$build_dir/coverage/html" \
     "${sources[@]}"
 
+# The same measurement in the format the tools that compare it against a diff read.
+"$llvm_cov" export "${report[@]}" -format=lcov "${sources[@]}" \
+    > "$build_dir/coverage/coverage.lcov"
+
 echo "html report: $build_dir/coverage/html/index.html"
