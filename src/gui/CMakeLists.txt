@@ -1,6 +1,6 @@
 wiola_add_library(
     wiola_gui
-    SOURCES main_window.cpp seek_bar.cpp
+    SOURCES equalizer_panel.cpp main_window.cpp seek_bar.cpp
     LIBS wiola_codec wiola_engine
 )
 

@@ -45,4 +45,17 @@ inline constexpr int full_volume{100};
 /// the whole audible range would crowd into the bottom of the travel.
 inline constexpr double volume_curve{2.0};
 
+/// How tall a band slider is drawn. Enough travel to place a band by eye.
+inline constexpr int band_slider_height{110};
+
+/// How wide a band's column is drawn. Fixed, so a readout changing between "0.0" and "-12.0"
+/// does not shift the row.
+inline constexpr int band_column_width{42};
+
+/// Steps a gain slider takes to the decibel, since a slider counts in whole numbers only.
+inline constexpr int gain_steps_per_db{10};
+
+/// How far a gain slider moves for a press of an arrow key, in its own steps.
+inline constexpr int gain_step{5};
+
 } // namespace wiola::gui::tuning
