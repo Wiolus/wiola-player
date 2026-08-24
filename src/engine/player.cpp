@@ -32,11 +32,12 @@
 
 namespace wiola::engine {
 
-Player::Player(std::unique_ptr<codec::Decoder> source)
+Player::Player(std::unique_ptr<codec::Decoder> source, audio::Chain& chain)
     : source_{std::move(source)}
     , buffer_{source_->spec().samples_per(tuning::buffer_duration)}
-    , device_{source_->spec(), buffer_}
+    , device_{source_->spec(), buffer_, chain}
 {
+    chain.configure(source_->spec());
 }
 
 Player::~Player()

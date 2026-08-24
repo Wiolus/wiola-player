@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <audio/chain.hpp>
 #include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
@@ -53,7 +54,8 @@ enum class DeviceState {
  */
 class Device {
 public:
-    Device(StreamSpec spec, lockfree::SPSCRingBuffer<float>& buffer);
+    /// Takes what it plays and what shapes it. Both outlive the device.
+    Device(StreamSpec spec, lockfree::SPSCRingBuffer<float>& buffer, Chain& chain);
 
     NO_COPY_SEMANTIC(Device);
     NO_MOVE_SEMANTIC(Device);
@@ -92,6 +94,7 @@ private:
 
     StreamSpec spec_{};
     lockfree::SPSCRingBuffer<float>* buffer_;
+    Chain* chain_;
     std::atomic<std::size_t> num_underruns_{0};
     std::atomic<std::size_t> frames_played_{0};
     std::unique_ptr<Backend> backend_;

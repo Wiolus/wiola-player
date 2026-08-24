@@ -22,6 +22,7 @@
 
 #include "seek_bar.hpp"
 
+#include <audio/chain.hpp>
 #include <engine/player.hpp>
 #include <utils/units.hpp>
 
@@ -78,6 +79,8 @@ private:
 
     [[nodiscard]] bool loaded() const noexcept { return player_ != nullptr; }
 
+    /// Outlives every player, so what a listener asked for is not undone by opening a track.
+    audio::Chain chain_{audio::StreamSpec{}};
     std::unique_ptr<engine::Player> player_;
 
     QPushButton* open_button_{nullptr};

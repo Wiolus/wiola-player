@@ -63,8 +63,9 @@ enum class PlayerState {
  */
 class Player final {
 public:
-    /// Takes the source it plays. It must not be null.
-    explicit Player(std::unique_ptr<codec::Decoder> source);
+    /// Takes the source it plays, which must not be null, and what shapes its output. The chain
+    /// is told the source's format and outlives the player.
+    Player(std::unique_ptr<codec::Decoder> source, audio::Chain& chain);
 
     NO_COPY_SEMANTIC(Player);
     NO_MOVE_SEMANTIC(Player);
