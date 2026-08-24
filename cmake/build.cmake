@@ -59,20 +59,32 @@ endif()
 # what we are asking about. Empty unless asked for.
 add_library(wiola_sanitizer INTERFACE)
 
-if(ENABLE_SANITIZER)
+# One process cannot hold both runtimes.
+if(ENABLE_ASAN AND ENABLE_TSAN)
+    message(FATAL_ERROR "ENABLE_ASAN and ENABLE_TSAN are mutually exclusive.")
+endif()
+
+if(ENABLE_ASAN OR ENABLE_TSAN)
     if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        message(FATAL_ERROR "ENABLE_SANITIZER needs GCC or Clang.")
+        message(FATAL_ERROR "The sanitizers need GCC or Clang.")
     endif()
 
-    # Frame pointers, so a report names the calls that led there.
+    # Frame pointers and symbols, so a report names the calls that led there.
+    target_compile_options(wiola_sanitizer INTERFACE -fno-omit-frame-pointer -g)
+endif()
+
+if(ENABLE_ASAN)
+    # A tail call is the first thing a stack trace loses, and a use-after-free is read from one.
     target_compile_options(
         wiola_sanitizer
-        INTERFACE "-fsanitize=${ENABLE_SANITIZER}" -fno-omit-frame-pointer -g
+        INTERFACE -fsanitize=address -fno-optimize-sibling-calls
     )
-    target_link_options(
-        wiola_sanitizer
-        INTERFACE "-fsanitize=${ENABLE_SANITIZER}"
-    )
+    target_link_options(wiola_sanitizer INTERFACE -fsanitize=address)
+endif()
+
+if(ENABLE_TSAN)
+    target_compile_options(wiola_sanitizer INTERFACE -fsanitize=thread)
+    target_link_options(wiola_sanitizer INTERFACE -fsanitize=thread)
 endif()
 
 # Written at configure time, so the version is a typed constant rather than a macro handed to

@@ -25,15 +25,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 option(ENABLE_UNIT_TESTS "Build unit tests" ON)
 option(ENABLE_COVERAGE "Instrument the project's code for coverage" OFF)
 
-set(ENABLE_SANITIZER
-    ""
-    CACHE STRING
-    "Sanitizer to build the project's code with"
-)
-set_property(
-    CACHE ENABLE_SANITIZER
-    PROPERTY STRINGS "" thread address undefined
-)
+option(ENABLE_ASAN "Build the project's code with the address sanitizer" OFF)
+option(ENABLE_TSAN "Build the project's code with the thread sanitizer" OFF)
 
 if(PROJECT_IS_TOP_LEVEL)
     include(CTest)
