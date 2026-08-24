@@ -7,7 +7,13 @@ add_subdirectory(gui)
 add_executable(wiola-player main.cpp)
 target_link_libraries(
     wiola-player
-    PRIVATE wiola_cli wiola_core wiola_coverage wiola_gui wiola_warnings
+    PRIVATE
+        wiola_cli
+        wiola_core
+        wiola_coverage
+        wiola_gui
+        wiola_sanitizer
+        wiola_warnings
 )
 
 # Windows opens a console for anything but a GUI binary. Ignored on other systems.
