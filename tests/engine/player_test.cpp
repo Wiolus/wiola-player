@@ -226,8 +226,6 @@ TEST(Player, SeekMovesTheSource)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    const std::size_t total{source->num_frames()};
-    const wiola::codec::Decoder* seeked{source.get()};
     Chain chain{StreamSpec{}};
     Player player{std::move(source), chain};
 
@@ -237,11 +235,17 @@ TEST(Player, SeekMovesTheSource)
     ASSERT_TRUE(player.pause());
     player.seek(1300_ms);
 
-    // Seeking near the end leaves the decoder with little left to read.
-    EXPECT_TRUE(eventually([seeked, total] { return seeked->num_frames_left() < total / 4; }));
-
     // Seeking does not start a paused player.
     EXPECT_FALSE(player.playing());
+
+    const auto began = std::chrono::steady_clock::now();
+
+    ASSERT_TRUE(player.resume());
+    player.wait();
+
+    // Only a source that moved runs out this soon: from where it was, the rest would take the
+    // length of the track.
+    EXPECT_LT(std::chrono::steady_clock::now() - began, player.total_time().chrono() / 2);
 }
 
 TEST(Player, SeekBeyondTheEndIsIgnored)
@@ -383,9 +387,14 @@ TEST(Player, StartsWhereASeekAskedForBeforeIt)
     if (!player.start())
         GTEST_SKIP() << "no playback device on this machine";
 
-    // Beginning a second into the source leaves the decoder with only the rest of it to read.
-    EXPECT_LT(begun->num_frames_left(), total / 2);
     EXPECT_GT(player.time_played().get<units::Sec>(), 0.9);
+
+    // The source belongs to the decoding thread while it runs, and to us once it has stopped.
+    player.stop();
+    player.wait();
+
+    // Beginning a second into the source left the decoder with only the rest of it to read.
+    EXPECT_LT(begun->num_frames_left(), total / 2);
 }
 
 TEST(Player, KeepsASeekAskedForAfterStopping)
