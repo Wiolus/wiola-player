@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-preset=coverage
+preset=linux-coverage
 cxx=${CXX:-clang++}
 
 # Where that preset builds. The profile and the report are written beside the binaries they were
