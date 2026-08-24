@@ -23,15 +23,21 @@ jobs:
       - run: ./scripts/format-cmake.sh --check
 
   test:
+    name: test (${{ matrix.preset }})
     runs-on: ubuntu-24.04
+    strategy:
+      # One sanitizer failing is not a reason to stop hearing from the others.
+      fail-fast: false
+      matrix:
+        preset: [linux-debug, linux-asan, linux-tsan]
     env:
       CXX: clang++-18
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y qt6-base-dev
-      - run: cmake --preset linux-debug
-      - run: cmake --build --preset linux-debug -j
-      - run: ctest --preset linux-debug
+      - run: cmake --preset ${{ matrix.preset }}
+      - run: cmake --build --preset ${{ matrix.preset }} -j
+      - run: ctest --preset ${{ matrix.preset }}
 
   coverage:
     runs-on: ubuntu-24.04
