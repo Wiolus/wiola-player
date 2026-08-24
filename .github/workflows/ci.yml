@@ -42,7 +42,15 @@ jobs:
   coverage:
     runs-on: ubuntu-24.04
     steps:
+      # All of it, since what a pull request changed is measured against where it started.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
       - run: sudo apt-get update && sudo apt-get install -y qt6-base-dev llvm-18
       - run: ./scripts/coverage.sh
         env:
@@ -55,6 +63,13 @@ jobs:
             cat build-coverage/coverage/summary.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      # What this pull request itself left untested, which a total is too blunt to show.
+      - if: github.event_name == 'pull_request'
+        run: |
+          diff-cover build-coverage/coverage/coverage.lcov \
+            --compare-branch "origin/${{ github.base_ref }}" \
+            --format "markdown:diff-coverage.md"
+          cat diff-coverage.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: coverage-html
