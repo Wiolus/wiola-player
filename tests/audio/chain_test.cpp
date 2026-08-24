@@ -39,9 +39,9 @@ using namespace wiola::units;
 
 constexpr StreamSpec stereo{.sample_rate = 48_kHz, .num_channels = 2};
 
-std::array<float, 4> samples()
+auto samples()
 {
-    return {1.0F, -0.5F, 0.25F, 0.0F};
+    return std::array{1.0F, -0.5F, 0.25F, 0.0F};
 }
 
 } // namespace
