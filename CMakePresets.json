@@ -44,12 +44,30 @@
             }
         },
         {
-            "name": "coverage",
+            "name": "linux-coverage",
             "displayName": "Linux, instrumented for coverage",
             "inherits": "linux-debug",
             "binaryDir": "${sourceDir}/build-coverage",
             "cacheVariables": {
                 "ENABLE_COVERAGE": "ON"
+            }
+        },
+        {
+            "name": "linux-tsan",
+            "displayName": "Linux, built with the thread sanitizer",
+            "inherits": "linux",
+            "binaryDir": "${sourceDir}/build-tsan",
+            "cacheVariables": {
+                "ENABLE_TSAN": "ON"
+            }
+        },
+        {
+            "name": "linux-asan",
+            "displayName": "Linux, built with the address sanitizer",
+            "inherits": "linux",
+            "binaryDir": "${sourceDir}/build-asan",
+            "cacheVariables": {
+                "ENABLE_ASAN": "ON"
             }
         }
     ],
@@ -75,8 +93,16 @@
             "configurePreset": "windows-release"
         },
         {
-            "name": "coverage",
-            "configurePreset": "coverage"
+            "name": "linux-coverage",
+            "configurePreset": "linux-coverage"
+        },
+        {
+            "name": "linux-tsan",
+            "configurePreset": "linux-tsan"
+        },
+        {
+            "name": "linux-asan",
+            "configurePreset": "linux-asan"
         }
     ],
     "testPresets": [
@@ -95,8 +121,22 @@
             }
         },
         {
-            "name": "coverage",
-            "configurePreset": "coverage",
+            "name": "linux-coverage",
+            "configurePreset": "linux-coverage",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "linux-tsan",
+            "configurePreset": "linux-tsan",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "linux-asan",
+            "configurePreset": "linux-asan",
             "output": {
                 "outputOnFailure": true
             }

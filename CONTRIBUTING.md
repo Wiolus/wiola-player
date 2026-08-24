@@ -115,7 +115,7 @@ sudo apt install llvm-18               # the profile tools, one version per clan
 scripts/coverage.sh                    # build instrumented, run the tests, print the report
 ```
 
-The build is the `coverage` preset, so `build-coverage/` and `build/` never meet. Debug, because
+The build is the `linux-coverage` preset, so `build-coverage/` and `build/` never meet. Debug, because
 optimized code no longer sits on the lines it was written on and the counts stop matching the
 source. The script needs clang, takes the one in `CXX` if that is set, and looks the profile tools
 up by the compiler's version, since a profile is not read by another.
