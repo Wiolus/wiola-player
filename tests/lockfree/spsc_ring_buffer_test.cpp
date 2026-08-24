@@ -23,12 +23,27 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <optional>
+#include <span>
+#include <stop_token>
+#include <thread>
+#include <vector>
 
 namespace {
 
+using namespace std::chrono_literals;
 using wiola::hw::hardware_destructive_interference_size;
+
+/// How long a threaded test waits for the other side before giving up, so a buffer that stops
+/// carrying anything fails rather than hangs.
+constexpr std::chrono::seconds patience{30};
+
+/// Small, so that a run of any length wraps many times.
+constexpr std::size_t threaded_capacity{64};
+
+constexpr int num_threaded_elements{200000};
 
 TEST(SPSCRingBuffer, KeepsProducerAndConsumerIndicesApart)
 {
@@ -303,6 +318,86 @@ TEST(SPSCRingBuffer, OffersNothingToAWriterOfAFullBuffer)
     EXPECT_EQ(region.size(), 0u);
     EXPECT_TRUE(region.first.empty());
     EXPECT_TRUE(region.second.empty());
+}
+
+/// What the buffer is for: one thread writing while another reads, with every element arriving
+/// once and in the order it was written.
+TEST(SPSCRingBuffer, CarriesEveryElementBetweenTwoThreads)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{threaded_capacity};
+
+    const std::jthread producer{[&buffer](const std::stop_token& stop) {
+        for (int value = 0; value < num_threaded_elements && !stop.stop_requested();) {
+            if (buffer.try_push(value))
+                ++value;
+            else
+                std::this_thread::yield();
+        }
+    }};
+
+    const auto deadline = std::chrono::steady_clock::now() + patience;
+
+    for (int expected = 0; expected < num_threaded_elements;) {
+        const std::optional<int> value{buffer.try_pop()};
+
+        if (!value.has_value()) {
+            ASSERT_LT(std::chrono::steady_clock::now(), deadline) << "stalled at " << expected;
+            std::this_thread::yield();
+            continue;
+        }
+
+        ASSERT_EQ(*value, expected);
+        ++expected;
+    }
+}
+
+/// The same, through the regions rather than element by element.
+TEST(SPSCRingBuffer, CarriesEveryElementBetweenTwoThreadsInRegions)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{threaded_capacity};
+
+    const std::jthread producer{[&buffer](const std::stop_token& stop) {
+        int value{0};
+
+        while (value < num_threaded_elements && !stop.stop_requested()) {
+            const auto region = buffer.acquire_write();
+
+            if (region.size() == 0) {
+                std::this_thread::yield();
+                continue;
+            }
+
+            std::size_t written{0};
+
+            for (std::span<int> part : {region.first, region.second})
+                for (int& slot : part)
+                    if (value < num_threaded_elements) {
+                        slot = value++;
+                        ++written;
+                    }
+
+            buffer.commit_write(written);
+        }
+    }};
+
+    const auto deadline = std::chrono::steady_clock::now() + patience;
+    int expected{0};
+
+    while (expected < num_threaded_elements) {
+        const auto region = buffer.acquire_read();
+
+        if (region.size() == 0) {
+            ASSERT_LT(std::chrono::steady_clock::now(), deadline) << "stalled at " << expected;
+            std::this_thread::yield();
+            continue;
+        }
+
+        for (std::span<const int> part : {region.first, region.second})
+            for (const int value : part)
+                ASSERT_EQ(value, expected++);
+
+        buffer.commit_read(region.size());
+    }
 }
 
 } // namespace
