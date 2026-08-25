@@ -70,4 +70,8 @@ report=("$build_dir/bin/wiola-player" "${objects[@]}"
 "$llvm_cov" export "${report[@]}" -format=lcov "${sources[@]}" \
     > "$build_dir/coverage/coverage.lcov"
 
+# The same measurement without the per-line detail, for whatever reads a number, not a report.
+"$llvm_cov" export "${report[@]}" -format=text -summary-only "${sources[@]}" \
+    > "$build_dir/coverage/summary.json"
+
 echo "html report: $build_dir/coverage/html/index.html"
