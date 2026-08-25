@@ -39,37 +39,17 @@ jobs:
         preset: [linux-debug, linux-asan, linux-tsan]
     env:
       CXX: clang++-18
-      CMAKE_CXX_COMPILER_LAUNCHER: ccache
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 500M
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y qt6-base-dev ccache
-      # What was fetched, which changes only when the pinned versions do. The build directories
-      # beside these are configuration's own and are left to be made again.
-      - uses: actions/cache@v4
+      - uses: ./.github/actions/setup-build
         with:
-          path: |
-            build-*/_deps/*-src
-            build-*/_deps/*-subbuild
-          key: deps-${{ matrix.preset }}-${{ hashFiles('cmake/dependencies.cmake') }}
-      # What was compiled last time. Keyed by commit so every run leaves one, and restored from
-      # whichever of this preset's is newest.
-      - uses: actions/cache@v4
-        with:
-          path: .ccache
-          key: ccache-${{ matrix.preset }}-${{ github.sha }}
-          restore-keys: ccache-${{ matrix.preset }}-
+          name: ${{ matrix.preset }}
       - run: cmake --preset ${{ matrix.preset }}
       - run: cmake --build --preset ${{ matrix.preset }} -j
       - run: ctest --preset ${{ matrix.preset }}
 
   coverage:
     runs-on: ubuntu-24.04
-    env:
-      CMAKE_CXX_COMPILER_LAUNCHER: ccache
-      CCACHE_DIR: ${{ github.workspace }}/.ccache
-      CCACHE_MAXSIZE: 500M
     steps:
       # All of it, since what a pull request changed is measured against where it started.
       - uses: actions/checkout@v4
@@ -80,18 +60,11 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
-      - run: sudo apt-get update && sudo apt-get install -y qt6-base-dev llvm-18 ccache
-      - uses: actions/cache@v4
+      - uses: ./.github/actions/setup-build
         with:
-          path: |
-            build-coverage/_deps/*-src
-            build-coverage/_deps/*-subbuild
-          key: deps-coverage-${{ hashFiles('cmake/dependencies.cmake') }}
-      - uses: actions/cache@v4
-        with:
-          path: .ccache
-          key: ccache-coverage-${{ github.sha }}
-          restore-keys: ccache-coverage-
+          name: coverage
+          build-dir: build-coverage
+          packages: llvm-18
       - run: ./scripts/coverage.sh
         env:
           CXX: clang++-18
