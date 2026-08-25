@@ -1,6 +1,6 @@
 # Wiola Player
 
-[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fgithub.com%2FWiolus%2Fwiola-player%2Freleases%2Fdownload%2Fcoverage%2Fbadge.json)](https://github.com/Wiolus/wiola-player/releases/download/coverage/coverage-html.zip)
+[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fwiolus.github.io%2Fwiola-player%2Fbadge.json)](https://wiolus.github.io/wiola-player/)
 
 A small desktop music player for WAV, FLAC and MP3. One window, three buttons, a seek bar. On
 Windows it is a single executable: nothing to install, no DLLs to place beside it.

@@ -74,4 +74,17 @@ report=("$build_dir/bin/wiola-player" "${objects[@]}"
 "$llvm_cov" export "${report[@]}" -format=text -summary-only "${sources[@]}" \
     > "$build_dir/coverage/summary.json"
 
+# The line total in the shape a badge reads, inside the report so that it is published with it.
+python3 - "$build_dir/coverage/summary.json" > "$build_dir/coverage/html/badge.json" <<'PY'
+import json
+import sys
+
+totals = json.load(open(sys.argv[1]))["data"][0]["totals"]
+percent = totals["lines"]["percent"]
+color = "brightgreen" if percent >= 90 else "yellow" if percent >= 75 else "red"
+
+print(json.dumps({"schemaVersion": 1, "label": "coverage",
+                  "message": f"{percent:.1f}%", "color": color}))
+PY
+
 echo "html report: $build_dir/coverage/html/index.html"
