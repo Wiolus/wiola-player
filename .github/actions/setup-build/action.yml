@@ -1,0 +1,45 @@
+name: Set up a build
+description: Installs what a build needs and restores what it can reuse.
+
+inputs:
+  name:
+    description: What the caches belong to, usually the preset.
+    required: true
+  build-dir:
+    description: Where the fetched dependencies land.
+    default: build-*
+  packages:
+    description: Anything to install beyond what every build needs.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qt6-base-dev ccache ${{ inputs.packages }}
+
+        # Read by cmake and by ccache itself, for every step after this one.
+        {
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache"
+          echo "CCACHE_DIR=${{ github.workspace }}/.ccache"
+          echo "CCACHE_MAXSIZE=500M"
+        } >> "$GITHUB_ENV"
+
+    # What was fetched, which changes only when the pinned versions do. The build directories
+    # beside these belong to one configuration and are left to be made again.
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ${{ inputs.build-dir }}/_deps/*-src
+          ${{ inputs.build-dir }}/_deps/*-subbuild
+        key: deps-${{ inputs.name }}-${{ hashFiles('cmake/dependencies.cmake') }}
+
+    # What was compiled last time. Keyed by commit so every run leaves one, and restored from
+    # whichever of this name's is newest.
+    - uses: actions/cache@v4
+      with:
+        path: .ccache
+        key: ccache-${{ inputs.name }}-${{ github.sha }}
+        restore-keys: ccache-${{ inputs.name }}-
