@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-# One tag that moves, so a link to the report does not have to name the run that produced it.
+# One tag for every run, so a link to the report does not have to name the run that produced it.
 tag=coverage
 
 coverage_dir=build-coverage/coverage
@@ -40,7 +40,7 @@ print(json.dumps({"schemaVersion": 1, "label": "coverage",
                   "message": f"{percent:.1f}%", "color": color}))
 PY
 
-# A prerelease, so that the release the README calls the latest one stays the player.
+# A prerelease, so that this is never the release "latest" resolves to.
 gh release view "$tag" >/dev/null 2>&1 ||
     gh release create "$tag" --prerelease --target "$(git rev-parse HEAD)" \
         --title Coverage --notes "The report from the tip of main."
