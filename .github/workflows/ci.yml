@@ -88,10 +88,16 @@ jobs:
           name: coverage-html
           path: build-coverage/coverage/html
       # Only from main: what a pull request measured is its own, and does not replace the report.
+      # The report takes a path of its own, leaving the root for whatever is put there later.
+      - if: github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p site/coverage
+          cp -r build-coverage/coverage/html/. site/coverage/
+          printf '<meta http-equiv="refresh" content="0; url=coverage/">\n' > site/index.html
       - if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build-coverage/coverage/html
+          path: site
 
   pages:
     needs: coverage
