@@ -27,6 +27,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
+#include <numbers>
+#include <span>
 
 namespace {
 
@@ -35,6 +38,8 @@ using namespace wiola::units;
 using wiola::audio::StreamSpec;
 
 constexpr StreamSpec stereo{.sample_rate = 48_kHz, .num_channels = 2};
+constexpr StreamSpec mono{.sample_rate = 44100_Hz, .num_channels = 1};
+constexpr StreamSpec surround{.sample_rate = 48_kHz, .num_channels = 6};
 
 TEST(SineSource, StaysWithinAmplitude)
 {
@@ -106,6 +111,121 @@ TEST(SineSource, LeavesPartialFramesUntouched)
 
     EXPECT_NE(block[0], 42.0F);
     EXPECT_FLOAT_EQ(block[4], 42.0F);
+}
+
+TEST(SineSource, ReportsTheSpecItWasGiven)
+{
+    EXPECT_EQ(SineSource(stereo, 440_Hz).spec(), stereo);
+    EXPECT_EQ(SineSource(mono, 440_Hz).spec(), mono);
+}
+
+TEST(SineSource, ReturnsTheNumberOfSamplesWritten)
+{
+    SineSource source{stereo, 440_Hz};
+    std::array<float, 512> block{};
+    std::array<float, 5> partial{};
+
+    EXPECT_EQ(source.render(block), block.size());
+    EXPECT_EQ(source.render(partial), 4U);
+}
+
+TEST(SineSource, WritesNothingWhenThereIsNoWholeFrame)
+{
+    SineSource source{stereo, 440_Hz};
+    std::array<float, 1> block{42.0F};
+
+    EXPECT_EQ(source.render(std::span<float>{}), 0U);
+    EXPECT_EQ(source.render(block), 0U);
+    EXPECT_FLOAT_EQ(block[0], 42.0F);
+}
+
+/// Held back frames are not skipped: what a short span refused is what the next call renders.
+TEST(SineSource, HoldsPhaseWhenNothingIsWritten)
+{
+    SineSource stalled{stereo, 440_Hz};
+    SineSource plain{stereo, 440_Hz};
+
+    std::array<float, 1> too_short{};
+    std::array<float, 64> from_stalled{};
+    std::array<float, 64> from_plain{};
+
+    stalled.render(too_short);
+    stalled.render(from_stalled);
+    plain.render(from_plain);
+
+    EXPECT_EQ(from_stalled, from_plain);
+}
+
+TEST(SineSource, FillsEveryChannelOfAnyLayout)
+{
+    SineSource single{mono, 440_Hz};
+    SineSource many{surround, 440_Hz};
+
+    std::array<float, 64> single_block{};
+    std::array<float, 64> many_block{};
+
+    EXPECT_EQ(single.render(single_block), single_block.size());
+    EXPECT_EQ(many.render(many_block), 60U);
+
+    for (std::size_t i = 0; i + surround.num_channels <= many_block.size();
+        i += surround.num_channels) {
+        for (std::size_t channel = 1; channel < surround.num_channels; ++channel)
+            EXPECT_FLOAT_EQ(many_block[i + channel], many_block[i]);
+    }
+}
+
+TEST(SineSource, StartsAtZeroPhase)
+{
+    SineSource source{stereo, 440_Hz};
+    std::array<float, 2> block{};
+
+    source.render(block);
+
+    EXPECT_FLOAT_EQ(block[0], 0.0F);
+}
+
+/// Wrapping the phase keeps the tone on the analytic sine rather than only near it.
+TEST(SineSource, FollowsTheAnalyticSineAcrossWraps)
+{
+    constexpr auto frequency = 997_Hz;
+    constexpr float amplitude{0.75F};
+    SineSource source{mono, frequency, amplitude};
+
+    std::array<float, 8192> block{};
+    source.render(block);
+
+    const double step{2.0 * std::numbers::pi * (frequency / mono.sample_rate)};
+
+    for (std::size_t i = 0; i < block.size(); ++i) {
+        const auto expected =
+            static_cast<float>(amplitude * std::sin(step * static_cast<double>(i)));
+        EXPECT_NEAR(block[i], expected, 1e-4F) << "at sample " << i;
+    }
+}
+
+TEST(SineSource, IsSilentAtZeroAmplitude)
+{
+    SineSource source{stereo, 440_Hz, 0.0F};
+    std::array<float, 128> block{};
+    block.fill(42.0F);
+
+    source.render(block);
+
+    for (const float sample : block)
+        EXPECT_FLOAT_EQ(sample, 0.0F);
+}
+
+TEST(SineSource, DefaultsToAQuietAmplitude)
+{
+    SineSource source{stereo, 440_Hz};
+    std::array<float, 4096> block{};
+
+    source.render(block);
+
+    const auto [min, max] = std::ranges::minmax_element(block);
+    EXPECT_LE(*max, 0.2F);
+    EXPECT_GE(*min, -0.2F);
+    EXPECT_GT(*max, 0.19F);
 }
 
 } // namespace
