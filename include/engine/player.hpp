@@ -119,9 +119,6 @@ public:
     /// has been asked for but not yet applied reads as the place it asked for.
     [[nodiscard]] units::Time time_played() const noexcept;
 
-    /// Callbacks that found the buffer short and had to emit silence.
-    [[nodiscard]] std::size_t num_underruns() const noexcept;
-
 private:
     /// Fills the buffer before the device is started, so the first callbacks find frames waiting.
     void prime();

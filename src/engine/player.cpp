@@ -216,11 +216,6 @@ void Player::wait()
         thread_.join();
 }
 
-std::size_t Player::num_underruns() const noexcept
-{
-    return device_.num_underruns();
-}
-
 void Player::prime()
 {
     std::array<float, tuning::decode_chunk_samples> chunk{};
