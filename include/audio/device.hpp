@@ -20,10 +20,9 @@
 
 #pragma once
 
-#include <audio/chain.hpp>
+#include <audio/source.hpp>
 #include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
-#include <lockfree/spsc_ring_buffer.hpp>
 
 #include <atomic>
 #include <cstddef>
@@ -48,14 +47,14 @@ enum class DeviceState {
 /**
  * Default system output.
  *
- * The device callback runs on a real-time thread owned by the backend: it only pops from the
- * ring buffer and never allocates, locks, or blocks. Whoever constructs the device owns the
- * buffer and is the single producer.
+ * The device callback runs on a real-time thread owned by the backend and does nothing but ask
+ * the source for frames, so a source that allocates, locks, blocks or throws must not be given
+ * to a device.
  */
 class Device {
 public:
-    /// Takes what it plays and what shapes it. Both outlive the device.
-    Device(StreamSpec spec, lockfree::SPSCRingBuffer<float>& buffer, Chain& chain);
+    /// Takes what it plays, which outlives the device and decides the format the output opens in.
+    explicit Device(Source& source);
 
     NO_COPY_SEMANTIC(Device);
     NO_MOVE_SEMANTIC(Device);
@@ -93,8 +92,7 @@ private:
     void render(std::span<float> output) noexcept;
 
     StreamSpec spec_{};
-    lockfree::SPSCRingBuffer<float>* buffer_;
-    Chain* chain_;
+    Source& source_;
     std::atomic<std::size_t> num_underruns_{0};
     std::atomic<std::size_t> frames_played_{0};
     std::unique_ptr<Backend> backend_;

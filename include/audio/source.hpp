@@ -28,13 +28,7 @@
 
 namespace wiola::audio {
 
-/**
- * Frames on demand, in one format, interleaved.
- *
- * Whoever holds a source asks for frames and is told how many arrived. Where they come from is
- * the source's own business, and how long they last is not part of this: a source that runs out
- * and one that never does answer the same two questions.
- */
+/// Frames on demand, in one format, interleaved. How long they last is not part of this.
 class Source {
 public:
     NO_COPY_SEMANTIC(Source);
@@ -42,11 +36,10 @@ public:
 
     virtual ~Source() = default;
 
-    /// Fills whole frames of `interleaved` and returns how many samples were written. Fewer than
-    /// it holds means there were not that many to give.
+    /// Fills whole frames and returns how many samples were written. Short means no more to give.
     virtual std::size_t render(std::span<float> interleaved) = 0;
 
-    /// The format the frames are in, which does not change while the source lives.
+    /// The format the frames are in. Fixed for the source's lifetime.
     [[nodiscard]] virtual StreamSpec spec() const noexcept = 0;
 
 protected:

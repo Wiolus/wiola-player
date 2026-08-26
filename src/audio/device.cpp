@@ -32,10 +32,9 @@ struct Device::Backend {
     bool initialized{false};
 };
 
-Device::Device(StreamSpec spec, lockfree::SPSCRingBuffer<float>& buffer, Chain& chain)
-    : spec_{spec}
-    , buffer_{&buffer}
-    , chain_{&chain}
+Device::Device(Source& source)
+    : spec_{source.spec()}
+    , source_{source}
     , backend_{std::make_unique<Backend>()}
 {
 }
@@ -50,14 +49,12 @@ Device::~Device()
 
 void Device::render(std::span<float> output) noexcept
 {
-    const std::size_t num_popped{buffer_->pop(output)};
+    const std::size_t num_rendered{source_.render(output)};
 
-    chain_->process(output.first(num_popped));
+    frames_played_.fetch_add(spec_.frames_per(num_rendered), std::memory_order_relaxed);
 
-    frames_played_.fetch_add(spec_.frames_per(num_popped), std::memory_order_relaxed);
-
-    if (num_popped < output.size()) {
-        std::ranges::fill(output.subspan(num_popped), 0.0F);
+    if (num_rendered < output.size()) {
+        std::ranges::fill(output.subspan(num_rendered), 0.0F);
         num_underruns_.fetch_add(1, std::memory_order_relaxed);
     }
 }

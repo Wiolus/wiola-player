@@ -32,10 +32,43 @@
 
 namespace wiola::engine {
 
+namespace {
+
+/// What the device plays: what the decoding thread has buffered, shaped on its way out.
+class BufferedOutput final : public audio::Source {
+public:
+    BufferedOutput(audio::StreamSpec spec, lockfree::SPSCRingBuffer<float>& buffer,
+        audio::Chain& chain) noexcept
+        : spec_{spec}
+        , buffer_{buffer}
+        , chain_{chain}
+    {
+    }
+
+    std::size_t render(std::span<float> interleaved) override
+    {
+        const std::size_t num_popped{buffer_.pop(interleaved)};
+
+        chain_.process(interleaved.first(num_popped));
+
+        return num_popped;
+    }
+
+    [[nodiscard]] audio::StreamSpec spec() const noexcept override { return spec_; }
+
+private:
+    audio::StreamSpec spec_;
+    lockfree::SPSCRingBuffer<float>& buffer_;
+    audio::Chain& chain_;
+};
+
+} // namespace
+
 Player::Player(std::unique_ptr<codec::Decoder> source, audio::Chain& chain)
     : source_{std::move(source)}
     , buffer_{source_->spec().samples_per(tuning::buffer_duration)}
-    , device_{source_->spec(), buffer_, chain}
+    , output_{std::make_unique<BufferedOutput>(source_->spec(), buffer_, chain)}
+    , device_{*output_}
 {
     chain.configure(source_->spec());
 }

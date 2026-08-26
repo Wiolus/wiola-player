@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <audio/chain.hpp>
 #include <audio/device.hpp>
 #include <codec/decoder.hpp>
 #include <core/macros.hpp>
@@ -151,6 +152,9 @@ private:
     /// when the device has played all of them, which is a fact rather than a buffer level.
     std::size_t num_pushed_{0};
     lockfree::SPSCRingBuffer<float> buffer_;
+
+    /// Reads `buffer_`, so it is built before the device that asks it for frames.
+    std::unique_ptr<audio::Source> output_;
     audio::Device device_;
     std::jthread thread_;
 };
