@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <audio/source.hpp>
 #include <audio/stream_spec.hpp>
 #include <utils/units.hpp>
 
@@ -29,15 +30,15 @@
 namespace wiola::audio {
 
 /// Generates a constant-frequency sine, the same signal on every channel.
-class SineSource {
+class SineSource final : public Source {
 public:
     SineSource(StreamSpec spec, units::Frequency frequency, float amplitude = 0.2F) noexcept;
 
     /// Writes whole frames only: channels alternate within a frame, never one array per channel
     /// as a planar layout would. A partial trailing frame is left untouched. Returns how many
     /// samples were written, which for a tone is every whole frame the span holds.
-    std::size_t render(std::span<float> interleaved) noexcept;
-    [[nodiscard]] StreamSpec spec() const noexcept;
+    std::size_t render(std::span<float> interleaved) noexcept override;
+    [[nodiscard]] StreamSpec spec() const noexcept override;
 
 private:
     const StreamSpec spec_{};

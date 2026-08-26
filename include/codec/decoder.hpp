@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <audio/source.hpp>
 #include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
 
@@ -41,16 +42,12 @@ namespace wiola::codec {
  * A subclass supplies one function, `decode`, and receives the counting, the clamping and the
  * end-of-stream question already answered.
  */
-class Decoder {
+class Decoder : public audio::Source {
 public:
-    NO_COPY_SEMANTIC(Decoder);
-    NO_MOVE_SEMANTIC(Decoder);
-    virtual ~Decoder() = default;
-
     /// Fills whole frames and returns how many samples were written. Short means end of file.
-    std::size_t render(std::span<float> output);
+    std::size_t render(std::span<float> output) override;
 
-    [[nodiscard]] audio::StreamSpec spec() const noexcept { return spec_; }
+    [[nodiscard]] audio::StreamSpec spec() const noexcept override { return spec_; }
 
     /// Total frames in the stream, and how many are still unread.
     [[nodiscard]] std::size_t num_frames() const noexcept { return num_frames_; }

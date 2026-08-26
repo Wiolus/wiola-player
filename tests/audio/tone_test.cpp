@@ -18,6 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <audio/source.hpp>
 #include <audio/stream_spec.hpp>
 #include <audio/tone.hpp>
 #include <utils/units.hpp>
@@ -111,6 +112,19 @@ TEST(SineSource, LeavesPartialFramesUntouched)
 
     EXPECT_NE(block[0], 42.0F);
     EXPECT_FLOAT_EQ(block[4], 42.0F);
+}
+
+/// A tone is reached through the role as well as through its own type, which is what lets anything
+/// that pulls frames take one.
+TEST(SineSource, AnswersAsASource)
+{
+    SineSource tone{stereo, 440_Hz};
+    wiola::audio::Source& source{tone};
+
+    std::array<float, 64> block{};
+
+    EXPECT_EQ(source.render(block), block.size());
+    EXPECT_EQ(source.spec(), stereo);
 }
 
 TEST(SineSource, ReportsTheSpecItWasGiven)
