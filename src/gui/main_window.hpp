@@ -29,6 +29,7 @@
 
 #include <QLabel>
 #include <QPushButton>
+#include <QSettings>
 #include <QSlider>
 #include <QTimer>
 #include <QWidget>
@@ -72,7 +73,8 @@ private:
     /// Opens the equalizer, building it the first time it is asked for.
     void show_equalizer();
 
-    /// Sets how loud the output is, from a slider position out of a hundred.
+    /// Sets how loud the output is, from a slider position out of a hundred, and keeps it for the
+    /// runs after this one.
     void set_volume(int percent);
 
     /// Moves playback to `fraction` of the loaded track.
@@ -90,6 +92,9 @@ private:
     /// Outlives every player, so what a listener asked for is not undone by opening a track.
     audio::Chain chain_{audio::StreamSpec{}};
     std::unique_ptr<engine::Player> player_;
+
+    /// What a run leaves behind for the next one.
+    QSettings settings_;
 
     QPushButton* open_button_{nullptr};
     QPushButton* play_button_{nullptr};
