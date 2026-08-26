@@ -173,7 +173,7 @@ void MainWindow::toggle_playback()
 void MainWindow::show_equalizer()
 {
     if (equalizer_ == nullptr)
-        equalizer_ = new EqualizerPanel{chain_, this};
+        equalizer_ = new EqualizerPanel{chain_.equalizer(), this};
 
     equalizer_->show();
     equalizer_->raise();
@@ -183,7 +183,7 @@ void MainWindow::set_volume(int percent)
 {
     const double position{static_cast<double>(percent) / tuning::full_volume};
 
-    chain_.set_volume(static_cast<float>(std::pow(position, tuning::volume_curve)));
+    chain_.volume().set_gain(static_cast<float>(std::pow(position, tuning::volume_curve)));
     settings_.setValue(volume_key, percent);
 }
 

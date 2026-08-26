@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <audio/chain.hpp>
+#include <audio/equalizer.hpp>
 
 #include <QCheckBox>
 #include <QHBoxLayout>
@@ -33,15 +33,15 @@ namespace wiola::gui {
 /**
  * One slider per band, and the two controls that apply to all of them.
  *
- * The bands are built from the chain each time the panel is shown, since a track can change how
- * many of them the format carries. Positions are read back from the chain rather than remembered
+ * The bands are built from the equalizer each time the panel is shown, since a track can change
+ * how many of them the format carries. Positions are read back from it rather than remembered
  * here, so what is shown is what is being applied.
  */
 class EqualizerPanel final : public QWidget {
     Q_OBJECT
 
 public:
-    EqualizerPanel(audio::Chain& chain, QWidget* parent);
+    EqualizerPanel(audio::Equalizer& equalizer, QWidget* parent);
 
 protected:
     void showEvent(QShowEvent* event) override;
@@ -50,7 +50,7 @@ private:
     /// Replaces the row of band sliders with one the current format asks for.
     void rebuild_bands();
 
-    audio::Chain* chain_;
+    audio::Equalizer* equalizer_;
 
     QCheckBox* enabled_box_{nullptr};
     QSlider* preamp_slider_{nullptr};

@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief What is done to samples between the buffer and the output.
+ * @brief How loud the output is.
  * @author Roman Glaz
  * @copyright © 2026, <vokerlee@gmail.com>
  *
@@ -18,41 +18,35 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/chain.hpp>
+#include <audio/volume.hpp>
 
 #include <algorithm>
 
 namespace wiola::audio {
 
-Chain::Chain(StreamSpec spec, BandLayout layout)
-    : spec_{spec}
-    , equalizer_{spec, layout}
+void Volume::set_gain(float gain) noexcept
 {
+    // A bound rather than a clamp, so that a value that is not a number falls to silence.
+    const float bounded{gain >= 0.0F ? std::min(gain, 1.0F) : 0.0F};
+
+    gain_.store(bounded, std::memory_order_relaxed);
 }
 
-void Chain::configure(StreamSpec spec)
+float Volume::gain() const noexcept
 {
-    spec_ = spec;
-    equalizer_.configure(spec);
+    return gain_.load(std::memory_order_relaxed);
 }
 
-StreamSpec Chain::spec() const noexcept
+void Volume::process(std::span<float> samples) noexcept
 {
-    return spec_;
-}
+    const float gain{gain_.load(std::memory_order_relaxed)};
 
-void Chain::process(std::span<float> samples) noexcept
-{
-    equalizer_.process(samples);
-    volume_.process(samples);
-
-    // A band is the only thing here that can lift a sample past what an output takes, and volume
-    // may have brought it back, so this is asked after both.
-    if (!equalizer_.shaping())
+    // Not for speed: at full volume the decoded samples pass through untouched.
+    if (gain == 1.0F)
         return;
 
     for (float& sample : samples)
-        sample = std::clamp(sample, -1.0F, 1.0F);
+        sample *= gain;
 }
 
 } // namespace wiola::audio

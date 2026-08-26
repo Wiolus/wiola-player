@@ -50,7 +50,7 @@ TEST(Chain, StartsAtFullVolume)
 {
     const Chain chain{stereo};
 
-    EXPECT_FLOAT_EQ(chain.volume(), 1.0F);
+    EXPECT_FLOAT_EQ(chain.volume().gain(), 1.0F);
 }
 
 /// Full volume is the samples as they arrived, not something multiplied by one.
@@ -69,7 +69,7 @@ TEST(Chain, ScalesEverySample)
     Chain chain{stereo};
     auto buffer{samples()};
 
-    chain.set_volume(0.5F);
+    chain.volume().set_gain(0.5F);
     chain.process(buffer);
 
     EXPECT_FLOAT_EQ(buffer[0], 0.5F);
@@ -83,7 +83,7 @@ TEST(Chain, SilencesAtZero)
     Chain chain{stereo};
     auto buffer{samples()};
 
-    chain.set_volume(0.0F);
+    chain.volume().set_gain(0.0F);
     chain.process(buffer);
 
     for (const float sample : buffer)
@@ -96,12 +96,12 @@ TEST(Chain, HoldsTheSettingAcrossCalls)
     auto first{samples()};
     auto second{samples()};
 
-    chain.set_volume(0.25F);
+    chain.volume().set_gain(0.25F);
     chain.process(first);
     chain.process(second);
 
     EXPECT_EQ(first, second);
-    EXPECT_FLOAT_EQ(chain.volume(), 0.25F);
+    EXPECT_FLOAT_EQ(chain.volume().gain(), 0.25F);
 }
 
 TEST(Chain, RefusesToAmplify)
@@ -109,9 +109,9 @@ TEST(Chain, RefusesToAmplify)
     Chain chain{stereo};
     auto buffer{samples()};
 
-    chain.set_volume(4.0F);
+    chain.volume().set_gain(4.0F);
 
-    EXPECT_FLOAT_EQ(chain.volume(), 1.0F);
+    EXPECT_FLOAT_EQ(chain.volume().gain(), 1.0F);
 
     chain.process(buffer);
 
@@ -122,20 +122,20 @@ TEST(Chain, TakesAnythingBelowZeroAsSilence)
 {
     Chain chain{stereo};
 
-    chain.set_volume(-2.0F);
+    chain.volume().set_gain(-2.0F);
 
-    EXPECT_FLOAT_EQ(chain.volume(), 0.0F);
+    EXPECT_FLOAT_EQ(chain.volume().gain(), 0.0F);
 
-    chain.set_volume(std::numeric_limits<float>::quiet_NaN());
+    chain.volume().set_gain(std::numeric_limits<float>::quiet_NaN());
 
-    EXPECT_FLOAT_EQ(chain.volume(), 0.0F);
+    EXPECT_FLOAT_EQ(chain.volume().gain(), 0.0F);
 }
 
 TEST(Chain, AcceptsNothingToDo)
 {
     Chain chain{stereo};
 
-    chain.set_volume(0.5F);
+    chain.volume().set_gain(0.5F);
     chain.process(std::span<float>{});
 }
 
@@ -150,12 +150,13 @@ TEST(Chain, LaysOutOneBandPerOctave)
 {
     const Chain chain{stereo};
 
-    ASSERT_EQ(chain.num_bands(), 10u);
-    EXPECT_EQ(chain.band_center(0), 31.25_Hz);
-    EXPECT_EQ(chain.band_center(9), 16_kHz);
+    ASSERT_EQ(chain.equalizer().num_bands(), 10u);
+    EXPECT_EQ(chain.equalizer().band_center(0), 31.25_Hz);
+    EXPECT_EQ(chain.equalizer().band_center(9), 16_kHz);
 
-    for (std::size_t i = 1; i < chain.num_bands(); ++i)
-        EXPECT_DOUBLE_EQ(chain.band_center(i) / chain.band_center(i - 1), 2.0);
+    for (std::size_t i = 1; i < chain.equalizer().num_bands(); ++i)
+        EXPECT_DOUBLE_EQ(chain.equalizer().band_center(i) / chain.equalizer().band_center(i - 1),
+            2.0);
 }
 
 /// A band that close to half the sample rate cannot be given its width, so it is not offered.
@@ -165,8 +166,8 @@ TEST(Chain, DropsBandsTheFormatCannotCarry)
         StreamSpec{.sample_rate = 22050_Hz, .num_channels = 2}
     };
 
-    EXPECT_EQ(chain.num_bands(), 9u);
-    EXPECT_EQ(chain.band_center(8), 8_kHz);
+    EXPECT_EQ(chain.equalizer().num_bands(), 9u);
+    EXPECT_EQ(chain.equalizer().band_center(8), 8_kHz);
 }
 
 TEST(Chain, LeavesEveryBandWellBelowNyquist)
@@ -176,8 +177,9 @@ TEST(Chain, LeavesEveryBandWellBelowNyquist)
             StreamSpec{.sample_rate = rate, .num_channels = 2}
         };
 
-        for (std::size_t i = 0; i < chain.num_bands(); ++i)
-            EXPECT_LT(chain.band_center(i), rate / 2.0) << "at " << rate.to<Hz>() << " Hz";
+        for (std::size_t i = 0; i < chain.equalizer().num_bands(); ++i)
+            EXPECT_LT(chain.equalizer().band_center(i), rate / 2.0)
+                << "at " << rate.to<Hz>() << " Hz";
     }
 }
 
@@ -187,7 +189,7 @@ TEST(Chain, OffersNoBandsForAFormatItCannotUse)
         StreamSpec{.sample_rate = Frequency{}, .num_channels = 2}
     };
 
-    EXPECT_EQ(chain.num_bands(), 0u);
+    EXPECT_EQ(chain.equalizer().num_bands(), 0u);
 }
 
 /// The row of octave bands is a default, not the only layout a chain can be built with.
@@ -196,29 +198,29 @@ TEST(Chain, TakesTheLayoutItIsGiven)
     const BandLayout thirds{.first = 20_Hz, .count = 31, .ratio = 1.2599210498948732};
     const Chain chain{stereo, thirds};
 
-    EXPECT_EQ(chain.band_center(0), 20_Hz);
-    EXPECT_NEAR(chain.band_center(3).to<Hz>(), 40.0, 1e-9);
+    EXPECT_EQ(chain.equalizer().band_center(0), 20_Hz);
+    EXPECT_NEAR(chain.equalizer().band_center(3).to<Hz>(), 40.0, 1e-9);
 
     // Three of these to an octave, so the last of the 31 is ten octaves up, which is more than
     // 48 kHz can carry: the cap answers the same way whatever the layout asks for.
-    EXPECT_NEAR(chain.band_center(30).to<Hz>(), 20480.0, 1e-6);
-    EXPECT_EQ(chain.num_bands(), 30u);
+    EXPECT_NEAR(chain.equalizer().band_center(30).to<Hz>(), 20480.0, 1e-6);
+    EXPECT_EQ(chain.equalizer().num_bands(), 30u);
 }
 
 TEST(Chain, TakesANewFormatWithoutForgettingTheSetting)
 {
     Chain chain{stereo};
 
-    chain.set_volume(0.5F);
+    chain.volume().set_gain(0.5F);
     chain.configure(StreamSpec{.sample_rate = 22050_Hz, .num_channels = 1});
 
-    EXPECT_FLOAT_EQ(chain.volume(), 0.5F);
+    EXPECT_FLOAT_EQ(chain.volume().gain(), 0.5F);
     EXPECT_EQ(chain.spec().num_channels, 1u);
-    EXPECT_EQ(chain.num_bands(), 9u);
+    EXPECT_EQ(chain.equalizer().num_bands(), 9u);
 
     chain.configure(stereo);
 
-    EXPECT_EQ(chain.num_bands(), 10u);
+    EXPECT_EQ(chain.equalizer().num_bands(), 10u);
 }
 
 namespace {
@@ -267,26 +269,26 @@ TEST(Chain, StartsWithEveryBandFlat)
 {
     const Chain chain{stereo};
 
-    for (std::size_t i = 0; i < chain.num_bands(); ++i)
-        EXPECT_FLOAT_EQ(chain.band_gain(i), 0.0F);
+    for (std::size_t i = 0; i < chain.equalizer().num_bands(); ++i)
+        EXPECT_FLOAT_EQ(chain.equalizer().band_gain(i), 0.0F);
 }
 
 TEST(Chain, LiftsWhatABandIsSetTo)
 {
     Chain chain{stereo};
 
-    chain.set_band_gain(5, 6.0F);
+    chain.equalizer().set_band_gain(5, 6.0F);
 
-    EXPECT_NEAR(response_db(chain, chain.band_center(5)), 6.0, 0.2);
+    EXPECT_NEAR(response_db(chain, chain.equalizer().band_center(5)), 6.0, 0.2);
 }
 
 TEST(Chain, CutsWhatABandIsSetTo)
 {
     Chain chain{stereo};
 
-    chain.set_band_gain(5, -6.0F);
+    chain.equalizer().set_band_gain(5, -6.0F);
 
-    EXPECT_NEAR(response_db(chain, chain.band_center(5)), -6.0, 0.2);
+    EXPECT_NEAR(response_db(chain, chain.equalizer().band_center(5)), -6.0, 0.2);
 }
 
 /// A band reaches its neighbors, but by much less than it lifts its own center.
@@ -294,9 +296,9 @@ TEST(Chain, LeavesTheNextBandMostlyAlone)
 {
     Chain chain{stereo};
 
-    chain.set_band_gain(5, 6.0F);
+    chain.equalizer().set_band_gain(5, 6.0F);
 
-    const double neighbor{response_db(chain, chain.band_center(6))};
+    const double neighbor{response_db(chain, chain.equalizer().band_center(6))};
 
     EXPECT_GT(neighbor, 0.0);
     EXPECT_LT(neighbor, 3.0);
@@ -307,8 +309,8 @@ TEST(Chain, LeavesSamplesUntouchedWhileFlat)
     Chain chain{stereo};
     auto buffer{samples()};
 
-    chain.set_band_gain(3, 6.0F);
-    chain.set_band_gain(3, 0.0F);
+    chain.equalizer().set_band_gain(3, 6.0F);
+    chain.equalizer().set_band_gain(3, 0.0F);
     chain.process(buffer);
 
     EXPECT_EQ(buffer, samples());
@@ -318,13 +320,13 @@ TEST(Chain, RefusesMoreThanABandMayDo)
 {
     Chain chain{stereo};
 
-    chain.set_band_gain(2, 40.0F);
+    chain.equalizer().set_band_gain(2, 40.0F);
 
-    EXPECT_FLOAT_EQ(chain.band_gain(2), 12.0F);
+    EXPECT_FLOAT_EQ(chain.equalizer().band_gain(2), 12.0F);
 
-    chain.set_band_gain(2, -40.0F);
+    chain.equalizer().set_band_gain(2, -40.0F);
 
-    EXPECT_FLOAT_EQ(chain.band_gain(2), -12.0F);
+    EXPECT_FLOAT_EQ(chain.equalizer().band_gain(2), -12.0F);
 }
 
 /// A gain outlives the format that could not carry its band.
@@ -332,30 +334,30 @@ TEST(Chain, RemembersGainsOfBandsAFormatDrops)
 {
     Chain chain{stereo};
 
-    chain.set_band_gain(9, 6.0F);
+    chain.equalizer().set_band_gain(9, 6.0F);
     chain.configure(StreamSpec{.sample_rate = 22050_Hz, .num_channels = 2});
 
-    ASSERT_EQ(chain.num_bands(), 9u);
-    EXPECT_FLOAT_EQ(chain.band_gain(9), 6.0F);
+    ASSERT_EQ(chain.equalizer().num_bands(), 9u);
+    EXPECT_FLOAT_EQ(chain.equalizer().band_gain(9), 6.0F);
 
     chain.configure(stereo);
 
-    EXPECT_NEAR(response_db(chain, chain.band_center(9)), 6.0, 0.5);
+    EXPECT_NEAR(response_db(chain, chain.equalizer().band_center(9)), 6.0, 0.5);
 }
 
 TEST(Chain, StartsWithTheEqualizerOnAndNoPreamp)
 {
     const Chain chain{stereo};
 
-    EXPECT_TRUE(chain.equalizer_enabled());
-    EXPECT_FLOAT_EQ(chain.preamp(), 0.0F);
+    EXPECT_TRUE(chain.equalizer().enabled());
+    EXPECT_FLOAT_EQ(chain.equalizer().preamp(), 0.0F);
 }
 
 TEST(Chain, CutsEverythingByThePreamp)
 {
     Chain chain{stereo};
 
-    chain.set_preamp(-6.0F);
+    chain.equalizer().set_preamp(-6.0F);
 
     EXPECT_NEAR(response_db(chain, 1_kHz), -6.0, 0.1);
     EXPECT_NEAR(response_db(chain, 8_kHz), -6.0, 0.1);
@@ -365,9 +367,9 @@ TEST(Chain, RefusesMoreThanAPreampMayDo)
 {
     Chain chain{stereo};
 
-    chain.set_preamp(-40.0F);
+    chain.equalizer().set_preamp(-40.0F);
 
-    EXPECT_FLOAT_EQ(chain.preamp(), -12.0F);
+    EXPECT_FLOAT_EQ(chain.equalizer().preamp(), -12.0F);
 }
 
 TEST(Chain, RunsNeitherBandsNorPreampWhileTurnedOff)
@@ -375,9 +377,9 @@ TEST(Chain, RunsNeitherBandsNorPreampWhileTurnedOff)
     Chain chain{stereo};
     auto buffer{samples()};
 
-    chain.set_band_gain(5, 6.0F);
-    chain.set_preamp(-6.0F);
-    chain.set_equalizer_enabled(false);
+    chain.equalizer().set_band_gain(5, 6.0F);
+    chain.equalizer().set_preamp(-6.0F);
+    chain.equalizer().set_enabled(false);
     chain.process(buffer);
 
     EXPECT_EQ(buffer, samples());
@@ -388,9 +390,9 @@ TEST(Chain, KeepsTheVolumeWhileTurnedOff)
     Chain chain{stereo};
     auto buffer{samples()};
 
-    chain.set_band_gain(5, 12.0F);
-    chain.set_equalizer_enabled(false);
-    chain.set_volume(0.5F);
+    chain.equalizer().set_band_gain(5, 12.0F);
+    chain.equalizer().set_enabled(false);
+    chain.volume().set_gain(0.5F);
     chain.process(buffer);
 
     EXPECT_FLOAT_EQ(buffer[0], 0.5F);
@@ -404,7 +406,7 @@ TEST(Chain, KeepsBoostedSamplesInRange)
     wiola::audio::SineSource source{stereo, 1_kHz, 0.95F};
     std::vector<float> block(stereo.samples_per(512));
 
-    chain.set_band_gain(5, 12.0F);
+    chain.equalizer().set_band_gain(5, 12.0F);
 
     for (int i = 0; i < 20; ++i) {
         source.render(block);
