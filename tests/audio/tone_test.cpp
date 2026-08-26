@@ -114,8 +114,6 @@ TEST(SineSource, LeavesPartialFramesUntouched)
     EXPECT_FLOAT_EQ(block[4], 42.0F);
 }
 
-/// A tone is reached through the role as well as through its own type, which is what lets anything
-/// that pulls frames take one.
 TEST(SineSource, AnswersAsASource)
 {
     SineSource tone{stereo, 440_Hz};

@@ -39,9 +39,8 @@ namespace {
 /// Under which name the slider position is kept.
 constexpr auto volume_key{"volume"};
 
-/// The slider position a previous run left, or full volume when there is none. A settings file is
-/// text and can be edited, so a position out of range is brought back into it, and one that is not
-/// a number at all is passed over: a typo is not a reason to start silent.
+/// The slider position a previous run left, or full volume when there is none or it reads
+/// as anything but a position.
 int kept_volume(QSettings& settings)
 {
     bool numeric{false};

@@ -38,8 +38,7 @@ std::filesystem::path fixture(const char* name)
     return std::filesystem::path{WIOLA_TEST_DATA_DIR} / name;
 }
 
-/// Reads a source to the end and reports how many samples it produced. Asks nothing of a decoder
-/// that it does not ask of anything frames come from, so it keeps working when the source changes.
+/// Reads a source to the end and reports how many samples it produced.
 std::size_t drain(wiola::audio::Source& source)
 {
     std::array<float, 1024> block{};
