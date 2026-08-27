@@ -24,9 +24,7 @@
 
 #include <audio/buffer_source.hpp>
 #include <audio/chain.hpp>
-#include <audio/device.hpp>
 #include <audio/output.hpp>
-#include <audio/shaped_source.hpp>
 #include <audio/stream_spec.hpp>
 #include <codec/decoder.hpp>
 #include <codec/open.hpp>

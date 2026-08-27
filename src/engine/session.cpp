@@ -66,15 +66,16 @@ Session::Session(OutputFactory make_output)
 
 Session::~Session() = default;
 
-bool Session::load(const std::filesystem::path& path)
+codec::OpenResult Session::load(const std::filesystem::path& path)
 {
-    std::unique_ptr<codec::Decoder> source{codec::open_file(path)};
+    codec::Opened opened{codec::open_file(path)};
 
-    if (source == nullptr) {
+    if (!opened) {
         pipeline_.reset();
-        return false;
+        return opened.result;
     }
 
+    std::unique_ptr<codec::Decoder> source{std::move(opened.decoder)};
     const audio::StreamSpec spec{source->spec()};
 
     // The old pipeline goes first: its device reads the chain that configuring one rebuilds.
@@ -82,7 +83,7 @@ bool Session::load(const std::filesystem::path& path)
     chain_.configure(spec);
     pipeline_ = std::make_unique<Pipeline>(std::move(source), chain_, make_output_);
 
-    return true;
+    return codec::OpenResult::opened;
 }
 
 bool Session::loaded() const noexcept

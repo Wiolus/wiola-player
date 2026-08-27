@@ -23,6 +23,7 @@
 #include <audio/output.hpp>
 #include <audio/source.hpp>
 #include <audio/stream_spec.hpp>
+#include <codec/open.hpp>
 #include <engine/session.hpp>
 #include <utils/units.hpp>
 
@@ -39,6 +40,7 @@ namespace {
 
 using namespace std::chrono_literals;
 using wiola::audio::Frames;
+using wiola::codec::OpenResult;
 using wiola::engine::PlayerState;
 using wiola::engine::Session;
 namespace units = wiola::units;
@@ -144,7 +146,8 @@ TEST(Session, LoadsATrack)
 {
     Fixture fixture;
 
-    ASSERT_TRUE(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")));
+    ASSERT_EQ(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")),
+        OpenResult::opened);
 
     EXPECT_TRUE(fixture.session.loaded());
     EXPECT_EQ(fixture.num_outputs, 1U);
@@ -156,7 +159,8 @@ TEST(Session, RefusesAFileItCannotRead)
 {
     Fixture fixture;
 
-    EXPECT_FALSE(fixture.session.load(std::filesystem::path{"no-such-track.wav"}));
+    EXPECT_EQ(fixture.session.load(std::filesystem::path{"no-such-track.wav"}),
+        OpenResult::unreadable);
     EXPECT_FALSE(fixture.session.loaded());
     EXPECT_EQ(fixture.num_outputs, 0U);
 }
@@ -167,8 +171,10 @@ TEST(Session, DropsWhatWasLoadedWhenTheNextFileFails)
 {
     Fixture fixture;
 
-    ASSERT_TRUE(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")));
-    EXPECT_FALSE(fixture.session.load(std::filesystem::path{"no-such-track.wav"}));
+    ASSERT_EQ(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")),
+        OpenResult::opened);
+    EXPECT_EQ(fixture.session.load(std::filesystem::path{"no-such-track.wav"}),
+        OpenResult::unreadable);
 
     EXPECT_FALSE(fixture.session.loaded());
     EXPECT_EQ(fixture.session.state(), PlayerState::idle);
@@ -181,8 +187,8 @@ TEST(Session, BuildsAnOutputForEveryTrack)
     Fixture fixture;
     const std::filesystem::path path{wiola::testing::write_wav("wiola_session.wav")};
 
-    ASSERT_TRUE(fixture.session.load(path));
-    ASSERT_TRUE(fixture.session.load(path));
+    ASSERT_EQ(fixture.session.load(path), OpenResult::opened);
+    ASSERT_EQ(fixture.session.load(path), OpenResult::opened);
 
     EXPECT_EQ(fixture.num_outputs, 2U);
 }
@@ -191,7 +197,8 @@ TEST(Session, PlaysAndPauses)
 {
     Fixture fixture;
 
-    ASSERT_TRUE(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")));
+    ASSERT_EQ(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")),
+        OpenResult::opened);
 
     ASSERT_TRUE(fixture.session.toggle());
     EXPECT_EQ(fixture.session.state(), PlayerState::playing);
@@ -208,7 +215,8 @@ TEST(Session, StopsAtTheBeginning)
 {
     Fixture fixture;
 
-    ASSERT_TRUE(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")));
+    ASSERT_EQ(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")),
+        OpenResult::opened);
     ASSERT_TRUE(fixture.session.toggle());
 
     fixture.session.seek(units::Time{1.0});
@@ -222,7 +230,8 @@ TEST(Session, SeeksWhereItIsAsked)
 {
     Fixture fixture;
 
-    ASSERT_TRUE(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")));
+    ASSERT_EQ(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")),
+        OpenResult::opened);
 
     fixture.session.seek(units::Time{1.0});
 
@@ -238,7 +247,7 @@ TEST(Session, KeepsItsSettingsAcrossTracks)
     fixture.session.volume().set_gain(0.25F);
     fixture.session.equalizer().set_preamp(-3.0F);
 
-    ASSERT_TRUE(fixture.session.load(path));
+    ASSERT_EQ(fixture.session.load(path), OpenResult::opened);
 
     EXPECT_FLOAT_EQ(fixture.session.volume().gain(), 0.25F);
     EXPECT_FLOAT_EQ(fixture.session.equalizer().preamp(), -3.0F);
