@@ -43,10 +43,11 @@ inline constexpr double band_quality{1.0};
 /// the band's upper half.
 inline constexpr double highest_band_share{0.4};
 
+/// The most a listener may lift the output past what arrived, as a factor. Anything above one
+/// reaches past what an output takes, and is flattened rather than heard.
+inline constexpr float max_volume_boost{1.4F};
+
 /// The most a band may lift or cut, in decibels.
 inline constexpr double max_band_gain_db{12.0};
-
-/// The most the preamp may lift or cut, in decibels.
-inline constexpr double max_preamp_db{12.0};
 
 } // namespace wiola::audio::tuning

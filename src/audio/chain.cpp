@@ -46,9 +46,9 @@ void Chain::process(std::span<float> samples) noexcept
     equalizer_.process(samples);
     volume_.process(samples);
 
-    // A band is the only thing here that can lift a sample past what an output takes, and volume
-    // may have brought it back, so this is asked after both.
-    if (!equalizer_.shaping())
+    // Only a lift can reach past what an output takes: a band's, or a volume asked for beyond
+    // what arrived. Neither is known until both have run.
+    if (!equalizer_.shaping() && volume_.gain() <= 1.0F)
         return;
 
     for (float& sample : samples)

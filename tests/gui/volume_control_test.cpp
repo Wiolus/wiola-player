@@ -140,4 +140,76 @@ TEST_F(VolumeControl, BringsAStoredPositionBackIntoRange)
     EXPECT_EQ(Control(volume, settings).restore(), 0);
 }
 
+/// Full volume is where the slider stops until the listener asks for more.
+TEST_F(VolumeControl, StopsAtFullUntilBoosted)
+{
+    Control control{volume, settings};
+
+    EXPECT_FALSE(control.boosted());
+    EXPECT_EQ(control.max_position(), tuning::full_volume);
+
+    control.set_position(130);
+
+    EXPECT_EQ(control.position(), tuning::full_volume);
+    EXPECT_FLOAT_EQ(volume.gain(), 1.0F);
+}
+
+/// Past full the slider says what it means: a hundred and forty is what arrived and forty more.
+TEST_F(VolumeControl, LiftsPastWhatArrivedWhenBoosted)
+{
+    Control control{volume, settings};
+
+    control.set_boosted(true);
+
+    EXPECT_EQ(control.max_position(), tuning::boosted_volume);
+
+    control.set_position(tuning::boosted_volume);
+
+    EXPECT_EQ(control.position(), tuning::boosted_volume);
+    EXPECT_FLOAT_EQ(volume.gain(), 1.4F);
+}
+
+/// The curve is below full only, so full is full either way.
+TEST_F(VolumeControl, LeavesTheTravelBelowFullAlone)
+{
+    Control control{volume, settings};
+
+    control.set_boosted(true);
+    control.set_position(50);
+
+    EXPECT_FLOAT_EQ(volume.gain(), 0.25F);
+
+    control.set_position(tuning::full_volume);
+
+    EXPECT_FLOAT_EQ(volume.gain(), 1.0F);
+}
+
+/// Turning it off is not a way to keep a position the slider can no longer reach.
+TEST_F(VolumeControl, BringsAPositionBackWhenBoostIsTurnedOff)
+{
+    Control control{volume, settings};
+
+    control.set_boosted(true);
+    control.set_position(130);
+    control.set_boosted(false);
+
+    EXPECT_EQ(control.position(), tuning::full_volume);
+    EXPECT_FLOAT_EQ(volume.gain(), 1.0F);
+}
+
+TEST_F(VolumeControl, GivesBackWhetherItWasBoosted)
+{
+    Control first{volume, settings};
+
+    first.set_boosted(true);
+    first.set_position(120);
+
+    Volume next;
+    Control later{next, settings};
+
+    EXPECT_EQ(later.restore(), 120);
+    EXPECT_TRUE(later.boosted());
+    EXPECT_FLOAT_EQ(next.gain(), 1.2F);
+}
+
 } // namespace

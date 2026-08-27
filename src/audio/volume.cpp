@@ -20,6 +20,8 @@
 
 #include <audio/volume.hpp>
 
+#include <audio/tuning.hpp>
+
 #include <algorithm>
 
 namespace wiola::audio {
@@ -27,7 +29,7 @@ namespace wiola::audio {
 void Volume::set_gain(float gain) noexcept
 {
     // A bound rather than a clamp, so that a value that is not a number falls to silence.
-    const float bounded{gain >= 0.0F ? std::min(gain, 1.0F) : 0.0F};
+    const float bounded{gain >= 0.0F ? std::min(gain, tuning::max_volume_boost) : 0.0F};
 
     gain_.store(bounded, std::memory_order_relaxed);
 }

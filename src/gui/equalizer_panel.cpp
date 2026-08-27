@@ -67,8 +67,6 @@ int as_steps(float db)
 
 constexpr int band_limit{
     static_cast<int>(audio::tuning::max_band_gain_db) * tuning::gain_steps_per_db};
-constexpr int preamp_limit{
-    static_cast<int>(audio::tuning::max_preamp_db) * tuning::gain_steps_per_db};
 
 } // namespace
 
@@ -83,30 +81,12 @@ EqualizerPanel::EqualizerPanel(EqualizerControl& equalizer, QWidget* parent)
 
     bands_row_ = new QHBoxLayout;
 
-    preamp_slider_ = new QSlider{Qt::Horizontal, this};
-    preamp_slider_->setRange(-preamp_limit, preamp_limit);
-    preamp_slider_->setSingleStep(tuning::gain_step);
-    preamp_slider_->setValue(as_steps(equalizer_.preamp()));
-
-    preamp_value_ = new QLabel{as_gain(preamp_slider_->value()) + " dB", this};
-
-    auto* preamp_row = new QHBoxLayout;
-    preamp_row->addWidget(new QLabel{"Preamp", this});
-    preamp_row->addWidget(preamp_slider_);
-    preamp_row->addWidget(preamp_value_);
-
     auto* layout = new QVBoxLayout{this};
     layout->addWidget(enabled_box_);
     layout->addLayout(bands_row_);
-    layout->addLayout(preamp_row);
 
     connect(enabled_box_, &QCheckBox::toggled, this,
         [this](bool on) { equalizer_.set_enabled(on); });
-
-    connect(preamp_slider_, &QSlider::valueChanged, this, [this](int steps) {
-        equalizer_.set_preamp(static_cast<float>(as_db(steps)));
-        preamp_value_->setText(as_gain(steps) + " dB");
-    });
 
     rebuild_bands();
 }

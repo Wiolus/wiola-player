@@ -77,6 +77,12 @@ private:
     /// runs after this one.
     void set_volume(int percent);
 
+    /// Lets the slider ask for more than arrived, or stops it doing so.
+    void set_boosted(bool boosted);
+
+    /// Says how loud the output is, as the slider has it.
+    void show_volume();
+
     /// Moves playback to `fraction` of the loaded track.
     void seek_to(double fraction);
 
@@ -101,7 +107,9 @@ private:
     QPushButton* stop_button_{nullptr};
     SeekBar* position_bar_{nullptr};
     QSlider* volume_slider_{nullptr};
+    QLabel* volume_value_{nullptr};
     QPushButton* equalizer_button_{nullptr};
+    QPushButton* boost_button_{nullptr};
     EqualizerPanel* equalizer_panel_{nullptr};
     QLabel* time_label_{nullptr};
     QLabel* status_label_{nullptr};

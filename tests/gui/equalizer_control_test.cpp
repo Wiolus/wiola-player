@@ -81,11 +81,10 @@ TEST_F(EqualizerControl, GivesBackWhatTheLastRunLeft)
     EXPECT_FLOAT_EQ(later.band_gain(2), 6.0F);
 }
 
-TEST_F(EqualizerControl, KeepsThePreampAndWhetherItRuns)
+TEST_F(EqualizerControl, KeepsWhetherItRuns)
 {
     Control control{equalizer, settings};
 
-    control.set_preamp(-4.5F);
     control.set_enabled(false);
 
     Equalizer next{stereo};
@@ -93,7 +92,6 @@ TEST_F(EqualizerControl, KeepsThePreampAndWhetherItRuns)
 
     later.restore();
 
-    EXPECT_FLOAT_EQ(later.preamp(), -4.5F);
     EXPECT_FALSE(later.enabled());
 }
 
@@ -140,14 +138,12 @@ TEST_F(EqualizerControl, KeepsABandTheFormatCannotCarry)
 /// The file is text and can be edited, and a typo leaves the band flat rather than anywhere.
 TEST_F(EqualizerControl, IgnoresAStoredValueThatIsNotAGain)
 {
-    settings.setValue("equalizer/preamp", "loud");
     settings.setValue("equalizer/band/1", "high");
 
     Control control{equalizer, settings};
 
     control.restore();
 
-    EXPECT_FLOAT_EQ(control.preamp(), 0.0F);
     EXPECT_FLOAT_EQ(control.band_gain(1), 0.0F);
 }
 

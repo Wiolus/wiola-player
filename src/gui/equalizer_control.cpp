@@ -27,7 +27,6 @@ namespace wiola::gui {
 namespace {
 
 constexpr auto enabled_key{"equalizer/enabled"};
-constexpr auto preamp_key{"equalizer/preamp"};
 
 QString band_key(std::size_t index)
 {
@@ -55,7 +54,6 @@ EqualizerControl::EqualizerControl(audio::Equalizer& equalizer, QSettings& setti
 void EqualizerControl::restore()
 {
     set_enabled(settings_.value(enabled_key, true).toBool());
-    set_preamp(stored_db(settings_, preamp_key, 0.0F));
 
     // Every band the layout names, not only those this format can carry: a band left out now is
     // still set for the track that can.
@@ -67,14 +65,6 @@ void EqualizerControl::set_enabled(bool enabled)
 {
     equalizer_.set_enabled(enabled);
     settings_.setValue(enabled_key, enabled);
-}
-
-void EqualizerControl::set_preamp(float db)
-{
-    equalizer_.set_preamp(db);
-
-    // What is stored is what was applied, since the equalizer decides what it allows.
-    settings_.setValue(preamp_key, equalizer_.preamp());
 }
 
 void EqualizerControl::set_band_gain(std::size_t index, float db)

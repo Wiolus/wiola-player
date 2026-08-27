@@ -20,6 +20,7 @@
 
 #include <audio/chain.hpp>
 #include <audio/tone.hpp>
+#include <audio/tuning.hpp>
 
 #include <gtest/gtest.h>
 
@@ -104,18 +105,28 @@ TEST(Chain, HoldsTheSettingAcrossCalls)
     EXPECT_FLOAT_EQ(chain.volume().gain(), 0.25F);
 }
 
-TEST(Chain, RefusesToAmplify)
+/// A listener may ask for more than arrived, but only so much more.
+TEST(Chain, RefusesMoreThanTheMostItMayLift)
+{
+    Chain chain{stereo};
+
+    chain.volume().set_gain(4.0F);
+
+    EXPECT_FLOAT_EQ(chain.volume().gain(), wiola::audio::tuning::max_volume_boost);
+}
+
+/// Past what an output takes there is nothing to hear, so what is lifted past it is flattened.
+TEST(Chain, FlattensWhatALiftPutPastFullScale)
 {
     Chain chain{stereo};
     auto buffer{samples()};
 
-    chain.volume().set_gain(4.0F);
-
-    EXPECT_FLOAT_EQ(chain.volume().gain(), 1.0F);
-
+    chain.volume().set_gain(1.4F);
     chain.process(buffer);
 
-    EXPECT_EQ(buffer, samples());
+    EXPECT_FLOAT_EQ(buffer[0], 1.0F);
+    EXPECT_FLOAT_EQ(buffer[1], -0.7F);
+    EXPECT_FLOAT_EQ(buffer[2], 0.35F);
 }
 
 TEST(Chain, TakesAnythingBelowZeroAsSilence)
@@ -273,13 +284,18 @@ TEST(Chain, StartsWithEveryBandFlat)
         EXPECT_FLOAT_EQ(chain.equalizer().band_gain(i), 0.0F);
 }
 
-TEST(Chain, LiftsWhatABandIsSetTo)
+/// A lifted band comes out where it was: the room it needed was taken from everything else.
+TEST(Chain, LiftsABandAboveTheRest)
 {
     Chain chain{stereo};
 
     chain.equalizer().set_band_gain(5, 6.0F);
 
-    EXPECT_NEAR(response_db(chain, chain.equalizer().band_center(5)), 6.0, 0.2);
+    const double lifted{response_db(chain, chain.equalizer().band_center(5))};
+    const double rest{response_db(chain, chain.equalizer().band_center(0))};
+
+    EXPECT_NEAR(lifted, 0.0, 0.2);
+    EXPECT_NEAR(lifted - rest, 6.0, 0.3);
 }
 
 TEST(Chain, CutsWhatABandIsSetTo)
@@ -298,10 +314,12 @@ TEST(Chain, LeavesTheNextBandMostlyAlone)
 
     chain.equalizer().set_band_gain(5, 6.0F);
 
+    const double lifted{response_db(chain, chain.equalizer().band_center(5))};
     const double neighbor{response_db(chain, chain.equalizer().band_center(6))};
+    const double rest{response_db(chain, chain.equalizer().band_center(0))};
 
-    EXPECT_GT(neighbor, 0.0);
-    EXPECT_LT(neighbor, 3.0);
+    EXPECT_GT(neighbor, rest);
+    EXPECT_LT(neighbor, lifted - 3.0);
 }
 
 TEST(Chain, LeavesSamplesUntouchedWhileFlat)
@@ -342,7 +360,10 @@ TEST(Chain, RemembersGainsOfBandsAFormatDrops)
 
     chain.configure(stereo);
 
-    EXPECT_NEAR(response_db(chain, chain.equalizer().band_center(9)), 6.0, 0.5);
+    const double restored{response_db(chain, chain.equalizer().band_center(9))};
+    const double rest{response_db(chain, chain.equalizer().band_center(0))};
+
+    EXPECT_NEAR(restored - rest, 6.0, 0.5);
 }
 
 TEST(Chain, StartsWithTheEqualizerOnAndNoPreamp)
@@ -353,23 +374,44 @@ TEST(Chain, StartsWithTheEqualizerOnAndNoPreamp)
     EXPECT_FLOAT_EQ(chain.equalizer().preamp(), 0.0F);
 }
 
-TEST(Chain, CutsEverythingByThePreamp)
+/// The cut is what a boost needs, so a lifted band comes out where it was and everything else
+/// comes down around it.
+TEST(Chain, TakesTheRoomABoostNeeds)
 {
     Chain chain{stereo};
 
-    chain.equalizer().set_preamp(-6.0F);
+    chain.equalizer().set_band_gain(5, 6.0F);
+    // The cut is worked out where the samples are shaped.
+    std::array<float, 2> block{};
+    chain.process(block);
 
-    EXPECT_NEAR(response_db(chain, 1_kHz), -6.0, 0.1);
-    EXPECT_NEAR(response_db(chain, 8_kHz), -6.0, 0.1);
+    EXPECT_FLOAT_EQ(chain.equalizer().preamp(), -6.0F);
+    EXPECT_NEAR(response_db(chain, chain.equalizer().band_center(5).hz() * 1_Hz), 0.0, 0.5);
 }
 
-TEST(Chain, RefusesMoreThanAPreampMayDo)
+/// Only a lift needs room: cutting a band asks for none.
+TEST(Chain, TakesNoRoomForACut)
 {
     Chain chain{stereo};
 
-    chain.equalizer().set_preamp(-40.0F);
+    chain.equalizer().set_band_gain(5, -6.0F);
+    std::array<float, 2> block{};
+    chain.process(block);
 
-    EXPECT_FLOAT_EQ(chain.equalizer().preamp(), -12.0F);
+    EXPECT_FLOAT_EQ(chain.equalizer().preamp(), 0.0F);
+}
+
+/// The room is for the largest lift, not for their sum.
+TEST(Chain, TakesTheRoomTheLargestBoostNeeds)
+{
+    Chain chain{stereo};
+
+    chain.equalizer().set_band_gain(2, 3.0F);
+    chain.equalizer().set_band_gain(5, 9.0F);
+    std::array<float, 2> block{};
+    chain.process(block);
+
+    EXPECT_FLOAT_EQ(chain.equalizer().preamp(), -9.0F);
 }
 
 TEST(Chain, RunsNeitherBandsNorPreampWhileTurnedOff)
@@ -378,7 +420,6 @@ TEST(Chain, RunsNeitherBandsNorPreampWhileTurnedOff)
     auto buffer{samples()};
 
     chain.equalizer().set_band_gain(5, 6.0F);
-    chain.equalizer().set_preamp(-6.0F);
     chain.equalizer().set_enabled(false);
     chain.process(buffer);
 
