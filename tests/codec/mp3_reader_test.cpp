@@ -20,13 +20,18 @@
 
 #include <mp3_reader.hpp>
 
+#include <audio/stream_spec.hpp>
+
 #include <gtest/gtest.h>
 
 #include <array>
 #include <filesystem>
 #include <vector>
 
+using wiola::audio::Frames;
 using wiola::codec::Mp3Reader;
+
+using wiola::audio::Frames;
 
 namespace {
 
@@ -80,8 +85,8 @@ TEST(Mp3Reader, ReadsFormatAndSamples)
     ASSERT_NE(reader, nullptr);
     EXPECT_EQ(reader->spec().sample_rate, wiola::units::Frequency{44100});
     EXPECT_EQ(reader->spec().num_channels, 2u);
-    EXPECT_GT(reader->num_frames(), 0u);
-    EXPECT_EQ(drain(*reader), reader->num_frames() * 2);
+    EXPECT_GT(reader->num_frames(), Frames{0});
+    EXPECT_EQ(drain(*reader), reader->spec().samples_per(reader->num_frames()));
     EXPECT_TRUE(reader->exhausted());
 }
 
@@ -103,7 +108,7 @@ TEST(Mp3Reader, SeekLandsWhereReadingWouldHave)
 
     auto sought = Mp3Reader::open(fixture("tone.mp3"));
     ASSERT_NE(sought, nullptr);
-    ASSERT_TRUE(sought->seek(target));
+    ASSERT_TRUE(sought->seek(Frames{target}));
 
     const std::size_t num_channels{sought->spec().num_channels};
     const std::vector<float> actual{read_frames(*sought, num_compared)};
@@ -117,12 +122,12 @@ TEST(Mp3Reader, SeekMovesThePosition)
     auto reader = Mp3Reader::open(fixture("tone.mp3"));
     ASSERT_NE(reader, nullptr);
 
-    ASSERT_TRUE(reader->seek(4000));
-    EXPECT_EQ(reader->num_frames_left(), reader->num_frames() - 4000);
+    ASSERT_TRUE(reader->seek(Frames{4000}));
+    EXPECT_EQ(reader->num_frames_left(), reader->num_frames() - Frames{4000});
     EXPECT_FALSE(reader->exhausted());
 
     ASSERT_TRUE(reader->seek(reader->num_frames()));
-    EXPECT_EQ(reader->num_frames_left(), 0u);
+    EXPECT_EQ(reader->num_frames_left(), Frames{0});
     EXPECT_TRUE(reader->exhausted());
 
     std::array<float, 16> block{};
@@ -136,7 +141,7 @@ TEST(Mp3Reader, SeekRewinds)
 
     const std::vector<float> first{read_frames(*reader, 64)};
 
-    ASSERT_TRUE(reader->seek(0));
+    ASSERT_TRUE(reader->seek(Frames{0}));
     EXPECT_EQ(reader->num_frames_left(), reader->num_frames());
     EXPECT_EQ(read_frames(*reader, 64), first);
 }
@@ -146,9 +151,9 @@ TEST(Mp3Reader, RefusesToSeekPastTheEnd)
     auto reader = Mp3Reader::open(fixture("tone.mp3"));
     ASSERT_NE(reader, nullptr);
 
-    ASSERT_TRUE(reader->seek(4000));
-    EXPECT_FALSE(reader->seek(reader->num_frames() + 1));
+    ASSERT_TRUE(reader->seek(Frames{4000}));
+    EXPECT_FALSE(reader->seek(reader->num_frames() + Frames{1}));
 
     // A refused seek leaves the position alone.
-    EXPECT_EQ(reader->num_frames_left(), reader->num_frames() - 4000);
+    EXPECT_EQ(reader->num_frames_left(), reader->num_frames() - Frames{4000});
 }

@@ -22,9 +22,9 @@
 
 namespace wiola::engine {
 
-void Playhead::request_seek(std::size_t frame_index) noexcept
+void Playhead::request_seek(audio::Frames frame_index) noexcept
 {
-    seek_target_.store(frame_index, std::memory_order_relaxed);
+    seek_target_.store(frame_index.count(), std::memory_order_relaxed);
     seeks_requested_.fetch_add(1, std::memory_order_release);
 }
 
@@ -40,14 +40,14 @@ Playhead::Claim Playhead::claim() const noexcept
 
     return Claim{
         .requested = requested,
-        .target = seek_target_.load(std::memory_order_relaxed),
+        .target = audio::Frames{seek_target_.load(std::memory_order_relaxed)},
         .outstanding = requested != seeks_applied_.load(std::memory_order_relaxed),
     };
 }
 
-void Playhead::begin_at(std::size_t frame_index, const Claim& claim) noexcept
+void Playhead::begin_at(audio::Frames frame_index, const Claim& claim) noexcept
 {
-    base_.store(frame_index, std::memory_order_relaxed);
+    base_.store(frame_index.count(), std::memory_order_relaxed);
     num_pushed_ = 0;
 
     // Carried out only now that the place asked for is the place reported.
@@ -64,12 +64,12 @@ std::size_t Playhead::num_pushed() const noexcept
     return num_pushed_;
 }
 
-std::size_t Playhead::position(std::size_t frames_played) const noexcept
+audio::Frames Playhead::position(audio::Frames frames_played) const noexcept
 {
     if (seek_outstanding())
-        return seek_target_.load(std::memory_order_relaxed);
+        return audio::Frames{seek_target_.load(std::memory_order_relaxed)};
 
-    return base_.load(std::memory_order_relaxed) + frames_played;
+    return audio::Frames{base_.load(std::memory_order_relaxed)} + frames_played;
 }
 
 } // namespace wiola::engine

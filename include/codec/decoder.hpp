@@ -50,22 +50,22 @@ public:
     [[nodiscard]] audio::StreamSpec spec() const noexcept override { return spec_; }
 
     /// Total frames in the stream, and how many are still unread.
-    [[nodiscard]] std::size_t num_frames() const noexcept { return num_frames_; }
+    [[nodiscard]] audio::Frames num_frames() const noexcept { return num_frames_; }
 
-    [[nodiscard]] std::size_t num_frames_left() const noexcept
+    [[nodiscard]] audio::Frames num_frames_left() const noexcept
     {
         return num_frames_ - num_frames_read_;
     }
 
-    [[nodiscard]] bool exhausted() const noexcept { return num_frames_left() == 0; }
+    [[nodiscard]] bool exhausted() const noexcept { return num_frames_left() == audio::Frames{}; }
 
     /// Moves so that the next render starts at `frame_index`, counted from the beginning of the
     /// stream. Seeking to `num_frames()` leaves nothing to read. False when the stream will not
     /// move, in which case the position is where it was.
-    bool seek(std::size_t frame_index);
+    bool seek(audio::Frames frame_index);
 
 protected:
-    Decoder(audio::StreamSpec spec, std::size_t num_frames) noexcept
+    Decoder(audio::StreamSpec spec, audio::Frames num_frames) noexcept
         : spec_{spec}
         , num_frames_{num_frames}
     {
@@ -73,15 +73,15 @@ protected:
 
     /// Writes at most `num_frames` whole frames into `output`, and returns how many it wrote.
     /// Never asked for more frames than remain, nor for more than `output` can hold.
-    virtual std::size_t decode(std::span<float> output, std::size_t num_frames) = 0;
+    virtual std::size_t decode(std::span<float> output, audio::Frames num_frames) = 0;
 
     /// Moves the stream itself to `frame_index`. Never asked for a frame past the end.
-    virtual bool seek_frame(std::size_t frame_index) = 0;
+    virtual bool seek_frame(audio::Frames frame_index) = 0;
 
 private:
     audio::StreamSpec spec_;
-    std::size_t num_frames_;
-    std::size_t num_frames_read_{0};
+    audio::Frames num_frames_;
+    audio::Frames num_frames_read_{};
 };
 
 } // namespace wiola::codec

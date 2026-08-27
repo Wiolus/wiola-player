@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
 
 #include <cstddef>
@@ -43,7 +44,7 @@ public:
     [[nodiscard]] virtual bool running() const noexcept = 0;
 
     /// Frames played since the last reset, which is what has been heard.
-    [[nodiscard]] virtual std::size_t frames_played() const noexcept = 0;
+    [[nodiscard]] virtual Frames frames_played() const noexcept = 0;
 
     /// Sets that count back to zero. Only legal while the output is stopped.
     virtual void reset_frames_played() noexcept = 0;

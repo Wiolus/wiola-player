@@ -31,6 +31,8 @@
 
 using wiola::codec::Decoder;
 
+using wiola::audio::Frames;
+
 namespace {
 
 std::filesystem::path fixture(const char* name)
@@ -61,7 +63,7 @@ TEST(OpenFile, OpensEveryFormatItSupports)
         ASSERT_NE(decoder, nullptr) << name;
         EXPECT_EQ(decoder->spec().sample_rate, wiola::units::Frequency{44100}) << name;
         EXPECT_EQ(decoder->spec().num_channels, 2u) << name;
-        EXPECT_GT(decoder->num_frames(), 0u) << name;
+        EXPECT_GT(decoder->num_frames(), Frames{0}) << name;
     }
 }
 
@@ -77,7 +79,7 @@ TEST(OpenFile, BelievesTheContentOverTheExtension)
 
     ASSERT_NE(decoder, nullptr);
     EXPECT_EQ(decoder->spec().num_channels, 2u);
-    EXPECT_EQ(drain(*decoder), decoder->num_frames() * 2);
+    EXPECT_EQ(drain(*decoder), decoder->spec().samples_per(decoder->num_frames()));
 }
 
 /// MP3 announces nothing, so it is reached only after every format that could have has declined.
@@ -90,7 +92,7 @@ TEST(OpenFile, ReachesAFormatThatCannotAnnounceItself)
     const auto decoder = wiola::codec::open_file(misnamed);
 
     ASSERT_NE(decoder, nullptr);
-    EXPECT_GT(decoder->num_frames(), 0u);
+    EXPECT_GT(decoder->num_frames(), Frames{0});
 }
 
 TEST(OpenFile, ReturnsNullWhenNoReaderAccepts)

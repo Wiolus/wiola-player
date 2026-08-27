@@ -48,7 +48,7 @@ using Callbacks = StreamCallbacks<drmp3_seek_origin, DRMP3_SEEK_SET, DRMP3_SEEK_
 
 } // namespace
 
-Mp3Reader::Mp3Reader(audio::StreamSpec spec, std::size_t num_frames,
+Mp3Reader::Mp3Reader(audio::StreamSpec spec, audio::Frames num_frames,
     std::unique_ptr<Handle> handle) noexcept
     : Decoder{spec, num_frames}
     , handle_{std::move(handle)}
@@ -76,19 +76,19 @@ std::unique_ptr<Mp3Reader> Mp3Reader::open(const std::filesystem::path& path)
     const auto num_frames = static_cast<std::size_t>(drmp3_get_pcm_frame_count(&handle->mp3));
 
     return std::unique_ptr<Mp3Reader>{
-        new Mp3Reader{spec, num_frames, std::move(handle)}
+        new Mp3Reader{spec, audio::Frames{num_frames}, std::move(handle)}
     };
 }
 
-std::size_t Mp3Reader::decode(std::span<float> output, std::size_t num_frames)
+std::size_t Mp3Reader::decode(std::span<float> output, audio::Frames num_frames)
 {
-    return static_cast<std::size_t>(drmp3_read_pcm_frames_f32(&handle_->mp3, num_frames,
+    return static_cast<std::size_t>(drmp3_read_pcm_frames_f32(&handle_->mp3, num_frames.count(),
         output.data()));
 }
 
-bool Mp3Reader::seek_frame(std::size_t frame_index)
+bool Mp3Reader::seek_frame(audio::Frames frame_index)
 {
-    return drmp3_seek_to_pcm_frame(&handle_->mp3, frame_index) == DRMP3_TRUE;
+    return drmp3_seek_to_pcm_frame(&handle_->mp3, frame_index.count()) == DRMP3_TRUE;
 }
 
 const Format& Mp3Reader::format()
