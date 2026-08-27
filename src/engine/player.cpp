@@ -61,20 +61,16 @@ bool Player::start()
     // A seek asked for while nothing was decoding has no thread to take it up, so it waits here
     // instead of being thrown away: a listener who moves the slider before pressing play means
     // to begin there.
-    const std::size_t requested{seeks_requested_.load(std::memory_order_acquire)};
-    const bool seek_requested{requested != seeks_applied_.load(std::memory_order_relaxed)};
+    const Playhead::Claim claim{head_.claim()};
 
-    if (previous != PlayerState::idle || seek_requested) {
-        const std::size_t start_frame{seek_requested
-                ? std::min(seek_target_.load(std::memory_order_relaxed), source_->num_frames())
-                : 0};
+    if (previous != PlayerState::idle || claim.outstanding) {
+        const std::size_t start_frame{
+            claim.outstanding ? std::min(claim.target, source_->num_frames()) : 0};
 
         buffer_.clear();
         source_->seek(start_frame);
-        position_base_.store(start_frame, std::memory_order_relaxed);
         output_.reset_frames_played();
-        num_pushed_ = 0;
-        seeks_applied_.store(requested, std::memory_order_release);
+        head_.begin_at(start_frame, claim);
     }
 
     prime();
@@ -92,8 +88,7 @@ void Player::seek(units::Time position) noexcept
 {
     const double frames{source_->spec().sample_rate * std::max(position, units::Time{})};
 
-    seek_target_.store(static_cast<std::size_t>(frames), std::memory_order_relaxed);
-    seeks_requested_.fetch_add(1, std::memory_order_release);
+    head_.request_seek(static_cast<std::size_t>(frames));
 }
 
 bool Player::pause() noexcept
@@ -128,20 +123,9 @@ units::Time Player::total_time() const noexcept
 
 units::Time Player::time_played() const noexcept
 {
-    // A seek nobody has taken up yet is already where playback is: what follows it, whenever it
-    // is applied, starts there. Reporting the old place until then would move the slider back
-    // under a listener who has just let go of it.
-    const std::size_t frames{seek_outstanding()
-            ? seek_target_.load(std::memory_order_relaxed)
-            : position_base_.load(std::memory_order_relaxed) + output_.frames_played()};
+    const std::size_t frames{head_.position(output_.frames_played())};
 
     return units::Time{static_cast<double>(frames) / source_->spec().sample_rate.get<units::Hz>()};
-}
-
-bool Player::seek_outstanding() const noexcept
-{
-    return seeks_requested_.load(std::memory_order_acquire) !=
-        seeks_applied_.load(std::memory_order_relaxed);
 }
 
 bool Player::playing() const noexcept
@@ -193,14 +177,13 @@ void Player::prime()
         if (num_rendered == 0)
             break;
 
-        num_pushed_ += buffer_.push(std::span{chunk}.first(num_rendered));
+        head_.push(buffer_.push(std::span{chunk}.first(num_rendered)));
     }
 }
 
 void Player::apply_seek()
 {
-    const std::size_t serving{seeks_requested_.load(std::memory_order_acquire)};
-    const std::size_t frame_index{seek_target_.load(std::memory_order_relaxed)};
+    const Playhead::Claim claim{head_.claim()};
 
     // What is buffered belongs to the old position. The consumer has to be stopped before it can
     // be thrown away, since discarding it moves an index the consumer owns.
@@ -209,17 +192,10 @@ void Player::apply_seek()
     output_.stop();
     buffer_.clear();
 
-    source_->seek(frame_index);
+    source_->seek(claim.target);
 
-    // Playback restarts from the new place, so what was counted before it no longer applies.
-    position_base_.store(frame_index, std::memory_order_relaxed);
     output_.reset_frames_played();
-    num_pushed_ = 0;
-
-    // Counted as carried out only now that the place asked for is the place reported. Saying so
-    // any earlier hands back the old position for as long as stopping and seeking take, which a
-    // listener sees as the bar springing back before it settles.
-    seeks_applied_.store(serving, std::memory_order_release);
+    head_.begin_at(claim.target, claim);
 
     prime();
 
@@ -235,7 +211,7 @@ void Player::run()
     std::array<float, tuning::decode_chunk_samples> chunk{};
 
     const auto seeking = [this] {
-        return seek_outstanding();
+        return head_.seek_outstanding();
     };
 
     while (!stopping()) {
@@ -252,7 +228,7 @@ void Player::run()
                 buffer_.push(std::span{chunk}.subspan(num_written, num_rendered - num_written))};
 
             num_written += num_taken;
-            num_pushed_ += num_taken;
+            head_.push(num_taken);
 
             if (num_written < num_rendered) {
                 // A seek makes the rest of this block stale, so it is abandoned rather than
@@ -271,8 +247,8 @@ void Player::run()
     // no longer running, which is the difference between waiting and hanging.
     const audio::StreamSpec spec{source_->spec()};
 
-    while (
-        !stopping() && output_.running() && output_.frames_played() < spec.frames_per(num_pushed_))
+    while (!stopping() && output_.running() &&
+        output_.frames_played() < spec.frames_per(head_.num_pushed()))
         std::this_thread::sleep_for(tuning::decode_poll_interval);
 
     output_.stop();

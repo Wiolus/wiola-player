@@ -1,3 +1,4 @@
+wiola_add_test(engine_playhead_test SOURCES playhead_test.cpp LIBS wiola_engine)
 wiola_add_test(
     engine_player_test
     SOURCES player_test.cpp
