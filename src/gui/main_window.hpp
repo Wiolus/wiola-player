@@ -22,6 +22,7 @@
 
 #include "equalizer_panel.hpp"
 #include "seek_bar.hpp"
+#include "volume_control.hpp"
 
 #include <engine/session.hpp>
 #include <utils/units.hpp>
@@ -90,8 +91,9 @@ private:
 
     engine::Session session_;
 
-    /// What a run leaves behind for the next one.
+    /// The file a run leaves things in.
     QSettings settings_;
+    VolumeControl volume_;
 
     QPushButton* open_button_{nullptr};
     QPushButton* play_button_{nullptr};
