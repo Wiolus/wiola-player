@@ -27,11 +27,33 @@
 
 namespace wiola::codec {
 
-/// Opens `path` with whichever reader accepts it. Null when no reader does.
+/// How opening a file went.
+enum class OpenResult {
+    opened,
+
+    /// Nothing could be read from it: it is missing, unreadable or empty.
+    unreadable,
+
+    /// Nothing here reads a file like this one.
+    unsupported,
+
+    /// A format claimed it by its signature, and its own reader refused it.
+    damaged,
+};
+
+/// A decoder, or why there is none.
+struct Opened {
+    std::unique_ptr<Decoder> decoder;
+    OpenResult result{OpenResult::opened};
+
+    [[nodiscard]] explicit operator bool() const noexcept { return decoder != nullptr; }
+};
+
+/// Opens `path` with whichever reader accepts it.
 ///
 /// Whether a file can be decoded is settled by handing it to a reader, so the extension only
 /// decides which one is asked first. A misnamed file therefore still plays, at the cost of an
-/// attempt, and a corrupt one fails the same way a missing one does.
-std::unique_ptr<Decoder> open_file(const std::filesystem::path& path);
+/// attempt.
+Opened open_file(const std::filesystem::path& path);
 
 } // namespace wiola::codec

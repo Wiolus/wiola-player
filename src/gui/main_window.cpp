@@ -120,7 +120,7 @@ MainWindow::~MainWindow() = default;
 
 bool MainWindow::load(const std::filesystem::path& path)
 {
-    session_.load(path);
+    static_cast<void>(session_.load(path));
 
     show_status(loaded() ? QString{} : QString{"cannot read that file"});
     setWindowTitle(loaded() ? QString::fromStdString(path.filename().string())

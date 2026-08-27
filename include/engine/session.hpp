@@ -25,6 +25,7 @@
 #include <audio/output.hpp>
 #include <audio/source.hpp>
 #include <audio/volume.hpp>
+#include <codec/open.hpp>
 #include <core/macros.hpp>
 #include <engine/player.hpp>
 #include <utils/units.hpp>
@@ -58,9 +59,9 @@ public:
 
     ~Session();
 
-    /// Loads `path`, replacing whatever was playing. False when the file cannot be read, in which
-    /// case nothing is loaded.
-    bool load(const std::filesystem::path& path);
+    /// Loads `path`, replacing whatever was playing. Anything but `opened` leaves nothing loaded
+    /// and says why.
+    codec::OpenResult load(const std::filesystem::path& path);
 
     [[nodiscard]] bool loaded() const noexcept;
 

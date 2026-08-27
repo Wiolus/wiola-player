@@ -89,7 +89,7 @@ inline std::filesystem::path write_wav(const char* name)
 /// The same file, opened.
 inline std::unique_ptr<codec::Decoder> open_fixture(const char* name = "wiola_fixture.wav")
 {
-    return codec::open_file(write_wav(name));
+    return std::move(codec::open_file(write_wav(name)).decoder);
 }
 
 } // namespace wiola::testing

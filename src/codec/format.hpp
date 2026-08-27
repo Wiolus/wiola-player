@@ -47,6 +47,9 @@ public:
     /// Whether `marker` is present where it says it should be.
     [[nodiscard]] bool carries(const Marker& marker) const noexcept;
 
+    /// Whether nothing could be read at all.
+    [[nodiscard]] bool empty() const noexcept { return size_ == 0; }
+
 private:
     /// Bytes kept, enough for the longest marker any format declares.
     static constexpr std::size_t capacity{16};
