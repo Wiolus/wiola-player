@@ -120,12 +120,7 @@ MainWindow::~MainWindow() = default;
 
 bool MainWindow::load(const std::filesystem::path& path)
 {
-    std::unique_ptr<codec::Decoder> source{codec::open_file(path)};
-
-    // The old player is stopped before the new one is built: a running device reads the chain
-    // that building one reconfigures.
-    player_.reset();
-    player_ = source ? std::make_unique<engine::Player>(std::move(source), chain_) : nullptr;
+    session_.load(path);
 
     show_status(loaded() ? QString{} : QString{"cannot read that file"});
     setWindowTitle(loaded() ? QString::fromStdString(path.filename().string())
@@ -153,27 +148,16 @@ void MainWindow::toggle_playback()
     if (!loaded())
         return;
 
-    // The state says which of the three this press means: silence it, carry on, or begin - the
-    // last of which also covers playing a track that has already finished.
-    switch (player_->state()) {
-    case engine::PlayerState::playing:
-        static_cast<void>(player_->pause());
-        return;
+    // Pausing cannot fail, so a refusal is always an output that would not open.
+    const bool pausing{session_.state() == engine::PlayerState::playing};
 
-    case engine::PlayerState::paused:
-        show_status(player_->resume() ? QString{} : QString{"no playback device"});
-        return;
-
-    default:
-        show_status(player_->start() ? QString{} : QString{"no playback device"});
-        return;
-    }
+    show_status(session_.toggle() || pausing ? QString{} : QString{"no playback device"});
 }
 
 void MainWindow::show_equalizer()
 {
     if (equalizer_ == nullptr)
-        equalizer_ = new EqualizerPanel{chain_.equalizer(), this};
+        equalizer_ = new EqualizerPanel{session_.equalizer(), this};
 
     equalizer_->show();
     equalizer_->raise();
@@ -183,7 +167,7 @@ void MainWindow::set_volume(int percent)
 {
     const double position{static_cast<double>(percent) / tuning::full_volume};
 
-    chain_.volume().set_gain(static_cast<float>(std::pow(position, tuning::volume_curve)));
+    session_.volume().set_gain(static_cast<float>(std::pow(position, tuning::volume_curve)));
     settings_.setValue(volume_key, percent);
 }
 
@@ -197,17 +181,13 @@ void MainWindow::stop_playback()
     if (!loaded())
         return;
 
-    player_->stop();
-
-    // Stopping is not pausing, which the play button already does: the next play begins at the
-    // start of the track, so that is where the slider and the clock have to say playback is.
-    player_->seek(units::Time{});
+    session_.stop();
 }
 
 void MainWindow::seek_to(double fraction)
 {
     if (loaded())
-        player_->seek(player_->total_time() * fraction);
+        session_.seek(session_.total_time() * fraction);
 }
 
 void MainWindow::refresh()
@@ -223,14 +203,14 @@ void MainWindow::refresh()
         return;
     }
 
-    const units::Time total{player_->total_time()};
+    const units::Time total{session_.total_time()};
 
     // While the edge is being dragged it is a place being chosen, and that is the time worth
     // showing: a listener aiming for somewhere needs to see where they are aiming.
     const units::Time shown{
-        position_bar_->dragging() ? total * position_bar_->fraction() : player_->time_played()};
+        position_bar_->dragging() ? total * position_bar_->fraction() : session_.time_played()};
 
-    play_button_->setText(player_->playing() ? "Pause" : "Play");
+    play_button_->setText(session_.playing() ? "Pause" : "Play");
     time_label_->setText(as_clock(shown) + " / " + as_clock(total));
 
     if (total == units::Time{})

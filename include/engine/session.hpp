@@ -1,0 +1,83 @@
+/**
+ * @file
+ * @brief One track, everything it plays through, and what the listener asked of it.
+ * @author Roman Glaz
+ * @copyright © 2026, <vokerlee@gmail.com>
+ *
+ * Wiola is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Wiola is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#include <audio/chain.hpp>
+#include <audio/equalizer.hpp>
+#include <audio/volume.hpp>
+#include <core/macros.hpp>
+#include <engine/player.hpp>
+#include <utils/units.hpp>
+
+#include <filesystem>
+#include <memory>
+
+namespace wiola::engine {
+
+/**
+ * Builds what a track is played through, and keeps it built while it plays.
+ *
+ * A buffer and an output are cut for the format of the track that is loaded, so opening another
+ * one replaces them. The chain outlives them all: a setting belongs to the listener rather than
+ * to what is playing.
+ */
+class Session {
+public:
+    Session();
+
+    NO_COPY_SEMANTIC(Session);
+    NO_MOVE_SEMANTIC(Session);
+
+    ~Session();
+
+    /// Loads `path`, replacing whatever was playing. False when the file cannot be read, in which
+    /// case nothing is loaded.
+    bool load(const std::filesystem::path& path);
+
+    [[nodiscard]] bool loaded() const noexcept;
+
+    /// Starts, pauses or resumes, whichever the transport is due. False when the output could not
+    /// be opened, and when there is nothing loaded.
+    bool toggle();
+
+    /// Ends playback and returns to the beginning of the track.
+    void stop() noexcept;
+
+    /// Moves playback to `position`, measured from the start of the track.
+    void seek(units::Time position) noexcept;
+
+    [[nodiscard]] PlayerState state() const noexcept;
+    [[nodiscard]] bool playing() const noexcept;
+    [[nodiscard]] units::Time time_played() const noexcept;
+    [[nodiscard]] units::Time total_time() const noexcept;
+
+    [[nodiscard]] audio::Volume& volume() noexcept { return chain_.volume(); }
+
+    [[nodiscard]] audio::Equalizer& equalizer() noexcept { return chain_.equalizer(); }
+
+private:
+    struct Pipeline;
+
+    audio::Chain chain_{audio::StreamSpec{}};
+    std::unique_ptr<Pipeline> pipeline_;
+};
+
+} // namespace wiola::engine
