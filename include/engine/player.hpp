@@ -20,7 +20,6 @@
 
 #pragma once
 
-#include <audio/chain.hpp>
 #include <audio/device.hpp>
 #include <codec/decoder.hpp>
 #include <core/macros.hpp>
@@ -64,9 +63,10 @@ enum class PlayerState {
  */
 class Player final {
 public:
-    /// Takes the source it plays, which must not be null, and what shapes its output. The chain
-    /// is told the source's format and outlives the player.
-    Player(std::unique_ptr<codec::Decoder> source, audio::Chain& chain);
+    /// Takes the source it plays, which must not be null, the buffer it decodes into, and the
+    /// output that buffer is played through. Both outlive the player.
+    Player(std::unique_ptr<codec::Decoder> source, lockfree::SPSCRingBuffer<float>& buffer,
+        audio::Device& device);
 
     NO_COPY_SEMANTIC(Player);
     NO_MOVE_SEMANTIC(Player);
@@ -148,11 +148,8 @@ private:
     /// Samples handed to the buffer since the device last had its count reset. Playback is over
     /// when the device has played all of them, which is a fact rather than a buffer level.
     std::size_t num_pushed_{0};
-    lockfree::SPSCRingBuffer<float> buffer_;
-
-    /// Reads `buffer_`, so it is built before the device that asks it for frames.
-    std::unique_ptr<audio::Source> output_;
-    audio::Device device_;
+    lockfree::SPSCRingBuffer<float>& buffer_;
+    audio::Device& device_;
     std::jthread thread_;
 };
 

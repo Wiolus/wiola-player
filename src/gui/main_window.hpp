@@ -23,8 +23,7 @@
 #include "equalizer_panel.hpp"
 #include "seek_bar.hpp"
 
-#include <audio/chain.hpp>
-#include <engine/player.hpp>
+#include <engine/session.hpp>
 #include <utils/units.hpp>
 
 #include <QLabel>
@@ -87,11 +86,9 @@ private:
     /// so a message stays readable rather than lasting until the next poll.
     void show_status(const QString& message);
 
-    [[nodiscard]] bool loaded() const noexcept { return player_ != nullptr; }
+    [[nodiscard]] bool loaded() const noexcept { return session_.loaded(); }
 
-    /// Outlives every player, so what a listener asked for is not undone by opening a track.
-    audio::Chain chain_{audio::StreamSpec{}};
-    std::unique_ptr<engine::Player> player_;
+    engine::Session session_;
 
     /// What a run leaves behind for the next one.
     QSettings settings_;
