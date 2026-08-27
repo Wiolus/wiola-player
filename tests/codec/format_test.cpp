@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <format.hpp>
+#include <codec/format.hpp>
 
 #include <gtest/gtest.h>
 

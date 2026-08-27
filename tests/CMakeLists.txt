@@ -1,7 +1,7 @@
 include(GoogleTest)
 
 function(wiola_add_test name)
-    cmake_parse_arguments(PARSE_ARGV 1 arg "" "DATA" "SOURCES;LIBS;INCLUDES")
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "DATA" "SOURCES;LIBS")
 
     add_executable(${name} ${arg_SOURCES})
     target_link_libraries(
@@ -19,9 +19,8 @@ function(wiola_add_test name)
         PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     )
 
-    if(arg_INCLUDES)
-        target_include_directories(${name} PRIVATE ${arg_INCLUDES})
-    endif()
+    # A test reaches its own layer's private headers the way that layer's sources do.
+    target_include_directories(${name} PRIVATE "${PROJECT_SOURCE_DIR}/src")
 
     if(arg_DATA)
         target_compile_definitions(
@@ -38,5 +37,6 @@ add_subdirectory(cli)
 add_subdirectory(codec)
 add_subdirectory(core)
 add_subdirectory(engine)
+add_subdirectory(gui)
 add_subdirectory(lockfree)
 add_subdirectory(utils)

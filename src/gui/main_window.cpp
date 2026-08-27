@@ -36,19 +36,6 @@ namespace wiola::gui {
 
 namespace {
 
-/// Under which name the slider position is kept.
-constexpr auto volume_key{"volume"};
-
-/// The slider position a previous run left, or full volume when there is none or it reads
-/// as anything but a position.
-int kept_volume(QSettings& settings)
-{
-    bool numeric{false};
-    const int percent{settings.value(volume_key, tuning::full_volume).toInt(&numeric)};
-
-    return numeric ? std::clamp(percent, 0, tuning::full_volume) : tuning::full_volume;
-}
-
 /// What to say about a file that would not open.
 QString as_status(codec::OpenResult result)
 {
@@ -76,6 +63,7 @@ QString as_clock(units::Time time)
 MainWindow::MainWindow()
     // A file of its own on both platforms, rather than the registry on one of them.
     : settings_{QSettings::IniFormat, QSettings::UserScope, "wiola-player", "settings"}
+    , volume_{session_.volume(), settings_}
 {
     setWindowTitle("Wiola Player");
 
@@ -91,7 +79,7 @@ MainWindow::MainWindow()
     refresh_timer_ = new QTimer{this};
 
     volume_slider_->setRange(0, tuning::full_volume);
-    volume_slider_->setValue(kept_volume(settings_));
+    volume_slider_->setValue(volume_.restore());
     volume_slider_->setFixedWidth(tuning::volume_slider_width);
     volume_slider_->setToolTip("Volume");
 
@@ -124,9 +112,6 @@ MainWindow::MainWindow()
 
     connect(refresh_timer_, &QTimer::timeout, this, &MainWindow::refresh);
     refresh_timer_->start(tuning::engine_poll_interval);
-
-    // The slider was placed before it was connected, so nothing has read it yet.
-    set_volume(volume_slider_->value());
 
     refresh();
 }
@@ -180,10 +165,7 @@ void MainWindow::show_equalizer()
 
 void MainWindow::set_volume(int percent)
 {
-    const double position{static_cast<double>(percent) / tuning::full_volume};
-
-    session_.volume().set_gain(static_cast<float>(std::pow(position, tuning::volume_curve)));
-    settings_.setValue(volume_key, percent);
+    volume_.set_position(percent);
 }
 
 void MainWindow::show_status(const QString& message)
