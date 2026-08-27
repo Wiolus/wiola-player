@@ -28,6 +28,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <string>
 
 using wiola::codec::Decoder;
 
@@ -58,7 +59,7 @@ std::size_t drain(wiola::audio::Source& source)
 TEST(OpenFile, OpensEveryFormatItSupports)
 {
     for (const char* name : {"tone.wav", "tone.flac", "tone.mp3"}) {
-        const auto decoder = wiola::codec::open_file(fixture(name));
+        const auto decoder = wiola::codec::open_file(fixture(name)).decoder;
 
         ASSERT_NE(decoder, nullptr) << name;
         EXPECT_EQ(decoder->spec().sample_rate, wiola::units::Frequency{44100}) << name;
@@ -75,7 +76,7 @@ TEST(OpenFile, BelievesTheContentOverTheExtension)
     std::filesystem::copy_file(fixture("tone.flac"), misnamed,
         std::filesystem::copy_options::overwrite_existing);
 
-    const auto decoder = wiola::codec::open_file(misnamed);
+    const auto decoder = wiola::codec::open_file(misnamed).decoder;
 
     ASSERT_NE(decoder, nullptr);
     EXPECT_EQ(decoder->spec().num_channels, 2u);
@@ -89,25 +90,65 @@ TEST(OpenFile, ReachesAFormatThatCannotAnnounceItself)
     std::filesystem::copy_file(fixture("tone.mp3"), misnamed,
         std::filesystem::copy_options::overwrite_existing);
 
-    const auto decoder = wiola::codec::open_file(misnamed);
+    const auto decoder = wiola::codec::open_file(misnamed).decoder;
 
     ASSERT_NE(decoder, nullptr);
     EXPECT_GT(decoder->num_frames(), Frames{0});
 }
 
-TEST(OpenFile, ReturnsNullWhenNoReaderAccepts)
+TEST(OpenFile, GivesNothingWhenNoReaderAccepts)
 {
     const std::filesystem::path junk{std::filesystem::temp_directory_path() / "wiola_junk.wav"};
     std::ofstream{junk, std::ios::binary} << "not audio at all, by any reader";
 
-    EXPECT_EQ(wiola::codec::open_file(junk), nullptr);
-    EXPECT_EQ(wiola::codec::open_file("/nonexistent/wiola.ogg"), nullptr);
-    EXPECT_EQ(wiola::codec::open_file(std::filesystem::temp_directory_path()), nullptr);
+    const wiola::codec::Opened opened{wiola::codec::open_file(junk)};
+
+    EXPECT_FALSE(opened);
+    EXPECT_EQ(opened.decoder, nullptr);
+}
+
+/// Nothing here reads a file like that one, which is not the same as being unable to read it.
+TEST(OpenFile, SaysWhenNothingReadsTheFormat)
+{
+    const std::filesystem::path junk{std::filesystem::temp_directory_path() / "wiola_junk.wav"};
+    std::ofstream{junk, std::ios::binary} << "not audio at all, by any reader";
+
+    EXPECT_EQ(wiola::codec::open_file(junk).result, wiola::codec::OpenResult::unsupported);
+}
+
+TEST(OpenFile, SaysWhenThereIsNothingToRead)
+{
+    EXPECT_EQ(wiola::codec::open_file("/nonexistent/wiola.ogg").result,
+        wiola::codec::OpenResult::unreadable);
+    EXPECT_EQ(wiola::codec::open_file(std::filesystem::temp_directory_path()).result,
+        wiola::codec::OpenResult::unreadable);
+
+    const std::filesystem::path empty{std::filesystem::temp_directory_path() / "wiola_empty.wav"};
+    std::ofstream{empty, std::ios::binary};
+
+    EXPECT_EQ(wiola::codec::open_file(empty).result, wiola::codec::OpenResult::unreadable);
+}
+
+/// A file carrying a format's signature is that format, so its reader refusing it is damage.
+TEST(OpenFile, SaysWhenAFileOfAKnownFormatIsDamaged)
+{
+    const std::filesystem::path broken{std::filesystem::temp_directory_path() / "wiola_broken.wav"};
+    std::ofstream{broken, std::ios::binary} << std::string{"RIFF\x20\0\0\0WAVE", 12}
+                                            << "not the chunks a wav needs";
+
+    EXPECT_EQ(wiola::codec::open_file(broken).result, wiola::codec::OpenResult::damaged);
+}
+
+/// Being opened is what a decoder answers with, not a flag beside it.
+TEST(OpenFile, IsTrueOnlyWhenItGaveADecoder)
+{
+    EXPECT_TRUE(wiola::codec::open_file(fixture("tone.wav")));
+    EXPECT_FALSE(wiola::codec::open_file("/nonexistent/wiola.ogg"));
 }
 
 TEST(Decoder, PlaysThroughTheInterface)
 {
-    const std::unique_ptr<Decoder> decoder{wiola::codec::open_file(fixture("tone.flac"))};
+    const std::unique_ptr<Decoder> decoder{wiola::codec::open_file(fixture("tone.flac")).decoder};
 
     ASSERT_NE(decoder, nullptr);
 

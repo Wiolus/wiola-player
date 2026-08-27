@@ -53,10 +53,15 @@ std::string lowercased_extension(const std::filesystem::path& path)
 
 } // namespace
 
-std::unique_ptr<Decoder> open_file(const std::filesystem::path& path)
+Opened open_file(const std::filesystem::path& path)
 {
     const FileHead head{FileHead::read(path)};
+
+    if (head.empty())
+        return Opened{.decoder = nullptr, .result = OpenResult::unreadable};
+
     const std::string extension{lowercased_extension(path)};
+    bool claimed{false};
 
     // A file is a format if that format's reader accepts it. Everything known about the file only
     // decides who is asked first, which is why the weakest reason still gets its turn.
@@ -65,12 +70,17 @@ std::unique_ptr<Decoder> open_file(const std::filesystem::path& path)
             if (match_of(format, head, extension) != reason)
                 continue;
 
+            claimed = claimed || reason == Match::signature;
+
             if (std::unique_ptr<Decoder> decoder{format.open(path)})
-                return decoder;
+                return Opened{.decoder = std::move(decoder), .result = OpenResult::opened};
         }
     }
 
-    return nullptr;
+    // A file carrying a format's signature is that format, so a reader refusing it is damage
+    // rather than a format nothing here reads.
+    return Opened{.decoder = nullptr,
+        .result = claimed ? OpenResult::damaged : OpenResult::unsupported};
 }
 
 } // namespace wiola::codec
