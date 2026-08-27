@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <audio/equalizer.hpp>
+#include "equalizer_control.hpp"
 
 #include <QCheckBox>
 #include <QHBoxLayout>
@@ -41,7 +41,7 @@ class EqualizerPanel final : public QWidget {
     Q_OBJECT
 
 public:
-    EqualizerPanel(audio::Equalizer& equalizer, QWidget* parent);
+    EqualizerPanel(EqualizerControl& equalizer, QWidget* parent);
 
 protected:
     void showEvent(QShowEvent* event) override;
@@ -50,7 +50,7 @@ private:
     /// Replaces the row of band sliders with one the current format asks for.
     void rebuild_bands();
 
-    audio::Equalizer* equalizer_;
+    EqualizerControl& equalizer_;
 
     QCheckBox* enabled_box_{nullptr};
     QSlider* preamp_slider_{nullptr};

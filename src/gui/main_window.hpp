@@ -94,6 +94,7 @@ private:
     /// The file a run leaves things in.
     QSettings settings_;
     VolumeControl volume_;
+    EqualizerControl equalizer_;
 
     QPushButton* open_button_{nullptr};
     QPushButton* play_button_{nullptr};
@@ -101,7 +102,7 @@ private:
     SeekBar* position_bar_{nullptr};
     QSlider* volume_slider_{nullptr};
     QPushButton* equalizer_button_{nullptr};
-    EqualizerPanel* equalizer_{nullptr};
+    EqualizerPanel* equalizer_panel_{nullptr};
     QLabel* time_label_{nullptr};
     QLabel* status_label_{nullptr};
     QTimer* refresh_timer_{nullptr};
