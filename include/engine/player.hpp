@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <audio/device.hpp>
+#include <audio/output.hpp>
 #include <codec/decoder.hpp>
 #include <core/macros.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
@@ -66,7 +66,7 @@ public:
     /// Takes the source it plays, which must not be null, the buffer it decodes into, and the
     /// output that buffer is played through. Both outlive the player.
     Player(std::unique_ptr<codec::Decoder> source, lockfree::SPSCRingBuffer<float>& buffer,
-        audio::Device& device);
+        audio::Output& output);
 
     NO_COPY_SEMANTIC(Player);
     NO_MOVE_SEMANTIC(Player);
@@ -149,7 +149,7 @@ private:
     /// when the device has played all of them, which is a fact rather than a buffer level.
     std::size_t num_pushed_{0};
     lockfree::SPSCRingBuffer<float>& buffer_;
-    audio::Device& device_;
+    audio::Output& output_;
     std::jthread thread_;
 };
 
