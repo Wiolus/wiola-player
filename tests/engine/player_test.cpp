@@ -33,10 +33,10 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
-#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -123,8 +123,8 @@ bool eventually(Predicate predicate, std::chrono::milliseconds limit = 5s)
 
 } // namespace
 
-/// An output that opens anywhere and plays only what it is told to.
-class FakeOutput final : public wiola::audio::Output {
+/// An output that counts only what a test says it has played.
+class ManualOutput final : public wiola::audio::Output {
 public:
     bool start() noexcept override
     {
@@ -148,23 +148,79 @@ private:
     std::atomic<std::size_t> frames_{0};
 };
 
-/// What a player is given, wired the way a session wires it.
-struct Rig {
-    explicit Rig(std::unique_ptr<wiola::codec::Decoder> source)
-        : chain{source->spec()}
-        , buffer{source->spec().samples_per(units::Time{std::chrono::milliseconds{250}})}
-        , decoded{source->spec(), buffer}
-        , shaped{decoded, chain}
-        , device{shaped}
-        , player{std::move(source), buffer, device}
+/// What a device does without the sound card: pulls its source on a thread of its own and counts
+/// what it took. It pulls as fast as it is answered, so a track is played through in the time it
+/// takes to decode it.
+class DrainingOutput final : public wiola::audio::Output {
+public:
+    explicit DrainingOutput(wiola::audio::Source& source) noexcept
+        : source_{source}
     {
     }
 
-    Chain chain;
+    ~DrainingOutput() override { stop(); }
+
+    bool start() noexcept override
+    {
+        if (running_.exchange(true))
+            return true;
+
+        thread_ = std::thread{[this] { pull(); }};
+
+        return true;
+    }
+
+    void stop() noexcept override
+    {
+        running_.store(false);
+
+        if (thread_.joinable())
+            thread_.join();
+    }
+
+    [[nodiscard]] bool running() const noexcept override { return running_.load(); }
+
+    [[nodiscard]] std::size_t frames_played() const noexcept override { return frames_.load(); }
+
+    void reset_frames_played() noexcept override { frames_.store(0); }
+
+private:
+    void pull()
+    {
+        const wiola::audio::StreamSpec spec{source_.spec()};
+        std::array<float, 512> block{};
+
+        while (running_.load()) {
+            const std::size_t num_rendered{source_.render(block)};
+
+            if (num_rendered == 0) {
+                std::this_thread::sleep_for(1ms);
+                continue;
+            }
+
+            frames_.fetch_add(spec.frames_per(num_rendered));
+        }
+    }
+
+    wiola::audio::Source& source_;
+    std::atomic<bool> running_{false};
+    std::atomic<std::size_t> frames_{0};
+    std::thread thread_;
+};
+
+/// What a player is given, wired the way a session wires it, with the sound card left out.
+struct Rig {
+    explicit Rig(std::unique_ptr<wiola::codec::Decoder> source)
+        : buffer{source->spec().samples_per(units::Time{std::chrono::milliseconds{250}})}
+        , decoded{source->spec(), buffer}
+        , output{decoded}
+        , player{std::move(source), buffer, output}
+    {
+    }
+
     wiola::lockfree::SPSCRingBuffer<float> buffer;
     wiola::audio::BufferSource decoded;
-    wiola::audio::ShapedSource shaped;
-    wiola::audio::Device device;
+    DrainingOutput output;
     Player player;
 };
 
@@ -177,8 +233,7 @@ TEST(Player, PlaysToTheEndOnItsOwn)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     EXPECT_TRUE(player.playing());
 
@@ -197,8 +252,7 @@ TEST(Player, StartReturnsBeforePlaybackEnds)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     EXPECT_FALSE(player.finished());
 }
@@ -211,8 +265,7 @@ TEST(Player, StopEndsPlaybackAtOnce)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     const auto before = std::chrono::steady_clock::now();
 
@@ -234,8 +287,7 @@ TEST(Player, StopIsHarmlessAfterPlaybackHasEnded)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     player.wait();
     player.stop();
@@ -252,8 +304,7 @@ TEST(Player, PauseSilencesAndResumeContinues)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     ASSERT_TRUE(player.pause());
     EXPECT_FALSE(player.playing());
@@ -280,8 +331,7 @@ TEST(Player, SeekMovesTheSource)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     ASSERT_TRUE(player.pause());
     player.seek(1300_ms);
@@ -307,8 +357,7 @@ TEST(Player, SeekBeyondTheEndIsIgnored)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     ASSERT_TRUE(player.pause());
     player.seek(3600_s);
@@ -339,8 +388,7 @@ TEST(Player, TimePlayedReachesTheEndOfTheSource)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     player.wait();
 
@@ -356,8 +404,7 @@ TEST(Player, TimePlayedFollowsASeek)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     ASSERT_TRUE(player.pause());
     player.seek(200_ms);
@@ -391,8 +438,7 @@ TEST(Player, DistinguishesEndingFromBeingStopped)
     Rig first_rig{std::move(ended)};
     Player& first{first_rig.player};
 
-    if (!first.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(first.start());
 
     first.wait();
     EXPECT_EQ(first.state(), PlayerState::ended);
@@ -436,8 +482,7 @@ TEST(Player, StartsWhereASeekAskedForBeforeIt)
 
     player.seek(1000_ms);
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     EXPECT_GT(player.time_played().get<units::Sec>(), 0.9);
 
@@ -457,8 +502,7 @@ TEST(Player, KeepsASeekAskedForAfterStopping)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     player.stop();
     player.wait();
@@ -507,8 +551,7 @@ TEST(Player, TimePlayedNeverFallsBackWhileASeekIsCarriedOut)
     Rig rig{std::make_unique<SlowSource>()};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     player.seek(2000_ms);
 
@@ -531,8 +574,7 @@ TEST(Player, PlaysAgainAfterEnding)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     player.wait();
     ASSERT_EQ(player.state(), PlayerState::ended);
@@ -554,8 +596,7 @@ TEST(Player, RefusesToStartWhilePlaying)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    if (!player.start())
-        GTEST_SKIP() << "no playback device on this machine";
+    ASSERT_TRUE(player.start());
 
     EXPECT_FALSE(player.start());
     EXPECT_EQ(player.state(), PlayerState::playing);
@@ -575,7 +616,7 @@ TEST(Player, RunsOnAnyOutput)
     const StreamSpec spec{source->spec()};
     wiola::lockfree::SPSCRingBuffer<float> buffer{
         spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
-    FakeOutput output;
+    ManualOutput output;
     Player player{std::move(source), buffer, output};
 
     ASSERT_TRUE(player.start());
@@ -598,7 +639,7 @@ TEST(Player, FollowsTheOutputRatherThanTheDecoder)
     const StreamSpec spec{source->spec()};
     wiola::lockfree::SPSCRingBuffer<float> buffer{
         spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
-    FakeOutput output;
+    ManualOutput output;
     Player player{std::move(source), buffer, output};
 
     ASSERT_TRUE(player.start());
