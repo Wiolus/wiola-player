@@ -37,23 +37,32 @@ namespace wiola::engine {
 /// Declared in the order they are wired, so that each is built before whoever reads it and torn
 /// down after.
 struct Session::Pipeline {
-    Pipeline(std::unique_ptr<codec::Decoder> source, audio::Chain& chain)
+    Pipeline(std::unique_ptr<codec::Decoder> source, audio::Chain& chain,
+        const OutputFactory& make_output)
         : buffer{source->spec().samples_per(tuning::buffer_duration)}
         , decoded{source->spec(), buffer}
         , shaped{decoded, chain}
-        , device{shaped}
-        , player{std::move(source), buffer, device}
+        , output{make_output(shaped)}
+        , player{std::move(source), buffer, *output}
     {
     }
 
     lockfree::SPSCRingBuffer<float> buffer;
     audio::BufferSource decoded;
     audio::ShapedSource shaped;
-    audio::Device device;
+    std::unique_ptr<audio::Output> output;
     Player player;
 };
 
-Session::Session() = default;
+Session::Session()
+    : Session{[](audio::Source& source) { return std::make_unique<audio::Device>(source); }}
+{
+}
+
+Session::Session(OutputFactory make_output)
+    : make_output_{std::move(make_output)}
+{
+}
 
 Session::~Session() = default;
 
@@ -71,7 +80,7 @@ bool Session::load(const std::filesystem::path& path)
     // The old pipeline goes first: its device reads the chain that configuring one rebuilds.
     pipeline_.reset();
     chain_.configure(spec);
-    pipeline_ = std::make_unique<Pipeline>(std::move(source), chain_);
+    pipeline_ = std::make_unique<Pipeline>(std::move(source), chain_, make_output_);
 
     return true;
 }

@@ -20,6 +20,8 @@
 
 #include <engine/player.hpp>
 
+#include "wav_fixture.hpp"
+
 #include <audio/buffer_source.hpp>
 #include <audio/chain.hpp>
 #include <audio/device.hpp>
@@ -54,58 +56,6 @@ using wiola::audio::StreamSpec;
 using wiola::engine::Player;
 using wiola::engine::PlayerState;
 namespace units = wiola::units;
-
-/// Seconds of audio a test source holds. It has to exceed what the player buffers ahead, or
-/// priming swallows the whole source before playback even starts and nothing can be observed.
-constexpr double source_seconds{1.5};
-constexpr std::uint32_t source_rate{44100};
-constexpr std::uint16_t source_channels{2};
-
-void append(std::string& out, std::uint32_t value, std::size_t num_bytes)
-{
-    for (std::size_t i = 0; i < num_bytes; ++i)
-        out += static_cast<char>((value >> (8 * i)) & 0xFFU);
-}
-
-/// Writes a few seconds of tone as a WAV file and opens it.
-std::unique_ptr<wiola::codec::Decoder> fixture()
-{
-    const auto num_frames{static_cast<std::size_t>(source_seconds * source_rate)};
-
-    std::string samples;
-    for (std::size_t i = 0; i < num_frames; ++i) {
-        const auto value = static_cast<std::uint32_t>(static_cast<std::int16_t>(12000 *
-            std::sin(2 * std::numbers::pi * 440 * i / source_rate)));
-
-        for (std::uint16_t channel = 0; channel < source_channels; ++channel)
-            append(samples, value, 2);
-    }
-
-    std::string fmt;
-    append(fmt, 1, 2);
-    append(fmt, source_channels, 2);
-    append(fmt, source_rate, 4);
-    append(fmt, source_rate * source_channels * 2, 4);
-    append(fmt, source_channels * 2, 2);
-    append(fmt, 16, 2);
-
-    std::string body{"WAVEfmt "};
-    append(body, static_cast<std::uint32_t>(fmt.size()), 4);
-    body += fmt + "data";
-    append(body, static_cast<std::uint32_t>(samples.size()), 4);
-    body += samples;
-
-    std::string file{"RIFF"};
-    append(file, static_cast<std::uint32_t>(body.size()), 4);
-    file += body;
-
-    const std::filesystem::path path{std::filesystem::temp_directory_path() / "wiola_player.wav"};
-    std::ofstream out{path, std::ios::binary};
-    out.write(file.data(), static_cast<std::streamsize>(file.size()));
-    out.close();
-
-    return wiola::codec::open_file(path);
-}
 
 /// Waits for `predicate`, so a test never depends on how fast a device happens to run.
 template<typename Predicate>
@@ -232,7 +182,7 @@ struct Rig {
 
 TEST(Player, PlaysToTheEndOnItsOwn)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     const wiola::codec::Decoder* played{source.get()};
@@ -252,7 +202,7 @@ TEST(Player, PlaysToTheEndOnItsOwn)
 /// The point of the thread: the caller is free while the audio is still going.
 TEST(Player, StartReturnsBeforePlaybackEnds)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -265,7 +215,7 @@ TEST(Player, StartReturnsBeforePlaybackEnds)
 
 TEST(Player, StopEndsPlaybackAtOnce)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -287,7 +237,7 @@ TEST(Player, StopEndsPlaybackAtOnce)
 
 TEST(Player, StopIsHarmlessAfterPlaybackHasEnded)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -304,7 +254,7 @@ TEST(Player, StopIsHarmlessAfterPlaybackHasEnded)
 
 TEST(Player, PauseSilencesAndResumeContinues)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -331,7 +281,7 @@ TEST(Player, PauseSilencesAndResumeContinues)
 /// The fixture is a quarter second, so seeking past halfway leaves very little to play.
 TEST(Player, SeekMovesTheSource)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -357,7 +307,7 @@ TEST(Player, SeekMovesTheSource)
 
 TEST(Player, SeekBeyondTheEndIsIgnored)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -375,7 +325,7 @@ TEST(Player, SeekBeyondTheEndIsIgnored)
 
 TEST(Player, TimePlayedStartsAtTheBeginning)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -386,7 +336,7 @@ TEST(Player, TimePlayedStartsAtTheBeginning)
 
 TEST(Player, TimePlayedReachesTheEndOfTheSource)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     const double length{static_cast<double>(source->num_frames().count()) /
@@ -404,7 +354,7 @@ TEST(Player, TimePlayedReachesTheEndOfTheSource)
 /// Position follows the device, so a seek moves it even though nothing has been played since.
 TEST(Player, TimePlayedFollowsASeek)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -423,7 +373,7 @@ TEST(Player, TimePlayedFollowsASeek)
 
 TEST(Player, ResumeRefusesBeforeStart)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -438,7 +388,7 @@ TEST(Player, ResumeRefusesBeforeStart)
 /// tell them apart: one is the cue to play the next thing, the other is not.
 TEST(Player, DistinguishesEndingFromBeingStopped)
 {
-    auto ended = fixture();
+    auto ended = wiola::testing::open_fixture();
     ASSERT_NE(ended, nullptr);
 
     Rig first_rig{std::move(ended)};
@@ -450,7 +400,7 @@ TEST(Player, DistinguishesEndingFromBeingStopped)
     EXPECT_EQ(first.state(), PlayerState::ended);
     EXPECT_TRUE(first.finished());
 
-    auto stopped = fixture();
+    auto stopped = wiola::testing::open_fixture();
     Rig second_rig{std::move(stopped)};
     Player& second{second_rig.player};
 
@@ -464,7 +414,7 @@ TEST(Player, DistinguishesEndingFromBeingStopped)
 
 TEST(Player, TimePlayedReportsASeekThatHasNotBeenAppliedYet)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -478,7 +428,7 @@ TEST(Player, TimePlayedReportsASeekThatHasNotBeenAppliedYet)
 
 TEST(Player, StartsWhereASeekAskedForBeforeIt)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     const wiola::audio::Frames total{source->num_frames()};
@@ -502,7 +452,7 @@ TEST(Player, StartsWhereASeekAskedForBeforeIt)
 
 TEST(Player, KeepsASeekAskedForAfterStopping)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -574,7 +524,7 @@ TEST(Player, TimePlayedNeverFallsBackWhileASeekIsCarriedOut)
 
 TEST(Player, PlaysAgainAfterEnding)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -596,7 +546,7 @@ TEST(Player, PlaysAgainAfterEnding)
 
 TEST(Player, RefusesToStartWhilePlaying)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     Rig rig{std::move(source)};
@@ -616,7 +566,7 @@ TEST(Player, RefusesToStartWhilePlaying)
 /// runs the same on a machine that has none.
 TEST(Player, RunsOnAnyOutput)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     const StreamSpec spec{source->spec()};
@@ -639,7 +589,7 @@ TEST(Player, RunsOnAnyOutput)
 /// What has been heard is the output's count, not what has been decoded.
 TEST(Player, FollowsTheOutputRatherThanTheDecoder)
 {
-    auto source = fixture();
+    auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
     const StreamSpec spec{source->spec()};

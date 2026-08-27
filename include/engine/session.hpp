@@ -22,12 +22,15 @@
 
 #include <audio/chain.hpp>
 #include <audio/equalizer.hpp>
+#include <audio/output.hpp>
+#include <audio/source.hpp>
 #include <audio/volume.hpp>
 #include <core/macros.hpp>
 #include <engine/player.hpp>
 #include <utils/units.hpp>
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 
 namespace wiola::engine {
@@ -39,9 +42,16 @@ namespace wiola::engine {
  * one replaces them. The chain outlives them all: a setting belongs to the listener rather than
  * to what is playing.
  */
+/// Builds the output a track is played through, from what that track plays.
+using OutputFactory = std::function<std::unique_ptr<audio::Output>(audio::Source&)>;
+
 class Session {
 public:
+    /// Plays through the system output.
     Session();
+
+    /// Plays through whatever `make_output` builds, which is asked once per track.
+    explicit Session(OutputFactory make_output);
 
     NO_COPY_SEMANTIC(Session);
     NO_MOVE_SEMANTIC(Session);
@@ -77,6 +87,7 @@ private:
     struct Pipeline;
 
     audio::Chain chain_{audio::StreamSpec{}};
+    OutputFactory make_output_;
     std::unique_ptr<Pipeline> pipeline_;
 };
 
