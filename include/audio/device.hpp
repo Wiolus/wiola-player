@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <audio/output.hpp>
 #include <audio/source.hpp>
 #include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
@@ -51,7 +52,7 @@ enum class DeviceState {
  * the source for frames, so a source that allocates, locks, blocks or throws must not be given
  * to a device.
  */
-class Device {
+class Device final : public Output {
 public:
     /// Takes what it plays, which outlives the device and decides the format the output opens in.
     explicit Device(Source& source);
@@ -62,24 +63,24 @@ public:
 
     /// Starts the callback, opening the output the first time. False when no device is
     /// available. Starting an already running device does nothing.
-    [[nodiscard]] bool start() noexcept;
+    [[nodiscard]] bool start() noexcept override;
 
     /// Halts the callback, keeping the output open so that starting again is immediate. The
     /// output itself is only given back when the device is destroyed.
-    void stop() noexcept;
+    void stop() noexcept override;
 
     /// What the output is doing, asked of the audio stack each time.
     [[nodiscard]] DeviceState state() const noexcept;
 
     /// Whether the callback is being called. Shorthand for `state() == DeviceState::running`.
-    [[nodiscard]] bool running() const noexcept;
+    [[nodiscard]] bool running() const noexcept override;
 
     /// Frames handed to the output since the last reset. This is what has been heard; a decoder's
     /// own position runs ahead of it by whatever the buffer is holding.
-    [[nodiscard]] std::size_t frames_played() const noexcept;
+    [[nodiscard]] std::size_t frames_played() const noexcept override;
 
     /// Sets that count back to zero. Only legal while the device is stopped.
-    void reset_frames_played() noexcept;
+    void reset_frames_played() noexcept override;
 
     /// Callbacks that found the buffer short and had to emit silence.
     [[nodiscard]] std::size_t num_underruns() const noexcept;

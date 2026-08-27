@@ -23,6 +23,7 @@
 #include <audio/buffer_source.hpp>
 #include <audio/chain.hpp>
 #include <audio/device.hpp>
+#include <audio/output.hpp>
 #include <audio/shaped_source.hpp>
 #include <audio/stream_spec.hpp>
 #include <codec/decoder.hpp>
@@ -32,6 +33,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -120,6 +122,31 @@ bool eventually(Predicate predicate, std::chrono::milliseconds limit = 5s)
 }
 
 } // namespace
+
+/// An output that opens anywhere and plays only what it is told to.
+class FakeOutput final : public wiola::audio::Output {
+public:
+    bool start() noexcept override
+    {
+        running_.store(true);
+        return true;
+    }
+
+    void stop() noexcept override { running_.store(false); }
+
+    [[nodiscard]] bool running() const noexcept override { return running_.load(); }
+
+    [[nodiscard]] std::size_t frames_played() const noexcept override { return frames_.load(); }
+
+    void reset_frames_played() noexcept override { frames_.store(0); }
+
+    /// Says that `num_frames` more have been heard.
+    void play(std::size_t num_frames) noexcept { frames_.fetch_add(num_frames); }
+
+private:
+    std::atomic<bool> running_{false};
+    std::atomic<std::size_t> frames_{0};
+};
 
 /// What a player is given, wired the way a session wires it.
 struct Rig {
@@ -536,4 +563,51 @@ TEST(Player, RefusesToStartWhilePlaying)
     ASSERT_TRUE(player.pause());
     EXPECT_FALSE(player.start());
     EXPECT_EQ(player.state(), PlayerState::paused);
+}
+
+/// A player needs somewhere to play, not a sound card: with an output of its own the transport
+/// runs the same on a machine that has none.
+TEST(Player, RunsOnAnyOutput)
+{
+    auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    const StreamSpec spec{source->spec()};
+    wiola::lockfree::SPSCRingBuffer<float> buffer{
+        spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
+    FakeOutput output;
+    Player player{std::move(source), buffer, output};
+
+    ASSERT_TRUE(player.start());
+    EXPECT_EQ(player.state(), PlayerState::playing);
+    EXPECT_TRUE(output.running());
+
+    player.stop();
+    player.wait();
+
+    EXPECT_EQ(player.state(), PlayerState::stopped);
+    EXPECT_FALSE(output.running());
+}
+
+/// What has been heard is the output's count, not what has been decoded.
+TEST(Player, FollowsTheOutputRatherThanTheDecoder)
+{
+    auto source = fixture();
+    ASSERT_NE(source, nullptr);
+
+    const StreamSpec spec{source->spec()};
+    wiola::lockfree::SPSCRingBuffer<float> buffer{
+        spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
+    FakeOutput output;
+    Player player{std::move(source), buffer, output};
+
+    ASSERT_TRUE(player.start());
+    EXPECT_EQ(player.time_played().get<units::Sec>(), 0.0);
+
+    output.play(static_cast<std::size_t>(spec.sample_rate.get<units::Hz>()) / 2);
+
+    EXPECT_NEAR(player.time_played().get<units::Sec>(), 0.5, 1e-6);
+
+    player.stop();
+    player.wait();
 }

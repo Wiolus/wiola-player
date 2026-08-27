@@ -33,10 +33,10 @@
 namespace wiola::engine {
 
 Player::Player(std::unique_ptr<codec::Decoder> source, lockfree::SPSCRingBuffer<float>& buffer,
-    audio::Device& device)
+    audio::Output& output)
     : source_{std::move(source)}
     , buffer_{buffer}
-    , device_{device}
+    , output_{output}
 {
 }
 
@@ -72,14 +72,14 @@ bool Player::start()
         buffer_.clear();
         source_->seek(start_frame);
         position_base_.store(start_frame, std::memory_order_relaxed);
-        device_.reset_frames_played();
+        output_.reset_frames_played();
         num_pushed_ = 0;
         seeks_applied_.store(requested, std::memory_order_release);
     }
 
     prime();
 
-    if (!device_.start())
+    if (!output_.start())
         return false;
 
     state_.store(PlayerState::playing, std::memory_order_release);
@@ -101,7 +101,7 @@ bool Player::pause() noexcept
     if (state() != PlayerState::playing)
         return false;
 
-    device_.stop();
+    output_.stop();
     state_.store(PlayerState::paused, std::memory_order_release);
 
     return true;
@@ -112,7 +112,7 @@ bool Player::resume() noexcept
     if (state() != PlayerState::paused)
         return false;
 
-    if (!device_.start())
+    if (!output_.start())
         return false;
 
     state_.store(PlayerState::playing, std::memory_order_release);
@@ -133,7 +133,7 @@ units::Time Player::time_played() const noexcept
     // under a listener who has just let go of it.
     const std::size_t frames{seek_outstanding()
             ? seek_target_.load(std::memory_order_relaxed)
-            : position_base_.load(std::memory_order_relaxed) + device_.frames_played()};
+            : position_base_.load(std::memory_order_relaxed) + output_.frames_played()};
 
     return units::Time{static_cast<double>(frames) / source_->spec().sample_rate.get<units::Hz>()};
 }
@@ -206,14 +206,14 @@ void Player::apply_seek()
     // be thrown away, since discarding it moves an index the consumer owns.
     const bool was_playing{state() == PlayerState::playing};
 
-    device_.stop();
+    output_.stop();
     buffer_.clear();
 
     source_->seek(frame_index);
 
     // Playback restarts from the new place, so what was counted before it no longer applies.
     position_base_.store(frame_index, std::memory_order_relaxed);
-    device_.reset_frames_played();
+    output_.reset_frames_played();
     num_pushed_ = 0;
 
     // Counted as carried out only now that the place asked for is the place reported. Saying so
@@ -223,7 +223,7 @@ void Player::apply_seek()
 
     prime();
 
-    if (was_playing && !device_.start())
+    if (was_playing && !output_.start())
         finish(PlayerState::stopped);
 }
 
@@ -272,10 +272,10 @@ void Player::run()
     const audio::StreamSpec spec{source_->spec()};
 
     while (
-        !stopping() && device_.running() && device_.frames_played() < spec.frames_per(num_pushed_))
+        !stopping() && output_.running() && output_.frames_played() < spec.frames_per(num_pushed_))
         std::this_thread::sleep_for(tuning::decode_poll_interval);
 
-    device_.stop();
+    output_.stop();
     finish(PlayerState::ended);
 }
 
