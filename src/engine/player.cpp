@@ -64,8 +64,8 @@ bool Player::start()
     const Playhead::Claim claim{head_.claim()};
 
     if (previous != PlayerState::idle || claim.outstanding) {
-        const std::size_t start_frame{
-            claim.outstanding ? std::min(claim.target, source_->num_frames()) : 0};
+        const audio::Frames start_frame{
+            claim.outstanding ? std::min(claim.target, source_->num_frames()) : audio::Frames{}};
 
         buffer_.clear();
         source_->seek(start_frame);
@@ -88,7 +88,7 @@ void Player::seek(units::Time position) noexcept
 {
     const double frames{source_->spec().sample_rate * std::max(position, units::Time{})};
 
-    head_.request_seek(static_cast<std::size_t>(frames));
+    head_.request_seek(audio::Frames{static_cast<std::size_t>(frames)});
 }
 
 bool Player::pause() noexcept
@@ -117,15 +117,16 @@ bool Player::resume() noexcept
 
 units::Time Player::total_time() const noexcept
 {
-    return units::Time{
-        static_cast<double>(source_->num_frames()) / source_->spec().sample_rate.get<units::Hz>()};
+    return units::Time{static_cast<double>(source_->num_frames().count()) /
+        source_->spec().sample_rate.get<units::Hz>()};
 }
 
 units::Time Player::time_played() const noexcept
 {
-    const std::size_t frames{head_.position(output_.frames_played())};
+    const audio::Frames frames{head_.position(output_.frames_played())};
 
-    return units::Time{static_cast<double>(frames) / source_->spec().sample_rate.get<units::Hz>()};
+    return units::Time{
+        static_cast<double>(frames.count()) / source_->spec().sample_rate.get<units::Hz>()};
 }
 
 bool Player::playing() const noexcept

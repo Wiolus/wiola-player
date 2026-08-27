@@ -25,6 +25,7 @@
 
 namespace {
 
+using wiola::audio::Frames;
 using wiola::audio::StreamSpec;
 using namespace wiola::units;
 
@@ -41,9 +42,9 @@ TEST(StreamSpec, ConvertsBetweenFramesAndSamples)
 {
     constexpr StreamSpec spec{.sample_rate = 44.1_kHz, .num_channels = 2};
 
-    EXPECT_EQ(spec.samples_per(128), 256u);
-    EXPECT_EQ(spec.frames_per(256), 128u);
-    EXPECT_EQ(spec.frames_per(spec.samples_per(7)), 7u);
+    EXPECT_EQ(spec.samples_per(Frames{128}), 256u);
+    EXPECT_EQ(spec.frames_per(256), Frames{128});
+    EXPECT_EQ(spec.frames_per(spec.samples_per(Frames{7})), Frames{7});
 }
 
 TEST(StreamSpec, SizesABufferFromMilliseconds)

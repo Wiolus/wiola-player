@@ -52,12 +52,12 @@ public:
 private:
     struct Handle;
 
-    WavReader(audio::StreamSpec spec, std::size_t num_frames,
+    WavReader(audio::StreamSpec spec, audio::Frames num_frames,
         std::unique_ptr<Handle> handle) noexcept;
 
-    std::size_t decode(std::span<float> output, std::size_t num_frames) override;
+    std::size_t decode(std::span<float> output, audio::Frames num_frames) override;
 
-    bool seek_frame(std::size_t frame_index) override;
+    bool seek_frame(audio::Frames frame_index) override;
 
     std::unique_ptr<Handle> handle_;
 };

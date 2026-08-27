@@ -176,7 +176,7 @@ void Equalizer::process(std::span<float> samples) noexcept
 
     apply_gain(samples, bands_->preamp);
 
-    const auto num_frames = static_cast<ma_uint64>(spec_.frames_per(samples.size()));
+    const auto num_frames = static_cast<ma_uint64>(spec_.frames_per(samples.size()).count());
 
     for (ma_peak2& filter : bands_->filters)
         ma_peak2_process_pcm_frames(&filter, samples.data(), samples.data(), num_frames);

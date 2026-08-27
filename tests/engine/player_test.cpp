@@ -136,12 +136,15 @@ public:
 
     [[nodiscard]] bool running() const noexcept override { return running_.load(); }
 
-    [[nodiscard]] std::size_t frames_played() const noexcept override { return frames_.load(); }
+    [[nodiscard]] wiola::audio::Frames frames_played() const noexcept override
+    {
+        return wiola::audio::Frames{frames_.load()};
+    }
 
     void reset_frames_played() noexcept override { frames_.store(0); }
 
     /// Says that `num_frames` more have been heard.
-    void play(std::size_t num_frames) noexcept { frames_.fetch_add(num_frames); }
+    void play(wiola::audio::Frames num_frames) noexcept { frames_.fetch_add(num_frames.count()); }
 
 private:
     std::atomic<bool> running_{false};
@@ -180,7 +183,10 @@ public:
 
     [[nodiscard]] bool running() const noexcept override { return running_.load(); }
 
-    [[nodiscard]] std::size_t frames_played() const noexcept override { return frames_.load(); }
+    [[nodiscard]] wiola::audio::Frames frames_played() const noexcept override
+    {
+        return wiola::audio::Frames{frames_.load()};
+    }
 
     void reset_frames_played() noexcept override { frames_.store(0); }
 
@@ -198,7 +204,7 @@ private:
                 continue;
             }
 
-            frames_.fetch_add(spec.frames_per(num_rendered));
+            frames_.fetch_add(spec.frames_per(num_rendered).count());
         }
     }
 
@@ -383,7 +389,7 @@ TEST(Player, TimePlayedReachesTheEndOfTheSource)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    const double length{static_cast<double>(source->num_frames()) /
+    const double length{static_cast<double>(source->num_frames().count()) /
         source->spec().sample_rate.get<wiola::units::Hz>()};
     Rig rig{std::move(source)};
     Player& player{rig.player};
@@ -475,7 +481,7 @@ TEST(Player, StartsWhereASeekAskedForBeforeIt)
     auto source = fixture();
     ASSERT_NE(source, nullptr);
 
-    const std::size_t total{source->num_frames()};
+    const wiola::audio::Frames total{source->num_frames()};
     const wiola::codec::Decoder* begun{source.get()};
     Rig rig{std::move(source)};
     Player& player{rig.player};
@@ -491,7 +497,7 @@ TEST(Player, StartsWhereASeekAskedForBeforeIt)
     player.wait();
 
     // Beginning a second into the source left the decoder with only the rest of it to read.
-    EXPECT_LT(begun->num_frames_left(), total / 2);
+    EXPECT_LT(begun->num_frames_left(), wiola::audio::Frames{total.count() / 2});
 }
 
 TEST(Player, KeepsASeekAskedForAfterStopping)
@@ -522,20 +528,20 @@ public:
     SlowSource()
         : Decoder{
               wiola::audio::StreamSpec{units::Frequency{44100.0}, 2},
-              44100 * 4
+              wiola::audio::Frames{44100 * 4}
     }
     {
     }
 
 protected:
-    std::size_t decode(std::span<float> output, std::size_t num_frames) override
+    std::size_t decode(std::span<float> output, wiola::audio::Frames num_frames) override
     {
-        std::fill_n(output.begin(), num_frames * 2, 0.0F);
+        std::fill_n(output.begin(), num_frames.count() * 2, 0.0F);
 
-        return num_frames;
+        return num_frames.count();
     }
 
-    bool seek_frame(std::size_t /*frame_index*/) override
+    bool seek_frame(wiola::audio::Frames /*frame_index*/) override
     {
         std::this_thread::sleep_for(200ms);
 
@@ -645,7 +651,8 @@ TEST(Player, FollowsTheOutputRatherThanTheDecoder)
     ASSERT_TRUE(player.start());
     EXPECT_EQ(player.time_played().get<units::Sec>(), 0.0);
 
-    output.play(static_cast<std::size_t>(spec.sample_rate.get<units::Hz>()) / 2);
+    output.play(wiola::audio::Frames{
+        static_cast<std::size_t>(spec.sample_rate.get<units::Hz>()) / 2});
 
     EXPECT_NEAR(player.time_played().get<units::Sec>(), 0.5, 1e-6);
 

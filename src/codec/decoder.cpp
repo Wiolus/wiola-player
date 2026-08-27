@@ -26,19 +26,19 @@ namespace wiola::codec {
 
 std::size_t Decoder::render(std::span<float> output)
 {
-    const std::size_t num_frames_wanted{
+    const audio::Frames num_frames_wanted{
         std::min(spec_.frames_per(output.size()), num_frames_left())};
 
-    if (num_frames_wanted == 0)
+    if (num_frames_wanted == audio::Frames{})
         return 0;
 
-    const std::size_t num_frames_decoded{decode(output, num_frames_wanted)};
+    const audio::Frames num_frames_decoded{decode(output, num_frames_wanted)};
     num_frames_read_ += num_frames_decoded;
 
     return spec_.samples_per(num_frames_decoded);
 }
 
-bool Decoder::seek(std::size_t frame_index)
+bool Decoder::seek(audio::Frames frame_index)
 {
     if (frame_index > num_frames_)
         return false;

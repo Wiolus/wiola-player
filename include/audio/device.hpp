@@ -77,7 +77,7 @@ public:
 
     /// Frames handed to the output since the last reset. This is what has been heard; a decoder's
     /// own position runs ahead of it by whatever the buffer is holding.
-    [[nodiscard]] std::size_t frames_played() const noexcept override;
+    [[nodiscard]] Frames frames_played() const noexcept override;
 
     /// Sets that count back to zero. Only legal while the device is stopped.
     void reset_frames_played() noexcept override;

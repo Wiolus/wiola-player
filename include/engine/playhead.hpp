@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include <audio/stream_spec.hpp>
+
 #include <atomic>
 #include <cstddef>
 
@@ -36,12 +38,12 @@ public:
     /// A seek to carry out, read as one so that a request arriving after it stays outstanding.
     struct Claim {
         std::size_t requested{0};
-        std::size_t target{0};
+        audio::Frames target{};
         bool outstanding{false};
     };
 
     /// Asks for playback to move to `frame_index`. Any thread.
-    void request_seek(std::size_t frame_index) noexcept;
+    void request_seek(audio::Frames frame_index) noexcept;
 
     /// Whether a seek has been asked for and not yet carried out.
     [[nodiscard]] bool seek_outstanding() const noexcept;
@@ -51,7 +53,7 @@ public:
 
     /// Playback starts again at `frame_index`, carrying out what `claim` held. What was counted
     /// before no longer applies.
-    void begin_at(std::size_t frame_index, const Claim& claim) noexcept;
+    void begin_at(audio::Frames frame_index, const Claim& claim) noexcept;
 
     /// Samples handed to the output since playback last began somewhere.
     void push(std::size_t num_samples) noexcept;
@@ -59,7 +61,7 @@ public:
     [[nodiscard]] std::size_t num_pushed() const noexcept;
 
     /// Where playback is, given what the output says it has played.
-    [[nodiscard]] std::size_t position(std::size_t frames_played) const noexcept;
+    [[nodiscard]] audio::Frames position(audio::Frames frames_played) const noexcept;
 
 private:
     std::atomic<std::size_t> seeks_requested_{0};

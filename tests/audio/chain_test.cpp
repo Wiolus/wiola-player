@@ -233,7 +233,7 @@ double response_db(Chain& chain, Frequency tone)
 
     const StreamSpec spec{chain.spec()};
     wiola::audio::SineSource source{spec, tone, 0.5F};
-    std::vector<float> block(spec.samples_per(num_frames));
+    std::vector<float> block(spec.samples_per(wiola::audio::Frames{num_frames}));
 
     double energy{0.0};
     double reference{0.0};
@@ -404,7 +404,7 @@ TEST(Chain, KeepsBoostedSamplesInRange)
 {
     Chain chain{stereo};
     wiola::audio::SineSource source{stereo, 1_kHz, 0.95F};
-    std::vector<float> block(stereo.samples_per(512));
+    std::vector<float> block(stereo.samples_per(wiola::audio::Frames{512}));
 
     chain.equalizer().set_band_gain(5, 12.0F);
 

@@ -55,8 +55,9 @@ public:
 
     std::size_t render(std::span<float> interleaved) override
     {
-        const auto num_frames =
-            static_cast<std::size_t>(spec_.frames_per(interleaved.size()) * fill_fraction_);
+        const wiola::audio::Frames num_frames{static_cast<std::size_t>(
+            static_cast<double>(spec_.frames_per(interleaved.size()).count()) * fill_fraction_
+        )};
         const std::size_t num_rendered{spec_.samples_per(num_frames)};
 
         std::ranges::fill(interleaved, 0.0F);
@@ -125,7 +126,7 @@ TEST(Device, AsksItsSourceForFramesWhileRunning)
 
     EXPECT_FALSE(device.running());
     EXPECT_GT(source.num_asked(), 0u);
-    EXPECT_GT(device.frames_played(), 0u);
+    EXPECT_GT(device.frames_played(), wiola::audio::Frames{});
     EXPECT_EQ(device.num_underruns(), 0u);
 }
 

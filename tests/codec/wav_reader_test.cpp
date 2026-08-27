@@ -20,6 +20,8 @@
 
 #include <wav_reader.hpp>
 
+#include <audio/stream_spec.hpp>
+
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -27,12 +29,15 @@
 #include <filesystem>
 #include <vector>
 
+using wiola::audio::Frames;
 using wiola::codec::WavReader;
+
+using wiola::audio::Frames;
 
 namespace {
 
 /// The fixture is a quarter second of 440 Hz stereo, so 11025 frames at 44100 Hz.
-constexpr std::size_t tone_num_frames{11025};
+constexpr Frames tone_num_frames{11025};
 
 std::filesystem::path fixture(const char* name)
 {
@@ -85,7 +90,7 @@ TEST(WavReader, ReadsFormatAndSamples)
     EXPECT_EQ(reader->spec().sample_rate, wiola::units::Frequency{44100});
     EXPECT_EQ(reader->spec().num_channels, 2u);
     EXPECT_EQ(reader->num_frames(), tone_num_frames);
-    EXPECT_EQ(drain(*reader), tone_num_frames * 2);
+    EXPECT_EQ(drain(*reader), reader->spec().samples_per(tone_num_frames));
     EXPECT_TRUE(reader->exhausted());
 }
 
@@ -116,8 +121,8 @@ TEST(WavReader, StopsWhenTheDataChunkRunsOut)
     auto reader = WavReader::open(fixture("tone.wav"));
     ASSERT_NE(reader, nullptr);
 
-    EXPECT_EQ(drain(*reader), tone_num_frames * 2);
-    EXPECT_EQ(reader->num_frames_left(), 0u);
+    EXPECT_EQ(drain(*reader), reader->spec().samples_per(tone_num_frames));
+    EXPECT_EQ(reader->num_frames_left(), Frames{0});
 
     std::array<float, 16> block{};
     EXPECT_EQ(reader->render(block), 0u);
@@ -142,7 +147,7 @@ TEST(WavReader, SeekLandsWhereReadingWouldHave)
 
     auto sought = WavReader::open(fixture("tone.wav"));
     ASSERT_NE(sought, nullptr);
-    ASSERT_TRUE(sought->seek(target));
+    ASSERT_TRUE(sought->seek(Frames{target}));
 
     const std::size_t num_channels{sought->spec().num_channels};
     const std::vector<float> actual{read_frames(*sought, num_compared)};
@@ -156,12 +161,12 @@ TEST(WavReader, SeekMovesThePosition)
     auto reader = WavReader::open(fixture("tone.wav"));
     ASSERT_NE(reader, nullptr);
 
-    ASSERT_TRUE(reader->seek(4000));
-    EXPECT_EQ(reader->num_frames_left(), reader->num_frames() - 4000);
+    ASSERT_TRUE(reader->seek(Frames{4000}));
+    EXPECT_EQ(reader->num_frames_left(), reader->num_frames() - Frames{4000});
     EXPECT_FALSE(reader->exhausted());
 
     ASSERT_TRUE(reader->seek(reader->num_frames()));
-    EXPECT_EQ(reader->num_frames_left(), 0u);
+    EXPECT_EQ(reader->num_frames_left(), Frames{0});
     EXPECT_TRUE(reader->exhausted());
 
     std::array<float, 16> block{};
@@ -175,7 +180,7 @@ TEST(WavReader, SeekRewinds)
 
     const std::vector<float> first{read_frames(*reader, 64)};
 
-    ASSERT_TRUE(reader->seek(0));
+    ASSERT_TRUE(reader->seek(Frames{0}));
     EXPECT_EQ(reader->num_frames_left(), reader->num_frames());
     EXPECT_EQ(read_frames(*reader, 64), first);
 }
@@ -185,9 +190,9 @@ TEST(WavReader, RefusesToSeekPastTheEnd)
     auto reader = WavReader::open(fixture("tone.wav"));
     ASSERT_NE(reader, nullptr);
 
-    ASSERT_TRUE(reader->seek(4000));
-    EXPECT_FALSE(reader->seek(reader->num_frames() + 1));
+    ASSERT_TRUE(reader->seek(Frames{4000}));
+    EXPECT_FALSE(reader->seek(reader->num_frames() + Frames{1}));
 
     // A refused seek leaves the position alone.
-    EXPECT_EQ(reader->num_frames_left(), reader->num_frames() - 4000);
+    EXPECT_EQ(reader->num_frames_left(), reader->num_frames() - Frames{4000});
 }

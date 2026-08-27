@@ -51,7 +51,7 @@ void Device::render(std::span<float> output) noexcept
 {
     const std::size_t num_rendered{source_.render(output)};
 
-    frames_played_.fetch_add(spec_.frames_per(num_rendered), std::memory_order_relaxed);
+    frames_played_.fetch_add(spec_.frames_per(num_rendered).count(), std::memory_order_relaxed);
 
     if (num_rendered < output.size()) {
         std::ranges::fill(output.subspan(num_rendered), 0.0F);
@@ -71,7 +71,7 @@ bool Device::start() noexcept
     config.pUserData = this;
     config.dataCallback = [](ma_device* handle, void* output, const void*, ma_uint32 num_frames) {
         auto* device = static_cast<Device*>(handle->pUserData);
-        const std::size_t num_samples{device->spec_.samples_per(num_frames)};
+        const std::size_t num_samples{device->spec_.samples_per(Frames{num_frames})};
         device->render(std::span<float>{static_cast<float*>(output), num_samples});
     };
 
@@ -107,9 +107,9 @@ bool Device::running() const noexcept
     return state() == DeviceState::running;
 }
 
-std::size_t Device::frames_played() const noexcept
+Frames Device::frames_played() const noexcept
 {
-    return frames_played_.load(std::memory_order_relaxed);
+    return Frames{frames_played_.load(std::memory_order_relaxed)};
 }
 
 void Device::reset_frames_played() noexcept
