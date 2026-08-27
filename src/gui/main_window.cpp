@@ -73,15 +73,29 @@ MainWindow::MainWindow()
     play_button_ = new QPushButton{"Play", this};
     stop_button_ = new QPushButton{"Stop", this};
     equalizer_button_ = new QPushButton{"EQ", this};
+    boost_button_ = new QPushButton{"+", this};
+    volume_value_ = new QLabel{this};
     position_bar_ = new SeekBar{this};
     time_label_ = new QLabel{this};
     status_label_ = new QLabel{this};
     volume_slider_ = new QSlider{Qt::Horizontal, this};
     refresh_timer_ = new QTimer{this};
 
-    volume_slider_->setRange(0, tuning::full_volume);
-    volume_slider_->setValue(volume_.restore());
+    const int position{volume_.restore()};
+
     equalizer_.restore();
+
+    boost_button_->setCheckable(true);
+    boost_button_->setChecked(volume_.boosted());
+    boost_button_->setFixedWidth(tuning::boost_button_width);
+    boost_button_->setToolTip("Past full volume");
+
+    volume_value_->setFixedWidth(tuning::volume_value_width);
+
+    volume_slider_->setRange(0, volume_.max_position());
+    volume_slider_->setValue(position);
+
+    show_volume();
     volume_slider_->setFixedWidth(tuning::volume_slider_width);
     volume_slider_->setToolTip("Volume");
 
@@ -92,6 +106,8 @@ MainWindow::MainWindow()
     controls->addWidget(equalizer_button_);
     controls->addWidget(time_label_);
     controls->addWidget(volume_slider_);
+    controls->addWidget(volume_value_);
+    controls->addWidget(boost_button_);
 
     auto* layout = new QVBoxLayout{this};
     layout->addWidget(position_bar_);
@@ -106,6 +122,7 @@ MainWindow::MainWindow()
 
     connect(equalizer_button_, &QPushButton::clicked, this, &MainWindow::show_equalizer);
     connect(volume_slider_, &QSlider::valueChanged, this, &MainWindow::set_volume);
+    connect(boost_button_, &QPushButton::toggled, this, &MainWindow::set_boosted);
 
     connect(position_bar_, &SeekBar::seek_requested, this, &MainWindow::seek_to);
 
@@ -168,6 +185,24 @@ void MainWindow::show_equalizer()
 void MainWindow::set_volume(int percent)
 {
     volume_.set_position(percent);
+
+    show_volume();
+}
+
+void MainWindow::show_volume()
+{
+    volume_value_->setText(QString::number(volume_.position()) + "%");
+}
+
+void MainWindow::set_boosted(bool boosted)
+{
+    volume_.set_boosted(boosted);
+
+    // The slider is asked to hold what the control now allows, and says what it settled on.
+    volume_slider_->setRange(0, volume_.max_position());
+    volume_slider_->setValue(volume_.position());
+
+    show_volume();
 }
 
 void MainWindow::show_status(const QString& message)

@@ -26,8 +26,8 @@
 
 namespace wiola::gui {
 
-/// A slider position out of a hundred, applied to `volume` and kept for the runs after this one.
-/// Nothing else may set the volume, or what it is set to is not what comes back.
+/// A slider position out of a hundred, applied to `volume` and kept for the runs after this
+/// one. Nothing else may set the volume, or what it is set to is not what comes back.
 class VolumeControl {
 public:
     VolumeControl(audio::Volume& volume, QSettings& settings) noexcept;
@@ -38,12 +38,21 @@ public:
 
     void set_position(int percent);
 
+    /// Whether the slider may ask for more than arrived. Turning it off brings a position that
+    /// was past full back to it.
+    void set_boosted(bool boosted);
+
     [[nodiscard]] int position() const noexcept;
+    [[nodiscard]] bool boosted() const noexcept;
+
+    /// The furthest the slider goes, which is what `boosted` decides.
+    [[nodiscard]] int max_position() const noexcept;
 
 private:
     audio::Volume& volume_;
     QSettings& settings_;
     int position_;
+    bool boosted_{false};
 };
 
 } // namespace wiola::gui

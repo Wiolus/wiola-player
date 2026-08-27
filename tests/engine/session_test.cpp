@@ -245,12 +245,12 @@ TEST(Session, KeepsItsSettingsAcrossTracks)
     const std::filesystem::path path{wiola::testing::write_wav("wiola_session.wav")};
 
     fixture.session.volume().set_gain(0.25F);
-    fixture.session.equalizer().set_preamp(-3.0F);
+    fixture.session.equalizer().set_band_gain(3, 6.0F);
 
     ASSERT_EQ(fixture.session.load(path), OpenResult::opened);
 
     EXPECT_FLOAT_EQ(fixture.session.volume().gain(), 0.25F);
-    EXPECT_FLOAT_EQ(fixture.session.equalizer().preamp(), -3.0F);
+    EXPECT_FLOAT_EQ(fixture.session.equalizer().band_gain(3), 6.0F);
 }
 
 } // namespace

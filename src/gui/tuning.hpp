@@ -41,6 +41,16 @@ inline constexpr int volume_slider_width{70};
 /// Where the volume slider starts, out of a hundred.
 inline constexpr int full_volume{100};
 
+/// How wide the volume readout is drawn. Fixed, so a slider moving between "5%" and "140%" does
+/// not shift the row.
+inline constexpr int volume_value_width{36};
+
+/// How wide the button that opens the volume past full is drawn.
+inline constexpr int boost_button_width{24};
+
+/// Where the volume slider ends once the listener has asked for more than arrived.
+inline constexpr int boosted_volume{140};
+
 /// How the slider's position becomes a gain. Above one because hearing is not linear: without it
 /// the whole audible range would crowd into the bottom of the travel.
 inline constexpr double volume_curve{2.0};

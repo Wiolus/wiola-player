@@ -25,7 +25,8 @@
 
 namespace wiola::audio {
 
-/// One gain over everything: 0 is silence, 1 the samples as they arrived. Nothing here amplifies.
+/// One gain over everything: 0 is silence, 1 the samples as they arrived, and up to
+/// `max_volume_boost` more than arrived.
 class Volume {
 public:
     /// Clamped to that range, and anything that is not a number is taken as silence.

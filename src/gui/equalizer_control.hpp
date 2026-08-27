@@ -39,10 +39,10 @@ public:
     void restore();
 
     void set_enabled(bool enabled);
-    void set_preamp(float db);
     void set_band_gain(std::size_t index, float db);
 
     [[nodiscard]] bool enabled() const noexcept;
+    /// The cut the equalizer took to make room for what its bands add.
     [[nodiscard]] float preamp() const noexcept;
     [[nodiscard]] float band_gain(std::size_t index) const noexcept;
     [[nodiscard]] std::size_t num_bands() const noexcept;

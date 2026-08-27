@@ -55,7 +55,7 @@ struct BandLayout {
 };
 
 /**
- * Lifts and cuts bands of the spectrum, with one cut before them to make room.
+ * Lifts and cuts bands of the spectrum, cutting beforehand to make room for what they add.
  *
  * `process` is called from the thread that feeds the device: it does not allocate, lock or block.
  * Settings are written from another thread and take effect on the next call, never partway
@@ -91,10 +91,8 @@ public:
 
     [[nodiscard]] float band_gain(std::size_t index) const noexcept;
 
-    /// Cut applied before the bands, in decibels, making room for what they add. Clamped to what
-    /// a preamp is allowed.
-    void set_preamp(float db) noexcept;
-
+    /// The cut taken before the bands, in decibels, making room for what they add. Worked out
+    /// from the band gains: what is lifted most is what has to be made room for.
     [[nodiscard]] float preamp() const noexcept;
 
     /// Whether the bands and the preamp run at all.

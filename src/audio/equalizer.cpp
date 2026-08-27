@@ -121,17 +121,24 @@ void Equalizer::configure(StreamSpec spec)
 
 void Equalizer::retune() noexcept
 {
-    bands_->preamp = amplitude(preamp());
-    bands_->shaping = bands_->preamp != 1.0F;
+    float lifted{0.0F};
+
+    bands_->shaping = false;
 
     for (std::size_t i = 0; i < num_bands_; ++i) {
-        const ma_peak2_config config{
-            band_config(spec_, layout_.quality, band_center(i), band_gain(i))};
+        const float gain{band_gain(i)};
+        const ma_peak2_config config{band_config(spec_, layout_.quality, band_center(i), gain)};
 
         ma_peak2_reinit(&config, &bands_->filters[i]);
 
-        bands_->shaping = bands_->shaping || band_gain(i) != 0.0F;
+        lifted = std::max(lifted, gain);
+        bands_->shaping = bands_->shaping || gain != 0.0F;
     }
+
+    // The room a boost needs, taken before the bands rather than asked of the listener. Without
+    // it a lifted band reaches past what an output takes, and is flattened rather than heard.
+    bands_->preamp_db.store(-lifted, std::memory_order_relaxed);
+    bands_->preamp = amplitude(-lifted);
 }
 
 const BandLayout& Equalizer::layout() const noexcept
@@ -190,14 +197,6 @@ void Equalizer::process(std::span<float> samples) noexcept
 bool Equalizer::shaping() const noexcept
 {
     return bands_->applied;
-}
-
-void Equalizer::set_preamp(float db) noexcept
-{
-    const auto limit = static_cast<float>(tuning::max_preamp_db);
-
-    bands_->preamp_db.store(std::clamp(db, -limit, limit), std::memory_order_relaxed);
-    bands_->changed.store(true, std::memory_order_release);
 }
 
 float Equalizer::preamp() const noexcept

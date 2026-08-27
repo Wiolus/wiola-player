@@ -31,7 +31,7 @@
 namespace wiola::gui {
 
 /**
- * One slider per band, and the two controls that apply to all of them.
+ * One slider per band, and the switch that turns them all off.
  *
  * The bands are built from the equalizer each time the panel is shown, since a track can change
  * how many of them the format carries. Positions are read back from it rather than remembered
@@ -53,8 +53,6 @@ private:
     EqualizerControl& equalizer_;
 
     QCheckBox* enabled_box_{nullptr};
-    QSlider* preamp_slider_{nullptr};
-    QLabel* preamp_value_{nullptr};
     QWidget* bands_{nullptr};
     QHBoxLayout* bands_row_{nullptr};
 };
