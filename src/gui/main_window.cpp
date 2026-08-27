@@ -49,6 +49,21 @@ int kept_volume(QSettings& settings)
     return numeric ? std::clamp(percent, 0, tuning::full_volume) : tuning::full_volume;
 }
 
+/// What to say about a file that would not open.
+QString as_status(codec::OpenResult result)
+{
+    switch (result) {
+    case codec::OpenResult::unsupported:
+        return QString{"unsupported format"};
+
+    case codec::OpenResult::damaged:
+        return QString{"that file is damaged"};
+
+    default:
+        return QString{"cannot read that file"};
+    }
+}
+
 QString as_clock(units::Time time)
 {
     const auto total = static_cast<int>(time.get<units::Sec>());
@@ -120,9 +135,9 @@ MainWindow::~MainWindow() = default;
 
 bool MainWindow::load(const std::filesystem::path& path)
 {
-    static_cast<void>(session_.load(path));
+    const codec::OpenResult result{session_.load(path)};
 
-    show_status(loaded() ? QString{} : QString{"cannot read that file"});
+    show_status(loaded() ? QString{} : as_status(result));
     setWindowTitle(loaded() ? QString::fromStdString(path.filename().string())
                             : QString{"Wiola Player"});
     position_bar_->set_fraction(0.0);
