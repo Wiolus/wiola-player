@@ -74,6 +74,10 @@ public:
     /// is running: it rebuilds what `process` reads.
     void configure(StreamSpec spec);
 
+    /// Where the bands sit, whether or not the format can carry them all. A gain is kept for
+    /// every one it names.
+    [[nodiscard]] const BandLayout& layout() const noexcept;
+
     /// How many bands the format can carry, counting up from the lowest. At most `count`: a band
     /// too close to half the sample rate cannot be given its width, and is left out.
     [[nodiscard]] std::size_t num_bands() const noexcept;

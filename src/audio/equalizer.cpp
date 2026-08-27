@@ -134,6 +134,11 @@ void Equalizer::retune() noexcept
     }
 }
 
+const BandLayout& Equalizer::layout() const noexcept
+{
+    return layout_;
+}
+
 std::size_t Equalizer::num_bands() const noexcept
 {
     return num_bands_;

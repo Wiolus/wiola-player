@@ -72,21 +72,21 @@ constexpr int preamp_limit{
 
 } // namespace
 
-EqualizerPanel::EqualizerPanel(audio::Equalizer& equalizer, QWidget* parent)
+EqualizerPanel::EqualizerPanel(EqualizerControl& equalizer, QWidget* parent)
     : QWidget{parent, Qt::Window}
-    , equalizer_{&equalizer}
+    , equalizer_{equalizer}
 {
     setWindowTitle("Equalizer");
 
     enabled_box_ = new QCheckBox{"Equalizer", this};
-    enabled_box_->setChecked(equalizer_->enabled());
+    enabled_box_->setChecked(equalizer_.enabled());
 
     bands_row_ = new QHBoxLayout;
 
     preamp_slider_ = new QSlider{Qt::Horizontal, this};
     preamp_slider_->setRange(-preamp_limit, preamp_limit);
     preamp_slider_->setSingleStep(tuning::gain_step);
-    preamp_slider_->setValue(as_steps(equalizer_->preamp()));
+    preamp_slider_->setValue(as_steps(equalizer_.preamp()));
 
     preamp_value_ = new QLabel{as_gain(preamp_slider_->value()) + " dB", this};
 
@@ -101,10 +101,10 @@ EqualizerPanel::EqualizerPanel(audio::Equalizer& equalizer, QWidget* parent)
     layout->addLayout(preamp_row);
 
     connect(enabled_box_, &QCheckBox::toggled, this,
-        [this](bool on) { equalizer_->set_enabled(on); });
+        [this](bool on) { equalizer_.set_enabled(on); });
 
     connect(preamp_slider_, &QSlider::valueChanged, this, [this](int steps) {
-        equalizer_->set_preamp(static_cast<float>(as_db(steps)));
+        equalizer_.set_preamp(static_cast<float>(as_db(steps)));
         preamp_value_->setText(as_gain(steps) + " dB");
     });
 
@@ -127,24 +127,24 @@ void EqualizerPanel::rebuild_bands()
 
     auto* row = new QHBoxLayout{bands_};
 
-    for (std::size_t i = 0; i < equalizer_->num_bands(); ++i) {
+    for (std::size_t i = 0; i < equalizer_.num_bands(); ++i) {
         auto* slider = new QSlider{Qt::Vertical, bands_};
 
         slider->setRange(-band_limit, band_limit);
         slider->setSingleStep(tuning::gain_step);
-        slider->setValue(as_steps(equalizer_->band_gain(i)));
+        slider->setValue(as_steps(equalizer_.band_gain(i)));
         slider->setFixedHeight(tuning::band_slider_height);
 
         auto* gain = new QLabel{as_gain(slider->value()), bands_};
         gain->setFixedWidth(tuning::band_column_width);
         gain->setAlignment(Qt::AlignHCenter);
 
-        auto* center = new QLabel{as_label(equalizer_->band_center(i)), bands_};
+        auto* center = new QLabel{as_label(equalizer_.band_center(i)), bands_};
         center->setFixedWidth(tuning::band_column_width);
         center->setAlignment(Qt::AlignHCenter);
 
         connect(slider, &QSlider::valueChanged, this, [this, i, gain](int steps) {
-            equalizer_->set_band_gain(i, static_cast<float>(as_db(steps)));
+            equalizer_.set_band_gain(i, static_cast<float>(as_db(steps)));
             gain->setText(as_gain(steps));
         });
 

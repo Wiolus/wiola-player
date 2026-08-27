@@ -64,6 +64,7 @@ MainWindow::MainWindow()
     // A file of its own on both platforms, rather than the registry on one of them.
     : settings_{QSettings::IniFormat, QSettings::UserScope, "wiola-player", "settings"}
     , volume_{session_.volume(), settings_}
+    , equalizer_{session_.equalizer(), settings_}
 {
     setWindowTitle("Wiola Player");
 
@@ -80,6 +81,7 @@ MainWindow::MainWindow()
 
     volume_slider_->setRange(0, tuning::full_volume);
     volume_slider_->setValue(volume_.restore());
+    equalizer_.restore();
     volume_slider_->setFixedWidth(tuning::volume_slider_width);
     volume_slider_->setToolTip("Volume");
 
@@ -156,11 +158,11 @@ void MainWindow::toggle_playback()
 
 void MainWindow::show_equalizer()
 {
-    if (equalizer_ == nullptr)
-        equalizer_ = new EqualizerPanel{session_.equalizer(), this};
+    if (equalizer_panel_ == nullptr)
+        equalizer_panel_ = new EqualizerPanel{equalizer_, this};
 
-    equalizer_->show();
-    equalizer_->raise();
+    equalizer_panel_->show();
+    equalizer_panel_->raise();
 }
 
 void MainWindow::set_volume(int percent)
