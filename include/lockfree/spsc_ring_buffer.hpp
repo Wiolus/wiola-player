@@ -89,19 +89,23 @@ public:
     [[nodiscard]] ReadRegion acquire_read() noexcept;
     void commit_read(std::size_t num_elements) noexcept;
 
-    /// Discards everything unread.
+    /// Producer side. Marks everything written so far as stale.
     ///
-    /// Only legal while nothing is consuming. Clearing writes both indices and both caches, and
-    /// a consumer running concurrently would compute how much is ready by subtracting an index
-    /// that has moved out from under it - unsigned, so the answer is not a small number but an
-    /// enormous one, and the read runs off into whatever the buffer last held.
-    void clear() noexcept;
+    /// The consumer steps over it on its next read, and only then does the space it held come
+    /// free: a producer that marks while nothing is consuming cannot write into it until the
+    /// consumer runs again. Marking, rather than moving the read index here, is what leaves
+    /// every index with a single writing thread and so needs nothing to be stopped first.
+    void mark_discard() noexcept;
 
     /// Observers. Stale the instant they return; for metering and sizing, not for control flow.
     [[nodiscard]] std::size_t size_approx() const noexcept;
     [[nodiscard]] bool empty_approx() const noexcept;
 
 private:
+    /// Consumer side. Steps over whatever the producer has marked stale, and answers where
+    /// reading begins now.
+    std::size_t apply_discard() noexcept;
+
     void copy_in(std::size_t w, std::span<const T> src) noexcept;
     void copy_out(std::size_t r, std::span<T> dst) noexcept;
 
@@ -112,9 +116,11 @@ private:
     // producer and consumer never invalidate each other's line on their own bookkeeping.
     alignas(hw::hardware_destructive_interference_size) std::atomic<std::size_t> write_{0};
     std::size_t producer_read_cache_{0};
+    std::atomic<std::size_t> discard_to_{0};
 
     alignas(hw::hardware_destructive_interference_size) std::atomic<std::size_t> read_{0};
     std::size_t consumer_write_cache_{0};
+    std::size_t applied_discard_{0};
 };
 
 template<RingElement T>
@@ -157,7 +163,7 @@ std::size_t SPSCRingBuffer<T>::push(std::span<const T> src) noexcept
 template<RingElement T>
 std::size_t SPSCRingBuffer<T>::pop(std::span<T> dst) noexcept
 {
-    const std::size_t r = read_.load(std::memory_order_relaxed);
+    const std::size_t r = apply_discard();
     std::size_t ready = consumer_write_cache_ - r;
 
     if (ready < dst.size()) [[unlikely]] {
@@ -214,7 +220,7 @@ void SPSCRingBuffer<T>::commit_write(std::size_t num_elements) noexcept
 template<RingElement T>
 auto SPSCRingBuffer<T>::acquire_read() noexcept -> ReadRegion
 {
-    const std::size_t r = read_.load(std::memory_order_relaxed);
+    const std::size_t r = apply_discard();
     consumer_write_cache_ = write_.load(std::memory_order_acquire);
 
     const std::size_t ready = consumer_write_cache_ - r;
@@ -234,13 +240,26 @@ void SPSCRingBuffer<T>::commit_read(std::size_t num_elements) noexcept
 }
 
 template<RingElement T>
-void SPSCRingBuffer<T>::clear() noexcept
+void SPSCRingBuffer<T>::mark_discard() noexcept
 {
-    const std::size_t w = write_.load(std::memory_order_acquire);
+    discard_to_.store(write_.load(std::memory_order_relaxed), std::memory_order_release);
+}
 
-    read_.store(w, std::memory_order_release);
-    producer_read_cache_ = w;
-    consumer_write_cache_ = w;
+template<RingElement T>
+std::size_t SPSCRingBuffer<T>::apply_discard() noexcept
+{
+    const std::size_t discard = discard_to_.load(std::memory_order_acquire);
+
+    if (discard == applied_discard_)
+        return read_.load(std::memory_order_relaxed);
+
+    // The mark was taken from the write index, which the read index never passes, so applying
+    // one only ever moves reading forward.
+    applied_discard_ = discard;
+    consumer_write_cache_ = discard;
+    read_.store(discard, std::memory_order_release);
+
+    return discard;
 }
 
 template<RingElement T>
