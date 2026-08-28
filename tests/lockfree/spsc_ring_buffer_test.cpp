@@ -23,6 +23,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <optional>
@@ -104,27 +105,132 @@ TEST(SPSCRingBuffer, WrapsAroundTheEndOfStorage)
     EXPECT_EQ(dst, second);
 }
 
-TEST(SPSCRingBuffer, ClearDiscardsWhatWasNotRead)
+TEST(SPSCRingBuffer, DiscardsWhatWasNotRead)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{8};
     const std::array written{1, 2, 3, 4};
 
     EXPECT_EQ(buffer.push(written), written.size());
-    EXPECT_EQ(buffer.size_approx(), written.size());
 
-    buffer.clear();
-
-    EXPECT_EQ(buffer.size_approx(), 0u);
-    EXPECT_TRUE(buffer.empty_approx());
-
-    // The buffer is usable again, and gives back only what came after the clear.
-    const std::array again{5, 6};
-    EXPECT_EQ(buffer.push(again), again.size());
+    buffer.mark_discard();
 
     std::array<int, 4> read{};
+    EXPECT_EQ(buffer.pop(read), 0u);
+
+    // The buffer is usable again, and gives back only what came after the mark.
+    const std::array again{5, 6};
+    EXPECT_EQ(buffer.push(again), again.size());
     EXPECT_EQ(buffer.pop(read), again.size());
     EXPECT_EQ(read[0], 5);
     EXPECT_EQ(read[1], 6);
+}
+
+/// What the producer writes after marking is kept: the mark is a place, not a switch.
+TEST(SPSCRingBuffer, KeepsWhatWasWrittenAfterAMark)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+    const std::array stale{1, 2, 3, 4};
+    const std::array fresh{5, 6};
+
+    EXPECT_EQ(buffer.push(stale), stale.size());
+    buffer.mark_discard();
+    EXPECT_EQ(buffer.push(fresh), fresh.size());
+
+    std::array<int, 6> read{};
+    EXPECT_EQ(buffer.pop(read), fresh.size());
+    EXPECT_EQ(read[0], 5);
+    EXPECT_EQ(read[1], 6);
+}
+
+/// A consumer that was away for several of them is left at the last one, not walked through each.
+TEST(SPSCRingBuffer, AppliesOnlyTheLatestOfSeveralMarks)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+
+    EXPECT_EQ(buffer.push(std::array{1, 2}), 2u);
+    buffer.mark_discard();
+    EXPECT_EQ(buffer.push(std::array{3, 4}), 2u);
+    buffer.mark_discard();
+    EXPECT_EQ(buffer.push(std::array{5}), 1u);
+
+    std::array<int, 8> read{};
+    EXPECT_EQ(buffer.pop(read), 1u);
+    EXPECT_EQ(read[0], 5);
+}
+
+TEST(SPSCRingBuffer, MarksNothingOnAnEmptyBuffer)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+
+    buffer.mark_discard();
+    buffer.mark_discard();
+
+    EXPECT_EQ(buffer.push(std::array{1, 2}), 2u);
+
+    std::array<int, 4> read{};
+    EXPECT_EQ(buffer.pop(read), 2u);
+    EXPECT_EQ(read[0], 1);
+}
+
+/// The point of marking rather than clearing: the space belongs to the consumer until it has
+/// stepped over it, so a producer that marks while nothing is reading gains nothing to write in.
+TEST(SPSCRingBuffer, FreesTheSpaceOnlyOnceTheConsumerHasRead)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{4};
+    const std::array full{1, 2, 3, 4};
+
+    EXPECT_EQ(buffer.push(full), full.size());
+
+    buffer.mark_discard();
+
+    EXPECT_EQ(buffer.push(std::array{5}), 0u);
+    EXPECT_EQ(buffer.size_approx(), full.size());
+
+    std::array<int, 4> read{};
+    EXPECT_EQ(buffer.pop(read), 0u);
+
+    EXPECT_TRUE(buffer.empty_approx());
+    EXPECT_EQ(buffer.push(std::array{5}), 1u);
+    EXPECT_EQ(buffer.pop(read), 1u);
+    EXPECT_EQ(read[0], 5);
+}
+
+/// Indices run free and are only masked on access, so a mark has to survive the wrap.
+TEST(SPSCRingBuffer, DiscardsAcrossTheWrap)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{4};
+    std::array<int, 4> read{};
+
+    for (int round = 0; round < 3; ++round) {
+        EXPECT_EQ(buffer.push(std::array{1, 2, 3}), 3u);
+        EXPECT_EQ(buffer.pop(read), 3u);
+    }
+
+    EXPECT_EQ(buffer.push(std::array{7, 8}), 2u);
+    buffer.mark_discard();
+    EXPECT_EQ(buffer.pop(read), 0u);
+
+    EXPECT_EQ(buffer.push(std::array{9}), 1u);
+    EXPECT_EQ(buffer.pop(read), 1u);
+    EXPECT_EQ(read[0], 9);
+}
+
+/// A region already handed out stays valid; the mark is applied when the next one is asked for.
+TEST(SPSCRingBuffer, LeavesAReadRegionAlreadyHandedOutAlone)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+
+    EXPECT_EQ(buffer.push(std::array{1, 2, 3, 4}), 4u);
+
+    const auto region = buffer.acquire_read();
+    ASSERT_EQ(region.size(), 4u);
+
+    buffer.mark_discard();
+
+    EXPECT_EQ(region.first[0], 1);
+    buffer.commit_read(2);
+
+    EXPECT_EQ(buffer.acquire_read().size(), 0u);
 }
 
 TEST(SPSCRingBuffer, TakesAndGivesBackOneValue)
@@ -401,3 +507,60 @@ TEST(SPSCRingBuffer, CarriesEveryElementBetweenTwoThreadsInRegions)
 }
 
 } // namespace
+
+/// A discard is the one thing that crosses between the two sides, so it is the one thing worth
+/// hammering: the consumer must never be handed a value the producer had already marked stale.
+TEST(SPSCRingBuffer, NeverCarriesWhatWasMarkedStale)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{threaded_capacity};
+    std::atomic<int> marked_through{-1};
+
+    const std::jthread producer{[&buffer, &marked_through](const std::stop_token& stop) {
+        for (int value = 0; value < num_threaded_elements && !stop.stop_requested();) {
+            if (!buffer.try_push(value)) {
+                std::this_thread::yield();
+                continue;
+            }
+
+            // Every so often, everything written so far is declared stale. The bar is published
+            // after the mark, so a consumer that reads the bar has certainly seen the mark.
+            if (value % 1000 == 999) {
+                buffer.mark_discard();
+                marked_through.store(value, std::memory_order_release);
+            }
+
+            ++value;
+        }
+    }};
+
+    const auto deadline = std::chrono::steady_clock::now() + patience;
+    int num_read{0};
+    int num_skipped{0};
+    int last{-1};
+
+    while (num_read < num_threaded_elements / 2) {
+        const int bar{marked_through.load(std::memory_order_acquire)};
+        const std::optional<int> value{buffer.try_pop()};
+
+        if (!value.has_value()) {
+            ASSERT_LT(std::chrono::steady_clock::now(), deadline) << "stalled at " << num_read;
+            std::this_thread::yield();
+            continue;
+        }
+
+        // Nothing comes back twice, nothing comes back out of order, and nothing comes back
+        // from before a mark this read has already stepped over.
+        ASSERT_GT(*value, last);
+        ASSERT_GT(*value, bar) << "read " << *value << " after everything through " << bar
+                               << " was marked stale";
+
+        if (*value != last + 1)
+            ++num_skipped;
+
+        last = *value;
+        ++num_read;
+    }
+
+    // Otherwise the run said nothing: every mark landed on an empty buffer and discarded nothing.
+    EXPECT_GT(num_skipped, 0) << "no mark ever discarded anything";
+}

@@ -67,7 +67,7 @@ bool Player::start()
         const audio::Frames start_frame{
             claim.outstanding ? std::min(claim.target, source_->num_frames()) : audio::Frames{}};
 
-        buffer_.clear();
+        buffer_.mark_discard();
         source_->seek(start_frame);
         output_.reset_frames_played();
         head_.begin_at(start_frame, claim);
@@ -186,12 +186,12 @@ void Player::apply_seek()
 {
     const Playhead::Claim claim{head_.claim()};
 
-    // What is buffered belongs to the old position. The consumer has to be stopped before it can
-    // be thrown away, since discarding it moves an index the consumer owns.
+    // What is buffered belongs to the old position. Marking it stale is all the decoding side
+    // can do: the space comes free when the output has stepped over it.
     const bool was_playing{state() == PlayerState::playing};
 
     output_.stop();
-    buffer_.clear();
+    buffer_.mark_discard();
 
     source_->seek(claim.target);
 
