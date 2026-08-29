@@ -38,7 +38,7 @@ using wiola::engine::Playhead;
 /// rather than hangs.
 constexpr auto patience = 5s;
 
-constexpr std::size_t num_threaded_seeks{2000};
+constexpr std::size_t num_threaded_seeks{100000};
 
 /// Where the seek numbered `index` asks to go. They ascend, so what is reported may never fall.
 constexpr Frames target_of(std::size_t index) noexcept
@@ -66,7 +66,7 @@ TEST(Playhead, CountsFromWherePlaybackBegan)
 {
     Playhead head;
 
-    head.begin_at(Frames{500}, head.claim());
+    head.begin_at(Frames{500}, Frames{}, head.claim());
 
     EXPECT_EQ(head.position(Frames{100}), Frames{600});
 }
@@ -79,7 +79,7 @@ TEST(Playhead, HoldsASeekUntilItIsCarriedOut)
 
     EXPECT_TRUE(head.seek_outstanding());
 
-    head.begin_at(Frames{4000}, head.claim());
+    head.begin_at(Frames{4000}, Frames{}, head.claim());
 
     EXPECT_FALSE(head.seek_outstanding());
 }
@@ -90,12 +90,12 @@ TEST(Playhead, ReportsASeekBeforeItIsCarriedOut)
 {
     Playhead head;
 
-    head.begin_at(Frames{1000}, head.claim());
+    head.begin_at(Frames{1000}, Frames{}, head.claim());
     head.request_seek(Frames{8000});
 
     EXPECT_EQ(head.position(Frames{500}), Frames{8000});
 
-    head.begin_at(Frames{8000}, head.claim());
+    head.begin_at(Frames{8000}, Frames{}, head.claim());
 
     EXPECT_EQ(head.position(Frames{0}), Frames{8000});
 }
@@ -111,7 +111,7 @@ TEST(Playhead, KeepsASeekAskedForWhileOneIsCarriedOut)
     const Playhead::Claim claim{head.claim()};
 
     head.request_seek(Frames{9000});
-    head.begin_at(claim.target, claim);
+    head.begin_at(claim.target, Frames{}, claim);
 
     EXPECT_TRUE(head.seek_outstanding());
     EXPECT_EQ(head.position(Frames{0}), Frames{9000});
@@ -144,7 +144,7 @@ TEST(Playhead, ForgetsWhatWasPushedWhenPlaybackBeginsElsewhere)
     Playhead head;
 
     head.push(4096);
-    head.begin_at(Frames{2000}, head.claim());
+    head.begin_at(Frames{2000}, Frames{}, head.claim());
 
     EXPECT_EQ(head.num_pushed(), 0U);
 }
@@ -160,10 +160,35 @@ TEST(Playhead, ClaimsNothingWhenNoSeekWasAsked)
     EXPECT_FALSE(claim.outstanding);
 
     // Beginning where it already is leaves the position alone and the count reset.
-    head.begin_at(Frames{0}, claim);
+    head.begin_at(Frames{0}, Frames{}, claim);
 
     EXPECT_EQ(head.position(Frames{50}), Frames{50});
     EXPECT_EQ(head.num_pushed(), 0U);
+}
+
+/// The output counts on and is never wound back, so beginning somewhere means measuring from
+/// what it had reached by then.
+TEST(Playhead, CountsFromWhatTheOutputHadAlreadyPlayed)
+{
+    Playhead head;
+
+    head.begin_at(Frames{1000}, Frames{700}, head.claim());
+
+    EXPECT_EQ(head.position(Frames{700}), Frames{1000});
+    EXPECT_EQ(head.position(Frames{750}), Frames{1050});
+}
+
+TEST(Playhead, MeasuresFromTheLatestPlaceItBeganAt)
+{
+    Playhead head;
+
+    head.begin_at(Frames{1000}, Frames{700}, head.claim());
+    ASSERT_EQ(head.position(Frames{800}), Frames{1100});
+
+    head.begin_at(Frames{5000}, Frames{800}, head.claim());
+
+    EXPECT_EQ(head.position(Frames{800}), Frames{5000});
+    EXPECT_EQ(head.position(Frames{900}), Frames{5100});
 }
 
 /// What the playhead is for: one thread asking for places while another carries them out, with
@@ -190,7 +215,7 @@ TEST(Playhead, CarriesEverySeekBetweenTwoThreads)
         const Playhead::Claim claim{head.claim()};
 
         if (claim.outstanding)
-            head.begin_at(claim.target, claim);
+            head.begin_at(claim.target, Frames{}, claim);
         else
             std::this_thread::yield();
     }
@@ -223,7 +248,7 @@ TEST(Playhead, NeverReportsAPlaceItHasLeft)
         const Playhead::Claim claim{head.claim()};
 
         if (claim.outstanding)
-            head.begin_at(claim.target, claim);
+            head.begin_at(claim.target, Frames{}, claim);
     }
 
     asking.store(false);

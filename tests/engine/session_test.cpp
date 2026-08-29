@@ -77,8 +77,6 @@ public:
 
     [[nodiscard]] Frames frames_played() const noexcept override { return Frames{frames_.load()}; }
 
-    void reset_frames_played() noexcept override { frames_.store(0); }
-
 private:
     void pull()
     {

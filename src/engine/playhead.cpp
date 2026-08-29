@@ -45,12 +45,15 @@ Playhead::Claim Playhead::claim() const noexcept
     };
 }
 
-void Playhead::begin_at(audio::Frames frame_index, const Claim& claim) noexcept
+void Playhead::begin_at(audio::Frames frame_index, audio::Frames frames_played,
+    const Claim& claim) noexcept
 {
     base_.store(frame_index.count(), std::memory_order_relaxed);
+    frames_at_begin_.store(frames_played.count(), std::memory_order_relaxed);
     num_pushed_ = 0;
 
-    // Carried out only now that the place asked for is the place reported.
+    // Carried out only now that the place asked for is the place reported, and only after both
+    // of the numbers a reader pairs with it are in place.
     seeks_applied_.store(claim.requested, std::memory_order_release);
 }
 
@@ -66,10 +69,27 @@ std::size_t Playhead::num_pushed() const noexcept
 
 audio::Frames Playhead::position(audio::Frames frames_played) const noexcept
 {
-    if (seek_outstanding())
-        return audio::Frames{seek_target_.load(std::memory_order_relaxed)};
+    while (true) {
+        // Read before the counts, never after: a place asked for is stored before the count that
+        // describes it, so a target read afterwards may belong to a request this read has not
+        // counted. Reporting that one is reporting a place playback has not been sent to yet,
+        // and the next read - which does count it - then falls back behind it.
+        const audio::Frames target{seek_target_.load(std::memory_order_acquire)};
+        const std::size_t applied{seeks_applied_.load(std::memory_order_acquire)};
 
-    return audio::Frames{base_.load(std::memory_order_relaxed)} + frames_played;
+        // A place asked for is where playback is until it is reached.
+        if (seeks_requested_.load(std::memory_order_acquire) != applied)
+            return target;
+
+        const audio::Frames base{base_.load(std::memory_order_acquire)};
+        const audio::Frames at_begin{frames_at_begin_.load(std::memory_order_acquire)};
+
+        // A seek carried out while those two were being read leaves them from either side of it,
+        // so the read is taken again rather than reported. The writer settles within one seek, so
+        // this goes round at most as often as playback is moved.
+        if (seeks_applied_.load(std::memory_order_acquire) == applied)
+            return base + (frames_played - at_begin);
+    }
 }
 
 } // namespace wiola::engine

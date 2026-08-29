@@ -62,16 +62,18 @@ bool Player::start()
     // instead of being thrown away: a listener who moves the slider before pressing play means
     // to begin there.
     const Playhead::Claim claim{head_.claim()};
+    const audio::Frames start_frame{
+        claim.outstanding ? std::min(claim.target, source_->num_frames()) : audio::Frames{}};
 
+    // A player that has never run is already at the beginning with nothing buffered.
     if (previous != Playback::State::idle || claim.outstanding) {
-        const audio::Frames start_frame{
-            claim.outstanding ? std::min(claim.target, source_->num_frames()) : audio::Frames{}};
-
         buffer_.mark_discard();
         source_->seek(start_frame);
-        output_.reset_frames_played();
-        head_.begin_at(start_frame, claim);
     }
+
+    // Measured from what the output has counted so far, since a count it keeps itself is one
+    // nothing else may wind back.
+    head_.begin_at(start_frame, output_.frames_played(), claim);
 
     prime();
 
@@ -107,16 +109,12 @@ bool Player::resume() noexcept
 
 units::Time Player::total_time() const noexcept
 {
-    return units::Time{static_cast<double>(source_->num_frames().count()) /
-        source_->spec().sample_rate.get<units::Hz>()};
+    return source_->spec().time_per(source_->num_frames());
 }
 
 units::Time Player::time_played() const noexcept
 {
-    const audio::Frames frames{head_.position(output_.frames_played())};
-
-    return units::Time{
-        static_cast<double>(frames.count()) / source_->spec().sample_rate.get<units::Hz>()};
+    return source_->spec().time_per(head_.position(output_.frames_played()));
 }
 
 bool Player::playing() const noexcept
@@ -170,8 +168,8 @@ void Player::apply_seek()
 
     source_->seek(claim.target);
 
-    output_.reset_frames_played();
-    head_.begin_at(claim.target, claim);
+    // The output is stopped, so what it has counted stands still while it is read.
+    head_.begin_at(claim.target, output_.frames_played(), claim);
 
     prime();
 
