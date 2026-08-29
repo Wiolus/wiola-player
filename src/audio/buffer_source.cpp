@@ -20,11 +20,14 @@
 
 #include <audio/buffer_source.hpp>
 
+#include <utility>
+
 namespace wiola::audio {
 
-BufferSource::BufferSource(StreamSpec spec, lockfree::SPSCRingBuffer<float>& buffer) noexcept
+BufferSource::BufferSource(StreamSpec spec,
+    lockfree::SPSCRingBuffer<float>::Consumer buffer) noexcept
     : spec_{spec}
-    , buffer_{buffer}
+    , buffer_{std::move(buffer)}
 {
 }
 

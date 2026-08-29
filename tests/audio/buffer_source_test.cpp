@@ -54,7 +54,8 @@ auto counted(std::size_t count)
 TEST(BufferSource, ReportsTheSpecItWasGiven)
 {
     SPSCRingBuffer<float> buffer{64};
-    BufferSource source{stereo, buffer};
+    auto producer{buffer.producer()};
+    BufferSource source{stereo, buffer.consumer()};
 
     EXPECT_EQ(source.spec(), stereo);
 }
@@ -62,7 +63,8 @@ TEST(BufferSource, ReportsTheSpecItWasGiven)
 TEST(BufferSource, GivesNothingFromAnEmptyBuffer)
 {
     SPSCRingBuffer<float> buffer{64};
-    BufferSource source{stereo, buffer};
+    auto producer{buffer.producer()};
+    BufferSource source{stereo, buffer.consumer()};
 
     std::array<float, 8> block{};
     block.fill(42.0F);
@@ -74,10 +76,11 @@ TEST(BufferSource, GivesNothingFromAnEmptyBuffer)
 TEST(BufferSource, GivesWhatWasPushedInOrder)
 {
     SPSCRingBuffer<float> buffer{64};
-    BufferSource source{stereo, buffer};
+    auto producer{buffer.producer()};
+    BufferSource source{stereo, buffer.consumer()};
 
     const auto pushed{counted(8)};
-    ASSERT_EQ(buffer.push(pushed), pushed.size());
+    ASSERT_EQ(producer.push(pushed), pushed.size());
 
     std::array<float, 8> block{};
 
@@ -92,10 +95,11 @@ TEST(BufferSource, GivesWhatWasPushedInOrder)
 TEST(BufferSource, IsShortWhenTheBufferHoldsLess)
 {
     SPSCRingBuffer<float> buffer{64};
-    BufferSource source{stereo, buffer};
+    auto producer{buffer.producer()};
+    BufferSource source{stereo, buffer.consumer()};
 
     const auto pushed{counted(4)};
-    ASSERT_EQ(buffer.push(pushed), pushed.size());
+    ASSERT_EQ(producer.push(pushed), pushed.size());
 
     std::array<float, 8> block{};
     block.fill(42.0F);
@@ -108,10 +112,11 @@ TEST(BufferSource, IsShortWhenTheBufferHoldsLess)
 TEST(BufferSource, TakesOnlyWhatWasAskedFor)
 {
     SPSCRingBuffer<float> buffer{64};
-    BufferSource source{stereo, buffer};
+    auto producer{buffer.producer()};
+    BufferSource source{stereo, buffer.consumer()};
 
     const auto pushed{counted(16)};
-    ASSERT_EQ(buffer.push(pushed), pushed.size());
+    ASSERT_EQ(producer.push(pushed), pushed.size());
 
     std::array<float, 4> block{};
 
@@ -122,11 +127,12 @@ TEST(BufferSource, TakesOnlyWhatWasAskedFor)
 TEST(BufferSource, AnswersAsASource)
 {
     SPSCRingBuffer<float> buffer{64};
-    BufferSource buffered{stereo, buffer};
+    auto producer{buffer.producer()};
+    BufferSource buffered{stereo, buffer.consumer()};
     Source& source{buffered};
 
     const auto pushed{counted(4)};
-    ASSERT_EQ(buffer.push(pushed), pushed.size());
+    ASSERT_EQ(producer.push(pushed), pushed.size());
 
     std::array<float, 4> block{};
 
@@ -137,10 +143,11 @@ TEST(BufferSource, AnswersAsASource)
 TEST(BufferSource, AcceptsNothingToFill)
 {
     SPSCRingBuffer<float> buffer{64};
-    BufferSource source{stereo, buffer};
+    auto producer{buffer.producer()};
+    BufferSource source{stereo, buffer.consumer()};
 
     const auto pushed{counted(4)};
-    ASSERT_EQ(buffer.push(pushed), pushed.size());
+    ASSERT_EQ(producer.push(pushed), pushed.size());
 
     EXPECT_EQ(source.render(std::span<float>{}), 0U);
     EXPECT_EQ(buffer.size_approx(), pushed.size());

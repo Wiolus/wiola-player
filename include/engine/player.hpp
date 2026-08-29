@@ -47,7 +47,7 @@ class Player final {
 public:
     /// Takes the source it plays, which must not be null, the buffer it decodes into, and the
     /// output that buffer is played through. Both outlive the player.
-    Player(std::unique_ptr<codec::Decoder> source, lockfree::SPSCRingBuffer<float>& buffer,
+    Player(std::unique_ptr<codec::Decoder> source, lockfree::SPSCRingBuffer<float>::Producer buffer,
         audio::Output& output);
 
     NO_COPY_SEMANTIC(Player);
@@ -128,7 +128,7 @@ private:
     std::unique_ptr<codec::Decoder> source_;
     Playback playback_;
     Playhead head_;
-    lockfree::SPSCRingBuffer<float>& buffer_;
+    lockfree::SPSCRingBuffer<float>::Producer buffer_;
     audio::Output& output_;
 
     /// What the output was last asked for. The decoding thread's while it runs, and seeded by

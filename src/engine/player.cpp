@@ -32,10 +32,10 @@
 
 namespace wiola::engine {
 
-Player::Player(std::unique_ptr<codec::Decoder> source, lockfree::SPSCRingBuffer<float>& buffer,
-    audio::Output& output)
+Player::Player(std::unique_ptr<codec::Decoder> source,
+    lockfree::SPSCRingBuffer<float>::Producer buffer, audio::Output& output)
     : source_{std::move(source)}
-    , buffer_{buffer}
+    , buffer_{std::move(buffer)}
     , output_{output}
 {
 }
@@ -147,7 +147,7 @@ void Player::prime()
 {
     std::array<float, tuning::decode_chunk_samples> block{};
 
-    while (buffer_.size_approx() + block.size() <= buffer_.capacity()) {
+    while (buffer_.space_approx() >= block.size()) {
         const std::size_t num_decoded{source_->render(block)};
 
         if (num_decoded == 0)

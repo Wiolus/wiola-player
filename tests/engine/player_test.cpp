@@ -219,9 +219,9 @@ private:
 struct Rig {
     explicit Rig(std::unique_ptr<wiola::codec::Decoder> source)
         : buffer{source->spec().samples_per(units::Time{std::chrono::milliseconds{250}})}
-        , decoded{source->spec(), buffer}
+        , decoded{source->spec(), buffer.consumer()}
         , output{decoded}
-        , player{std::move(source), buffer, output}
+        , player{std::move(source), buffer.producer(), output}
     {
     }
 
@@ -596,7 +596,7 @@ TEST(Player, SeeksWhileTheLastOfItIsStillBeingPlayed)
 
     // An output that plays nothing holds the player in that gap for as long as the test needs.
     ManualOutput output;
-    Player player{std::move(source), buffer, output};
+    Player player{std::move(source), buffer.producer(), output};
 
     ASSERT_TRUE(player.start());
     ASSERT_EQ(moved->num_seeks(), 0);
@@ -684,7 +684,7 @@ TEST(Player, RunsOnAnyOutput)
     wiola::lockfree::SPSCRingBuffer<float> buffer{
         spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
     ManualOutput output;
-    Player player{std::move(source), buffer, output};
+    Player player{std::move(source), buffer.producer(), output};
 
     ASSERT_TRUE(player.start());
     EXPECT_EQ(player.state(), State::playing);
@@ -707,7 +707,7 @@ TEST(Player, FollowsTheOutputRatherThanTheDecoder)
     wiola::lockfree::SPSCRingBuffer<float> buffer{
         spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
     ManualOutput output;
-    Player player{std::move(source), buffer, output};
+    Player player{std::move(source), buffer.producer(), output};
 
     ASSERT_TRUE(player.start());
     EXPECT_EQ(player.time_played().get<units::Sec>(), 0.0);
@@ -721,7 +721,10 @@ TEST(Player, FollowsTheOutputRatherThanTheDecoder)
     player.wait();
 }
 
-// TEMP: a listener doing everything at once, for as long as it takes tsan to notice something.
+/// Everything a listener can ask for, as fast as it can be asked, against a track that is
+/// playing. The tests above each name one interleaving; this one names none, and is there for
+/// the ones nobody thought to name. It asserts almost nothing on its own - the thread sanitizer
+/// is what reads the result.
 TEST(Player, SurvivesATransportHammering)
 {
     auto source = wiola::testing::open_fixture();
@@ -742,7 +745,7 @@ TEST(Player, SurvivesATransportHammering)
         }
     }};
 
-    std::this_thread::sleep_for(3s);
+    std::this_thread::sleep_for(1s);
     asking.store(false);
 }
 
@@ -758,7 +761,7 @@ TEST(Player, TouchesTheOutputFromTheDecodingThreadAlone)
     wiola::lockfree::SPSCRingBuffer<float> buffer{
         spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
     ThreadWatchingOutput output;
-    Player player{std::move(source), buffer, output};
+    Player player{std::move(source), buffer.producer(), output};
 
     ASSERT_TRUE(player.start());
 

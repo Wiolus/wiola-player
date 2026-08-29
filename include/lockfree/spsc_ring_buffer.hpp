@@ -70,38 +70,105 @@ public:
     NO_MOVE_SEMANTIC(SPSCRingBuffer);
     ~SPSCRingBuffer() = default;
 
+    /**
+     * The end that fills the buffer, for the one thread that does.
+     *
+     * Handed out rather than reachable from the buffer, so that a thread which fills it cannot
+     * reach what belongs to the thread that empties it: the two sides own an index each, and a
+     * call from the wrong side corrupts the other's without any of it looking wrong.
+     */
+    class Producer {
+    public:
+        NO_COPY_SEMANTIC(Producer);
+        DEFAULT_MOVE_SEMANTIC(Producer);
+        ~Producer() = default;
+
+        /// Returns the number of elements accepted, which may be short of `src`.
+        std::size_t push(std::span<const T> src) noexcept;
+
+        [[nodiscard]] bool try_push(const T& value) noexcept;
+
+        /// Zero-copy handshake: fill the returned spans, then commit what you used.
+        [[nodiscard]] WriteRegion acquire_write() noexcept;
+        void commit_write(std::size_t num_elements) noexcept;
+
+        /// Marks everything written so far as stale.
+        ///
+        /// The consumer steps over it on its next read, and only then does the space it held
+        /// come free: a producer that marks while nothing is consuming cannot write into it
+        /// until the consumer runs again. Marking, rather than moving the read index here, is
+        /// what leaves every index with a single writing thread and so needs nothing to be
+        /// stopped first.
+        void mark_discard() noexcept;
+
+        /// How many more elements would be accepted now. Stale the instant it returns, and only
+        /// ever an underestimate: the consumer may free more at any moment.
+        [[nodiscard]] std::size_t space_approx() const noexcept;
+
+    private:
+        friend class SPSCRingBuffer;
+
+        explicit Producer(SPSCRingBuffer& ring) noexcept
+            : ring_{&ring}
+        {
+        }
+
+        SPSCRingBuffer* ring_;
+    };
+
+    /// The end that empties the buffer, for the one thread that does. Handed out for the same
+    /// reason as the producer's.
+    class Consumer {
+    public:
+        NO_COPY_SEMANTIC(Consumer);
+        DEFAULT_MOVE_SEMANTIC(Consumer);
+        ~Consumer() = default;
+
+        /// Returns the number of elements written into `dst`.
+        std::size_t pop(std::span<T> dst) noexcept;
+
+        [[nodiscard]] std::optional<T> try_pop() noexcept;
+
+        /// Zero-copy handshake, mirroring the producer's.
+        [[nodiscard]] ReadRegion acquire_read() noexcept;
+        void commit_read(std::size_t num_elements) noexcept;
+
+    private:
+        friend class SPSCRingBuffer;
+
+        explicit Consumer(SPSCRingBuffer& ring) noexcept
+            : ring_{&ring}
+        {
+        }
+
+        SPSCRingBuffer* ring_;
+    };
+
+    /// The two ends. One each per buffer, taken where the buffer is wired up.
+    [[nodiscard]] Producer producer() noexcept { return Producer{*this}; }
+
+    [[nodiscard]] Consumer consumer() noexcept { return Consumer{*this}; }
+
     [[nodiscard]] std::size_t capacity() const noexcept;
-
-    /// Producer side. Returns the number of elements accepted, which may be short of `src`.
-    std::size_t push(std::span<const T> src) noexcept;
-
-    /// Consumer side. Returns the number of elements written into `dst`.
-    std::size_t pop(std::span<T> dst) noexcept;
-
-    [[nodiscard]] bool try_push(const T& value) noexcept;
-    [[nodiscard]] std::optional<T> try_pop() noexcept;
-
-    /// Zero-copy producer handshake: fill the returned spans, then commit what you used.
-    [[nodiscard]] WriteRegion acquire_write() noexcept;
-    void commit_write(std::size_t num_elements) noexcept;
-
-    /// Zero-copy consumer handshake, mirroring acquire_write().
-    [[nodiscard]] ReadRegion acquire_read() noexcept;
-    void commit_read(std::size_t num_elements) noexcept;
-
-    /// Producer side. Marks everything written so far as stale.
-    ///
-    /// The consumer steps over it on its next read, and only then does the space it held come
-    /// free: a producer that marks while nothing is consuming cannot write into it until the
-    /// consumer runs again. Marking, rather than moving the read index here, is what leaves
-    /// every index with a single writing thread and so needs nothing to be stopped first.
-    void mark_discard() noexcept;
 
     /// Observers. Stale the instant they return; for metering and sizing, not for control flow.
     [[nodiscard]] std::size_t size_approx() const noexcept;
     [[nodiscard]] bool empty_approx() const noexcept;
 
 private:
+    friend class Producer;
+    friend class Consumer;
+
+    std::size_t push(std::span<const T> src) noexcept;
+    std::size_t pop(std::span<T> dst) noexcept;
+    [[nodiscard]] bool try_push(const T& value) noexcept;
+    [[nodiscard]] std::optional<T> try_pop() noexcept;
+    [[nodiscard]] WriteRegion acquire_write() noexcept;
+    void commit_write(std::size_t num_elements) noexcept;
+    [[nodiscard]] ReadRegion acquire_read() noexcept;
+    void commit_read(std::size_t num_elements) noexcept;
+    void mark_discard() noexcept;
+
     /// Consumer side. Steps over whatever the producer has marked stale, and answers where
     /// reading begins now.
     std::size_t apply_discard() noexcept;
@@ -135,6 +202,66 @@ SPSCRingBuffer<T>::SPSCRingBuffer(std::size_t minimum_capacity)
     : mask_{std::bit_ceil(std::max<std::size_t>(minimum_capacity, 2)) - 1}
     , storage_{std::make_unique_for_overwrite<T[]>(mask_ + 1)}
 {
+}
+
+template<RingElement T>
+std::size_t SPSCRingBuffer<T>::Producer::push(std::span<const T> src) noexcept
+{
+    return ring_->push(src);
+}
+
+template<RingElement T>
+bool SPSCRingBuffer<T>::Producer::try_push(const T& value) noexcept
+{
+    return ring_->try_push(value);
+}
+
+template<RingElement T>
+auto SPSCRingBuffer<T>::Producer::acquire_write() noexcept -> WriteRegion
+{
+    return ring_->acquire_write();
+}
+
+template<RingElement T>
+void SPSCRingBuffer<T>::Producer::commit_write(std::size_t num_elements) noexcept
+{
+    ring_->commit_write(num_elements);
+}
+
+template<RingElement T>
+void SPSCRingBuffer<T>::Producer::mark_discard() noexcept
+{
+    ring_->mark_discard();
+}
+
+template<RingElement T>
+std::size_t SPSCRingBuffer<T>::Producer::space_approx() const noexcept
+{
+    return ring_->capacity() - ring_->size_approx();
+}
+
+template<RingElement T>
+std::size_t SPSCRingBuffer<T>::Consumer::pop(std::span<T> dst) noexcept
+{
+    return ring_->pop(dst);
+}
+
+template<RingElement T>
+std::optional<T> SPSCRingBuffer<T>::Consumer::try_pop() noexcept
+{
+    return ring_->try_pop();
+}
+
+template<RingElement T>
+auto SPSCRingBuffer<T>::Consumer::acquire_read() noexcept -> ReadRegion
+{
+    return ring_->acquire_read();
+}
+
+template<RingElement T>
+void SPSCRingBuffer<T>::Consumer::commit_read(std::size_t num_elements) noexcept
+{
+    ring_->commit_read(num_elements);
 }
 
 template<RingElement T>
