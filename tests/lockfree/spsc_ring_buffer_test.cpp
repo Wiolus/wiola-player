@@ -64,11 +64,13 @@ TEST(SPSCRingBuffer, RoundsCapacityUpToPowerOfTwo)
 TEST(SPSCRingBuffer, PopsWhatWasPushed)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     const std::array src{1.0F, 2.0F, 3.0F};
     std::array<float, 3> dst{};
 
-    EXPECT_EQ(buffer.push(src), 3u);
-    EXPECT_EQ(buffer.pop(dst), 3u);
+    EXPECT_EQ(producer.push(src), 3u);
+    EXPECT_EQ(consumer.pop(dst), 3u);
     EXPECT_EQ(dst, src);
     EXPECT_TRUE(buffer.empty_approx());
 }
@@ -76,51 +78,59 @@ TEST(SPSCRingBuffer, PopsWhatWasPushed)
 TEST(SPSCRingBuffer, PushIsShortWhenFull)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     const std::array src{1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
 
-    EXPECT_EQ(buffer.push(src), 4u);
-    EXPECT_EQ(buffer.push(src), 0u);
+    EXPECT_EQ(producer.push(src), 4u);
+    EXPECT_EQ(producer.push(src), 0u);
 }
 
 TEST(SPSCRingBuffer, PopIsEmptyWhenDrained)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     std::array<float, 2> dst{};
 
-    EXPECT_EQ(buffer.pop(dst), 0u);
-    EXPECT_FALSE(buffer.try_pop().has_value());
+    EXPECT_EQ(consumer.pop(dst), 0u);
+    EXPECT_FALSE(consumer.try_pop().has_value());
 }
 
 TEST(SPSCRingBuffer, WrapsAroundTheEndOfStorage)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     const std::array first{1.0F, 2.0F, 3.0F};
     const std::array second{4.0F, 5.0F, 6.0F};
     std::array<float, 3> dst{};
 
-    EXPECT_EQ(buffer.push(first), 3u);
-    EXPECT_EQ(buffer.pop(dst), 3u);
-    EXPECT_EQ(buffer.push(second), 3u);
-    EXPECT_EQ(buffer.pop(dst), 3u);
+    EXPECT_EQ(producer.push(first), 3u);
+    EXPECT_EQ(consumer.pop(dst), 3u);
+    EXPECT_EQ(producer.push(second), 3u);
+    EXPECT_EQ(consumer.pop(dst), 3u);
     EXPECT_EQ(dst, second);
 }
 
 TEST(SPSCRingBuffer, DiscardsWhatWasNotRead)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     const std::array written{1, 2, 3, 4};
 
-    EXPECT_EQ(buffer.push(written), written.size());
+    EXPECT_EQ(producer.push(written), written.size());
 
-    buffer.mark_discard();
+    producer.mark_discard();
 
     std::array<int, 4> read{};
-    EXPECT_EQ(buffer.pop(read), 0u);
+    EXPECT_EQ(consumer.pop(read), 0u);
 
     // The buffer is usable again, and gives back only what came after the mark.
     const std::array again{5, 6};
-    EXPECT_EQ(buffer.push(again), again.size());
-    EXPECT_EQ(buffer.pop(read), again.size());
+    EXPECT_EQ(producer.push(again), again.size());
+    EXPECT_EQ(consumer.pop(read), again.size());
     EXPECT_EQ(read[0], 5);
     EXPECT_EQ(read[1], 6);
 }
@@ -129,15 +139,17 @@ TEST(SPSCRingBuffer, DiscardsWhatWasNotRead)
 TEST(SPSCRingBuffer, KeepsWhatWasWrittenAfterAMark)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     const std::array stale{1, 2, 3, 4};
     const std::array fresh{5, 6};
 
-    EXPECT_EQ(buffer.push(stale), stale.size());
-    buffer.mark_discard();
-    EXPECT_EQ(buffer.push(fresh), fresh.size());
+    EXPECT_EQ(producer.push(stale), stale.size());
+    producer.mark_discard();
+    EXPECT_EQ(producer.push(fresh), fresh.size());
 
     std::array<int, 6> read{};
-    EXPECT_EQ(buffer.pop(read), fresh.size());
+    EXPECT_EQ(consumer.pop(read), fresh.size());
     EXPECT_EQ(read[0], 5);
     EXPECT_EQ(read[1], 6);
 }
@@ -146,29 +158,33 @@ TEST(SPSCRingBuffer, KeepsWhatWasWrittenAfterAMark)
 TEST(SPSCRingBuffer, AppliesOnlyTheLatestOfSeveralMarks)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
 
-    EXPECT_EQ(buffer.push(std::array{1, 2}), 2u);
-    buffer.mark_discard();
-    EXPECT_EQ(buffer.push(std::array{3, 4}), 2u);
-    buffer.mark_discard();
-    EXPECT_EQ(buffer.push(std::array{5}), 1u);
+    EXPECT_EQ(producer.push(std::array{1, 2}), 2u);
+    producer.mark_discard();
+    EXPECT_EQ(producer.push(std::array{3, 4}), 2u);
+    producer.mark_discard();
+    EXPECT_EQ(producer.push(std::array{5}), 1u);
 
     std::array<int, 8> read{};
-    EXPECT_EQ(buffer.pop(read), 1u);
+    EXPECT_EQ(consumer.pop(read), 1u);
     EXPECT_EQ(read[0], 5);
 }
 
 TEST(SPSCRingBuffer, MarksNothingOnAnEmptyBuffer)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
 
-    buffer.mark_discard();
-    buffer.mark_discard();
+    producer.mark_discard();
+    producer.mark_discard();
 
-    EXPECT_EQ(buffer.push(std::array{1, 2}), 2u);
+    EXPECT_EQ(producer.push(std::array{1, 2}), 2u);
 
     std::array<int, 4> read{};
-    EXPECT_EQ(buffer.pop(read), 2u);
+    EXPECT_EQ(consumer.pop(read), 2u);
     EXPECT_EQ(read[0], 1);
 }
 
@@ -177,21 +193,23 @@ TEST(SPSCRingBuffer, MarksNothingOnAnEmptyBuffer)
 TEST(SPSCRingBuffer, FreesTheSpaceOnlyOnceTheConsumerHasRead)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     const std::array full{1, 2, 3, 4};
 
-    EXPECT_EQ(buffer.push(full), full.size());
+    EXPECT_EQ(producer.push(full), full.size());
 
-    buffer.mark_discard();
+    producer.mark_discard();
 
-    EXPECT_EQ(buffer.push(std::array{5}), 0u);
+    EXPECT_EQ(producer.push(std::array{5}), 0u);
     EXPECT_EQ(buffer.size_approx(), full.size());
 
     std::array<int, 4> read{};
-    EXPECT_EQ(buffer.pop(read), 0u);
+    EXPECT_EQ(consumer.pop(read), 0u);
 
     EXPECT_TRUE(buffer.empty_approx());
-    EXPECT_EQ(buffer.push(std::array{5}), 1u);
-    EXPECT_EQ(buffer.pop(read), 1u);
+    EXPECT_EQ(producer.push(std::array{5}), 1u);
+    EXPECT_EQ(consumer.pop(read), 1u);
     EXPECT_EQ(read[0], 5);
 }
 
@@ -199,19 +217,21 @@ TEST(SPSCRingBuffer, FreesTheSpaceOnlyOnceTheConsumerHasRead)
 TEST(SPSCRingBuffer, DiscardsAcrossTheWrap)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     std::array<int, 4> read{};
 
     for (int round = 0; round < 3; ++round) {
-        EXPECT_EQ(buffer.push(std::array{1, 2, 3}), 3u);
-        EXPECT_EQ(buffer.pop(read), 3u);
+        EXPECT_EQ(producer.push(std::array{1, 2, 3}), 3u);
+        EXPECT_EQ(consumer.pop(read), 3u);
     }
 
-    EXPECT_EQ(buffer.push(std::array{7, 8}), 2u);
-    buffer.mark_discard();
-    EXPECT_EQ(buffer.pop(read), 0u);
+    EXPECT_EQ(producer.push(std::array{7, 8}), 2u);
+    producer.mark_discard();
+    EXPECT_EQ(consumer.pop(read), 0u);
 
-    EXPECT_EQ(buffer.push(std::array{9}), 1u);
-    EXPECT_EQ(buffer.pop(read), 1u);
+    EXPECT_EQ(producer.push(std::array{9}), 1u);
+    EXPECT_EQ(consumer.pop(read), 1u);
     EXPECT_EQ(read[0], 9);
 }
 
@@ -219,28 +239,32 @@ TEST(SPSCRingBuffer, DiscardsAcrossTheWrap)
 TEST(SPSCRingBuffer, LeavesAReadRegionAlreadyHandedOutAlone)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
 
-    EXPECT_EQ(buffer.push(std::array{1, 2, 3, 4}), 4u);
+    EXPECT_EQ(producer.push(std::array{1, 2, 3, 4}), 4u);
 
-    const auto region = buffer.acquire_read();
+    const auto region = consumer.acquire_read();
     ASSERT_EQ(region.size(), 4u);
 
-    buffer.mark_discard();
+    producer.mark_discard();
 
     EXPECT_EQ(region.first[0], 1);
-    buffer.commit_read(2);
+    consumer.commit_read(2);
 
-    EXPECT_EQ(buffer.acquire_read().size(), 0u);
+    EXPECT_EQ(consumer.acquire_read().size(), 0u);
 }
 
 TEST(SPSCRingBuffer, TakesAndGivesBackOneValue)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
 
-    EXPECT_TRUE(buffer.try_push(1.5F));
+    EXPECT_TRUE(producer.try_push(1.5F));
     EXPECT_EQ(buffer.size_approx(), 1u);
 
-    const std::optional<float> value{buffer.try_pop()};
+    const std::optional<float> value{consumer.try_pop()};
 
     ASSERT_TRUE(value.has_value());
     EXPECT_FLOAT_EQ(*value, 1.5F);
@@ -250,10 +274,12 @@ TEST(SPSCRingBuffer, TakesAndGivesBackOneValue)
 TEST(SPSCRingBuffer, RefusesOneMoreThanFits)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{2};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
 
-    EXPECT_TRUE(buffer.try_push(1.0F));
-    EXPECT_TRUE(buffer.try_push(2.0F));
-    EXPECT_FALSE(buffer.try_push(3.0F));
+    EXPECT_TRUE(producer.try_push(1.0F));
+    EXPECT_TRUE(producer.try_push(2.0F));
+    EXPECT_FALSE(producer.try_push(3.0F));
     EXPECT_EQ(buffer.size_approx(), 2u);
 }
 
@@ -261,16 +287,20 @@ TEST(SPSCRingBuffer, RefusesOneMoreThanFits)
 TEST(SPSCRingBuffer, IsShortWhenFullWhateverItHolds)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     const std::array src{1, 2, 3, 4, 5, 6};
 
-    EXPECT_EQ(buffer.push(src), 4u);
-    EXPECT_EQ(buffer.push(src), 0u);
+    EXPECT_EQ(producer.push(src), 4u);
+    EXPECT_EQ(producer.push(src), 0u);
 }
 
 TEST(SPSCRingBuffer, OffersEverySlotToAWriter)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
-    const auto region = buffer.acquire_write();
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
+    const auto region = producer.acquire_write();
 
     EXPECT_EQ(region.size(), 4u);
     EXPECT_EQ(region.first.size(), 4u);
@@ -280,17 +310,19 @@ TEST(SPSCRingBuffer, OffersEverySlotToAWriter)
 TEST(SPSCRingBuffer, CommitsOnlyWhatAWriterUsed)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
-    const auto region = buffer.acquire_write();
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
+    const auto region = producer.acquire_write();
 
     region.first[0] = 1.0F;
     region.first[1] = 2.0F;
-    buffer.commit_write(2);
+    producer.commit_write(2);
 
     EXPECT_EQ(buffer.size_approx(), 2u);
 
     std::array<float, 2> dst{};
 
-    EXPECT_EQ(buffer.pop(dst), 2u);
+    EXPECT_EQ(consumer.pop(dst), 2u);
     EXPECT_FLOAT_EQ(dst[0], 1.0F);
     EXPECT_FLOAT_EQ(dst[1], 2.0F);
 }
@@ -299,13 +331,15 @@ TEST(SPSCRingBuffer, CommitsOnlyWhatAWriterUsed)
 TEST(SPSCRingBuffer, SplitsAWrittenRegionAcrossTheWrap)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     const std::array filler{1.0F, 2.0F, 3.0F};
     std::array<float, 3> drained{};
 
-    ASSERT_EQ(buffer.push(filler), 3u);
-    ASSERT_EQ(buffer.pop(drained), 3u);
+    ASSERT_EQ(producer.push(filler), 3u);
+    ASSERT_EQ(consumer.pop(drained), 3u);
 
-    const auto region = buffer.acquire_write();
+    const auto region = producer.acquire_write();
 
     ASSERT_EQ(region.size(), 4u);
     EXPECT_EQ(region.first.size(), 1u);
@@ -315,22 +349,24 @@ TEST(SPSCRingBuffer, SplitsAWrittenRegionAcrossTheWrap)
     region.second[0] = 5.0F;
     region.second[1] = 6.0F;
     region.second[2] = 7.0F;
-    buffer.commit_write(region.size());
+    producer.commit_write(region.size());
 
     std::array<float, 4> dst{};
 
-    EXPECT_EQ(buffer.pop(dst), 4u);
+    EXPECT_EQ(consumer.pop(dst), 4u);
     EXPECT_EQ(dst, (std::array{4.0F, 5.0F, 6.0F, 7.0F}));
 }
 
 TEST(SPSCRingBuffer, OffersWhatIsReadyToAReader)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     const std::array src{1.0F, 2.0F, 3.0F};
 
-    ASSERT_EQ(buffer.push(src), 3u);
+    ASSERT_EQ(producer.push(src), 3u);
 
-    const auto region = buffer.acquire_read();
+    const auto region = consumer.acquire_read();
 
     ASSERT_EQ(region.size(), 3u);
     EXPECT_EQ(region.first.size(), 3u);
@@ -342,35 +378,39 @@ TEST(SPSCRingBuffer, OffersWhatIsReadyToAReader)
 TEST(SPSCRingBuffer, CommitsOnlyWhatAReaderTook)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     const std::array src{1.0F, 2.0F, 3.0F};
 
-    ASSERT_EQ(buffer.push(src), 3u);
+    ASSERT_EQ(producer.push(src), 3u);
 
-    const auto region = buffer.acquire_read();
+    const auto region = consumer.acquire_read();
 
     ASSERT_EQ(region.size(), 3u);
-    buffer.commit_read(1);
+    consumer.commit_read(1);
 
     EXPECT_EQ(buffer.size_approx(), 2u);
 
     std::array<float, 2> dst{};
 
-    EXPECT_EQ(buffer.pop(dst), 2u);
+    EXPECT_EQ(consumer.pop(dst), 2u);
     EXPECT_FLOAT_EQ(dst[0], 2.0F);
 }
 
 TEST(SPSCRingBuffer, SplitsAReadRegionAcrossTheWrap)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     const std::array filler{1.0F, 2.0F, 3.0F};
     const std::array written{4.0F, 5.0F, 6.0F, 7.0F};
     std::array<float, 3> drained{};
 
-    ASSERT_EQ(buffer.push(filler), 3u);
-    ASSERT_EQ(buffer.pop(drained), 3u);
-    ASSERT_EQ(buffer.push(written), 4u);
+    ASSERT_EQ(producer.push(filler), 3u);
+    ASSERT_EQ(consumer.pop(drained), 3u);
+    ASSERT_EQ(producer.push(written), 4u);
 
-    const auto region = buffer.acquire_read();
+    const auto region = consumer.acquire_read();
 
     ASSERT_EQ(region.size(), 4u);
     EXPECT_EQ(region.first.size(), 1u);
@@ -379,7 +419,7 @@ TEST(SPSCRingBuffer, SplitsAReadRegionAcrossTheWrap)
     EXPECT_FLOAT_EQ(region.second[0], 5.0F);
     EXPECT_FLOAT_EQ(region.second[2], 7.0F);
 
-    buffer.commit_read(region.size());
+    consumer.commit_read(region.size());
 
     EXPECT_TRUE(buffer.empty_approx());
 }
@@ -387,16 +427,18 @@ TEST(SPSCRingBuffer, SplitsAReadRegionAcrossTheWrap)
 TEST(SPSCRingBuffer, LeavesTheBufferAloneWhenNothingIsCommitted)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
 
-    static_cast<void>(buffer.acquire_write());
-    buffer.commit_write(0);
+    static_cast<void>(producer.acquire_write());
+    producer.commit_write(0);
 
     EXPECT_TRUE(buffer.empty_approx());
 
-    ASSERT_TRUE(buffer.try_push(1.0F));
+    ASSERT_TRUE(producer.try_push(1.0F));
 
-    static_cast<void>(buffer.acquire_read());
-    buffer.commit_read(0);
+    static_cast<void>(consumer.acquire_read());
+    consumer.commit_read(0);
 
     EXPECT_EQ(buffer.size_approx(), 1u);
 }
@@ -405,7 +447,9 @@ TEST(SPSCRingBuffer, LeavesTheBufferAloneWhenNothingIsCommitted)
 TEST(SPSCRingBuffer, OffersNothingToAReaderOfAnEmptyBuffer)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
-    const auto region = buffer.acquire_read();
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
+    const auto region = consumer.acquire_read();
 
     EXPECT_EQ(region.size(), 0u);
     EXPECT_TRUE(region.first.empty());
@@ -415,11 +459,13 @@ TEST(SPSCRingBuffer, OffersNothingToAReaderOfAnEmptyBuffer)
 TEST(SPSCRingBuffer, OffersNothingToAWriterOfAFullBuffer)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{2};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     const std::array src{1.0F, 2.0F};
 
-    ASSERT_EQ(buffer.push(src), 2u);
+    ASSERT_EQ(producer.push(src), 2u);
 
-    const auto region = buffer.acquire_write();
+    const auto region = producer.acquire_write();
 
     EXPECT_EQ(region.size(), 0u);
     EXPECT_TRUE(region.first.empty());
@@ -431,10 +477,12 @@ TEST(SPSCRingBuffer, OffersNothingToAWriterOfAFullBuffer)
 TEST(SPSCRingBuffer, CarriesEveryElementBetweenTwoThreads)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{threaded_capacity};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
 
-    const std::jthread producer{[&buffer](const std::stop_token& stop) {
+    const std::jthread writer{[&producer](const std::stop_token& stop) {
         for (int value = 0; value < num_threaded_elements && !stop.stop_requested();) {
-            if (buffer.try_push(value))
+            if (producer.try_push(value))
                 ++value;
             else
                 std::this_thread::yield();
@@ -444,7 +492,7 @@ TEST(SPSCRingBuffer, CarriesEveryElementBetweenTwoThreads)
     const auto deadline = std::chrono::steady_clock::now() + patience;
 
     for (int expected = 0; expected < num_threaded_elements;) {
-        const std::optional<int> value{buffer.try_pop()};
+        const std::optional<int> value{consumer.try_pop()};
 
         if (!value.has_value()) {
             ASSERT_LT(std::chrono::steady_clock::now(), deadline) << "stalled at " << expected;
@@ -461,12 +509,14 @@ TEST(SPSCRingBuffer, CarriesEveryElementBetweenTwoThreads)
 TEST(SPSCRingBuffer, CarriesEveryElementBetweenTwoThreadsInRegions)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{threaded_capacity};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
 
-    const std::jthread producer{[&buffer](const std::stop_token& stop) {
+    const std::jthread writer{[&producer](const std::stop_token& stop) {
         int value{0};
 
         while (value < num_threaded_elements && !stop.stop_requested()) {
-            const auto region = buffer.acquire_write();
+            const auto region = producer.acquire_write();
 
             if (region.size() == 0) {
                 std::this_thread::yield();
@@ -482,7 +532,7 @@ TEST(SPSCRingBuffer, CarriesEveryElementBetweenTwoThreadsInRegions)
                         ++written;
                     }
 
-            buffer.commit_write(written);
+            producer.commit_write(written);
         }
     }};
 
@@ -490,7 +540,7 @@ TEST(SPSCRingBuffer, CarriesEveryElementBetweenTwoThreadsInRegions)
     int expected{0};
 
     while (expected < num_threaded_elements) {
-        const auto region = buffer.acquire_read();
+        const auto region = consumer.acquire_read();
 
         if (region.size() == 0) {
             ASSERT_LT(std::chrono::steady_clock::now(), deadline) << "stalled at " << expected;
@@ -502,7 +552,7 @@ TEST(SPSCRingBuffer, CarriesEveryElementBetweenTwoThreadsInRegions)
             for (const int value : part)
                 ASSERT_EQ(value, expected++);
 
-        buffer.commit_read(region.size());
+        consumer.commit_read(region.size());
     }
 }
 
@@ -513,11 +563,13 @@ TEST(SPSCRingBuffer, CarriesEveryElementBetweenTwoThreadsInRegions)
 TEST(SPSCRingBuffer, NeverCarriesWhatWasMarkedStale)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{threaded_capacity};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
     std::atomic<int> marked_through{-1};
 
-    const std::jthread producer{[&buffer, &marked_through](const std::stop_token& stop) {
+    const std::jthread writer{[&producer, &marked_through](const std::stop_token& stop) {
         for (int value = 0; value < num_threaded_elements && !stop.stop_requested();) {
-            if (!buffer.try_push(value)) {
+            if (!producer.try_push(value)) {
                 std::this_thread::yield();
                 continue;
             }
@@ -525,7 +577,7 @@ TEST(SPSCRingBuffer, NeverCarriesWhatWasMarkedStale)
             // Every so often, everything written so far is declared stale. The bar is published
             // after the mark, so a consumer that reads the bar has certainly seen the mark.
             if (value % 1000 == 999) {
-                buffer.mark_discard();
+                producer.mark_discard();
                 marked_through.store(value, std::memory_order_release);
             }
 
@@ -540,7 +592,7 @@ TEST(SPSCRingBuffer, NeverCarriesWhatWasMarkedStale)
 
     while (num_read < num_threaded_elements / 2) {
         const int bar{marked_through.load(std::memory_order_acquire)};
-        const std::optional<int> value{buffer.try_pop()};
+        const std::optional<int> value{consumer.try_pop()};
 
         if (!value.has_value()) {
             ASSERT_LT(std::chrono::steady_clock::now(), deadline) << "stalled at " << num_read;

@@ -40,10 +40,10 @@ struct Session::Pipeline {
     Pipeline(std::unique_ptr<codec::Decoder> source, audio::Chain& chain,
         const OutputFactory& make_output)
         : buffer{source->spec().samples_per(tuning::buffer_duration)}
-        , decoded{source->spec(), buffer}
+        , decoded{source->spec(), buffer.consumer()}
         , shaped{decoded, chain}
         , output{make_output(shaped)}
-        , player{std::move(source), buffer, *output}
+        , player{std::move(source), buffer.producer(), *output}
     {
     }
 

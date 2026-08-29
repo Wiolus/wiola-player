@@ -32,7 +32,7 @@ namespace wiola::audio {
 /// What a ring buffer holds. Short whenever whoever fills it has not kept up.
 class BufferSource final : public Source {
 public:
-    BufferSource(StreamSpec spec, lockfree::SPSCRingBuffer<float>& buffer) noexcept;
+    BufferSource(StreamSpec spec, lockfree::SPSCRingBuffer<float>::Consumer buffer) noexcept;
 
     std::size_t render(std::span<float> interleaved) override;
 
@@ -40,7 +40,7 @@ public:
 
 private:
     StreamSpec spec_;
-    lockfree::SPSCRingBuffer<float>& buffer_;
+    lockfree::SPSCRingBuffer<float>::Consumer buffer_;
 };
 
 } // namespace wiola::audio
