@@ -94,6 +94,12 @@ struct StreamSpec {
         return Frames{num_samples / num_channels};
     }
 
+    /// How long `num_frames` take to play.
+    [[nodiscard]] constexpr units::Time time_per(Frames num_frames) const noexcept
+    {
+        return units::Time{static_cast<double>(num_frames.count()) / sample_rate.get<units::Hz>()};
+    }
+
     [[nodiscard]] constexpr std::size_t samples_per(units::Time duration) const noexcept
     {
         return samples_per(Frames{static_cast<std::size_t>(duration * sample_rate)});

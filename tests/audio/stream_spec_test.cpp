@@ -47,6 +47,26 @@ TEST(StreamSpec, ConvertsBetweenFramesAndSamples)
     EXPECT_EQ(spec.frames_per(spec.samples_per(Frames{7})), Frames{7});
 }
 
+TEST(StreamSpec, SaysHowLongFramesTakeToPlay)
+{
+    constexpr StreamSpec spec{.sample_rate = 44.1_kHz, .num_channels = 2};
+
+    static_assert(spec.time_per(Frames{44100}) == 1_s);
+
+    EXPECT_EQ(spec.time_per(Frames{}), Time{});
+    EXPECT_EQ(spec.time_per(Frames{22050}), 500_ms);
+    EXPECT_EQ(spec.time_per(Frames{44100}), 1_s);
+}
+
+/// The way back from a duration, so that a position and a length are measured the same way.
+TEST(StreamSpec, TimeAndSamplesAgreeWithEachOther)
+{
+    constexpr StreamSpec spec{.sample_rate = 48_kHz, .num_channels = 2};
+
+    EXPECT_EQ(spec.time_per(spec.frames_per(spec.samples_per(250_ms))), 250_ms);
+    EXPECT_EQ(spec.samples_per(spec.time_per(Frames{1200})), 2400u);
+}
+
 TEST(StreamSpec, SizesABufferFromMilliseconds)
 {
     constexpr StreamSpec spec{.sample_rate = 48_kHz, .num_channels = 2};
