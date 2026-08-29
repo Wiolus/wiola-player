@@ -99,9 +99,9 @@ bool Session::toggle()
     // The state says which of the three this means: silence it, carry on, or begin - the last of
     // which also covers playing a track that has already finished.
     switch (state()) {
-    case PlayerState::playing:
+    case Playback::State::playing:
         return pipeline_->player.pause();
-    case PlayerState::paused:
+    case Playback::State::paused:
         return pipeline_->player.resume();
     default:
         return pipeline_->player.start();
@@ -125,9 +125,9 @@ void Session::seek(units::Time position) noexcept
         pipeline_->player.seek(position);
 }
 
-PlayerState Session::state() const noexcept
+Playback::State Session::state() const noexcept
 {
-    return loaded() ? pipeline_->player.state() : PlayerState::idle;
+    return loaded() ? pipeline_->player.state() : Playback::State::idle;
 }
 
 bool Session::playing() const noexcept

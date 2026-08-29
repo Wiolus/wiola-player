@@ -40,7 +40,9 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <numbers>
+#include <ranges>
 #include <span>
 #include <string>
 #include <thread>
@@ -52,7 +54,7 @@ using namespace wiola::units::literals;
 using wiola::audio::Chain;
 using wiola::audio::StreamSpec;
 using wiola::engine::Player;
-using wiola::engine::PlayerState;
+using State = wiola::engine::Playback::State;
 namespace units = wiola::units;
 
 /// Waits for `predicate`, so a test never depends on how fast a device happens to run.
@@ -160,6 +162,63 @@ private:
     std::atomic<bool> running_{false};
     std::atomic<std::size_t> frames_{0};
     std::thread thread_;
+};
+
+/// An output that remembers which threads started or stopped it, once a test starts watching.
+/// The rule is that the caller opens the device and the decoding thread has it from then on;
+/// this is what lets a test check that rather than trust it.
+class ThreadWatchingOutput final : public wiola::audio::Output {
+public:
+    bool start() noexcept override
+    {
+        note();
+        running_.store(true);
+
+        return true;
+    }
+
+    void stop() noexcept override
+    {
+        note();
+        running_.store(false);
+    }
+
+    [[nodiscard]] bool running() const noexcept override { return running_.load(); }
+
+    [[nodiscard]] wiola::audio::Frames frames_played() const noexcept override
+    {
+        return wiola::audio::Frames{frames_.load()};
+    }
+
+    void reset_frames_played() noexcept override { frames_.store(0); }
+
+    /// From here on, remember who touches it.
+    void watch() noexcept { watching_.store(true); }
+
+    [[nodiscard]] std::vector<std::thread::id> touching_threads() const
+    {
+        const std::lock_guard guard{mutex_};
+
+        return ids_;
+    }
+
+private:
+    void note() noexcept
+    {
+        if (!watching_.load())
+            return;
+
+        const std::lock_guard guard{mutex_};
+
+        if (std::ranges::find(ids_, std::this_thread::get_id()) == ids_.end())
+            ids_.push_back(std::this_thread::get_id());
+    }
+
+    mutable std::mutex mutex_;
+    std::vector<std::thread::id> ids_;
+    std::atomic<bool> watching_{false};
+    std::atomic<bool> running_{false};
+    std::atomic<std::size_t> frames_{0};
 };
 
 /// What a player is given, wired the way a session wires it, with the sound card left out.
@@ -377,7 +436,7 @@ TEST(Player, ResumeRefusesBeforeStart)
     Rig rig{std::move(source)};
     Player& player{rig.player};
 
-    EXPECT_EQ(player.state(), PlayerState::idle);
+    EXPECT_EQ(player.state(), State::idle);
     EXPECT_FALSE(player.resume());
     EXPECT_FALSE(player.playing());
 }
@@ -395,7 +454,7 @@ TEST(Player, DistinguishesEndingFromBeingStopped)
     ASSERT_TRUE(first.start());
 
     first.wait();
-    EXPECT_EQ(first.state(), PlayerState::ended);
+    EXPECT_EQ(first.state(), State::ended);
     EXPECT_TRUE(first.finished());
 
     auto stopped = wiola::testing::open_fixture();
@@ -406,7 +465,7 @@ TEST(Player, DistinguishesEndingFromBeingStopped)
     second.stop();
     second.wait();
 
-    EXPECT_EQ(second.state(), PlayerState::stopped);
+    EXPECT_EQ(second.state(), State::stopped);
     EXPECT_TRUE(second.finished());
 }
 
@@ -497,6 +556,66 @@ protected:
     }
 };
 
+/// A source short enough to run out while what it decoded is still being played, and one that
+/// says how often it was moved.
+class ShortSource final : public wiola::codec::Decoder {
+public:
+    ShortSource()
+        : Decoder{
+              wiola::audio::StreamSpec{units::Frequency{44100.0}, 2},
+              wiola::audio::Frames{4410}
+    }
+    {
+    }
+
+    [[nodiscard]] int num_seeks() const noexcept { return num_seeks_.load(); }
+
+protected:
+    std::size_t decode(std::span<float> output, wiola::audio::Frames num_frames) override
+    {
+        std::fill_n(output.begin(), num_frames.count() * 2, 0.0F);
+
+        return num_frames.count();
+    }
+
+    bool seek_frame(wiola::audio::Frames /*frame_index*/) override
+    {
+        num_seeks_.fetch_add(1);
+
+        return true;
+    }
+
+private:
+    std::atomic<int> num_seeks_{0};
+};
+
+/// The source runs out long before the device has played what it decoded. A seek asked for in
+/// that gap is carried out there and then, rather than waiting for the next start.
+TEST(Player, SeeksWhileTheLastOfItIsStillBeingPlayed)
+{
+    auto source = std::make_unique<ShortSource>();
+    const ShortSource* moved{source.get()};
+
+    const StreamSpec spec{source->spec()};
+    wiola::lockfree::SPSCRingBuffer<float> buffer{
+        spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
+
+    // An output that plays nothing holds the player in that gap for as long as the test needs.
+    ManualOutput output;
+    Player player{std::move(source), buffer, output};
+
+    ASSERT_TRUE(player.start());
+    ASSERT_EQ(moved->num_seeks(), 0);
+
+    player.seek(50_ms);
+
+    EXPECT_TRUE(eventually([moved] { return moved->num_seeks() == 1; }));
+    EXPECT_FALSE(player.finished());
+
+    player.stop();
+    player.wait();
+}
+
 /// Carrying a seek out takes time - a device to stop, a file to move through - and for all of it
 /// the place asked for is where playback is going. Reporting the old one meanwhile shows as a bar
 /// that springs back before it settles.
@@ -531,15 +650,15 @@ TEST(Player, PlaysAgainAfterEnding)
     ASSERT_TRUE(player.start());
 
     player.wait();
-    ASSERT_EQ(player.state(), PlayerState::ended);
+    ASSERT_EQ(player.state(), State::ended);
 
     // Starting a finished player winds it back rather than refusing.
     ASSERT_TRUE(player.start());
-    EXPECT_EQ(player.state(), PlayerState::playing);
+    EXPECT_EQ(player.state(), State::playing);
     EXPECT_LT(player.time_played().get<wiola::units::Sec>(), 0.5);
 
     player.wait();
-    EXPECT_EQ(player.state(), PlayerState::ended);
+    EXPECT_EQ(player.state(), State::ended);
 }
 
 TEST(Player, RefusesToStartWhilePlaying)
@@ -553,14 +672,14 @@ TEST(Player, RefusesToStartWhilePlaying)
     ASSERT_TRUE(player.start());
 
     EXPECT_FALSE(player.start());
-    EXPECT_EQ(player.state(), PlayerState::playing);
+    EXPECT_EQ(player.state(), State::playing);
 
     ASSERT_TRUE(player.pause());
     EXPECT_FALSE(player.start());
-    EXPECT_EQ(player.state(), PlayerState::paused);
+    EXPECT_EQ(player.state(), State::paused);
 }
 
-/// A player needs somewhere to play, not a sound card: with an output of its own the transport
+/// A player needs somewhere to play, not a sound card: with an output of its own playback
 /// runs the same on a machine that has none.
 TEST(Player, RunsOnAnyOutput)
 {
@@ -574,13 +693,13 @@ TEST(Player, RunsOnAnyOutput)
     Player player{std::move(source), buffer, output};
 
     ASSERT_TRUE(player.start());
-    EXPECT_EQ(player.state(), PlayerState::playing);
+    EXPECT_EQ(player.state(), State::playing);
     EXPECT_TRUE(output.running());
 
     player.stop();
     player.wait();
 
-    EXPECT_EQ(player.state(), PlayerState::stopped);
+    EXPECT_EQ(player.state(), State::stopped);
     EXPECT_FALSE(output.running());
 }
 
@@ -606,4 +725,66 @@ TEST(Player, FollowsTheOutputRatherThanTheDecoder)
 
     player.stop();
     player.wait();
+}
+
+// TEMP: a listener doing everything at once, for as long as it takes tsan to notice something.
+TEST(Player, SurvivesATransportHammering)
+{
+    auto source = wiola::testing::open_fixture();
+    ASSERT_NE(source, nullptr);
+
+    Rig rig{std::move(source)};
+    Player& player{rig.player};
+
+    ASSERT_TRUE(player.start());
+
+    std::atomic<bool> asking{true};
+
+    const std::jthread listener{[&player, &asking] {
+        for (int i = 0; asking.load(); ++i) {
+            static_cast<void>(player.pause());
+            player.seek(units::Time{std::chrono::milliseconds{i % 1400}});
+            static_cast<void>(player.resume());
+        }
+    }};
+
+    std::this_thread::sleep_for(3s);
+    asking.store(false);
+}
+
+/// The rule the device depends on: the caller opens it, and from the moment there is a decoding
+/// thread, only that thread starts or stops it. A listener asking to pause moves the state and
+/// nothing else. Checked here rather than left to a sanitizer, so it holds on any build.
+TEST(Player, TouchesTheOutputFromTheDecodingThreadAlone)
+{
+    auto source = wiola::testing::open_fixture();
+    ASSERT_NE(source, nullptr);
+
+    const StreamSpec spec{source->spec()};
+    wiola::lockfree::SPSCRingBuffer<float> buffer{
+        spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
+    ThreadWatchingOutput output;
+    Player player{std::move(source), buffer, output};
+
+    ASSERT_TRUE(player.start());
+
+    // The caller opened the device on the line above; everything from here is the decoding
+    // thread's, and the pauses below are what would tempt another thread into it.
+    output.watch();
+
+    for (int i = 0; i < 20; ++i) {
+        ASSERT_TRUE(player.pause());
+        std::this_thread::sleep_for(5ms);
+
+        ASSERT_TRUE(player.resume());
+        std::this_thread::sleep_for(5ms);
+    }
+
+    player.stop();
+    player.wait();
+
+    const std::vector<std::thread::id> touching{output.touching_threads()};
+
+    ASSERT_EQ(touching.size(), 1u) << "more than one thread started or stopped the output";
+    EXPECT_NE(touching.front(), std::this_thread::get_id());
 }

@@ -41,7 +41,7 @@ namespace {
 using namespace std::chrono_literals;
 using wiola::audio::Frames;
 using wiola::codec::OpenResult;
-using wiola::engine::PlayerState;
+using State = wiola::engine::Playback::State;
 using wiola::engine::Session;
 namespace units = wiola::units;
 
@@ -122,7 +122,7 @@ TEST(Session, StartsWithNothingLoaded)
     const Fixture fixture;
 
     EXPECT_FALSE(fixture.session.loaded());
-    EXPECT_EQ(fixture.session.state(), PlayerState::idle);
+    EXPECT_EQ(fixture.session.state(), State::idle);
     EXPECT_FALSE(fixture.session.playing());
     EXPECT_EQ(fixture.session.total_time(), units::Time{});
     EXPECT_EQ(fixture.session.time_played(), units::Time{});
@@ -177,7 +177,7 @@ TEST(Session, DropsWhatWasLoadedWhenTheNextFileFails)
         OpenResult::unreadable);
 
     EXPECT_FALSE(fixture.session.loaded());
-    EXPECT_EQ(fixture.session.state(), PlayerState::idle);
+    EXPECT_EQ(fixture.session.state(), State::idle);
 }
 
 /// Everything a track is played through is cut for its format, so opening another one builds it
@@ -201,14 +201,14 @@ TEST(Session, PlaysAndPauses)
         OpenResult::opened);
 
     ASSERT_TRUE(fixture.session.toggle());
-    EXPECT_EQ(fixture.session.state(), PlayerState::playing);
+    EXPECT_EQ(fixture.session.state(), State::playing);
     EXPECT_TRUE(fixture.session.playing());
 
     ASSERT_TRUE(fixture.session.toggle());
-    EXPECT_EQ(fixture.session.state(), PlayerState::paused);
+    EXPECT_EQ(fixture.session.state(), State::paused);
 
     ASSERT_TRUE(fixture.session.toggle());
-    EXPECT_EQ(fixture.session.state(), PlayerState::playing);
+    EXPECT_EQ(fixture.session.state(), State::playing);
 }
 
 TEST(Session, StopsAtTheBeginning)
@@ -222,7 +222,7 @@ TEST(Session, StopsAtTheBeginning)
     fixture.session.seek(units::Time{1.0});
     fixture.session.stop();
 
-    EXPECT_EQ(fixture.session.state(), PlayerState::stopped);
+    EXPECT_EQ(fixture.session.state(), State::stopped);
     EXPECT_EQ(fixture.session.time_played(), units::Time{});
 }
 
