@@ -48,9 +48,9 @@ Player::~Player()
 
 bool Player::start()
 {
-    const PlayerState previous{state()};
+    const Playback::State previous{playback_.state()};
 
-    if (previous == PlayerState::playing || previous == PlayerState::paused)
+    if (previous == Playback::State::playing || previous == Playback::State::paused)
         return false;
 
     // A player that has already run is wound back rather than thrown away, so playing a finished
@@ -63,7 +63,7 @@ bool Player::start()
     // to begin there.
     const Playhead::Claim claim{head_.claim()};
 
-    if (previous != PlayerState::idle || claim.outstanding) {
+    if (previous != Playback::State::idle || claim.outstanding) {
         const audio::Frames start_frame{
             claim.outstanding ? std::min(claim.target, source_->num_frames()) : audio::Frames{}};
 
@@ -78,7 +78,11 @@ bool Player::start()
     if (!output_.start())
         return false;
 
-    state_.store(PlayerState::playing, std::memory_order_release);
+    output_started_ = true;
+
+    if (!playback_.begin())
+        return false;
+
     thread_ = std::jthread{[this] { run(); }};
 
     return true;
@@ -93,26 +97,12 @@ void Player::seek(units::Time position) noexcept
 
 bool Player::pause() noexcept
 {
-    if (state() != PlayerState::playing)
-        return false;
-
-    output_.stop();
-    state_.store(PlayerState::paused, std::memory_order_release);
-
-    return true;
+    return playback_.pause();
 }
 
 bool Player::resume() noexcept
 {
-    if (state() != PlayerState::paused)
-        return false;
-
-    if (!output_.start())
-        return false;
-
-    state_.store(PlayerState::playing, std::memory_order_release);
-
-    return true;
+    return playback_.resume();
 }
 
 units::Time Player::total_time() const noexcept
@@ -131,35 +121,22 @@ units::Time Player::time_played() const noexcept
 
 bool Player::playing() const noexcept
 {
-    return state() == PlayerState::playing;
+    return playback_.playing();
 }
 
 void Player::stop() noexcept
 {
-    finish(PlayerState::stopped);
+    playback_.finish(Playback::State::stopped);
 }
 
-void Player::finish(PlayerState reason) noexcept
+Playback::State Player::state() const noexcept
 {
-    PlayerState current{state_.load(std::memory_order_relaxed)};
-
-    // Whoever reaches a final state first keeps it, so a stop during the last block is not undone
-    // by the source running out a moment later.
-    while (current != PlayerState::ended && current != PlayerState::stopped &&
-        !state_.compare_exchange_weak(current, reason, std::memory_order_acq_rel,
-            std::memory_order_relaxed)) { }
-}
-
-PlayerState Player::state() const noexcept
-{
-    return state_.load(std::memory_order_acquire);
+    return playback_.state();
 }
 
 bool Player::finished() const noexcept
 {
-    const PlayerState current{state()};
-
-    return current == PlayerState::ended || current == PlayerState::stopped;
+    return playback_.finished();
 }
 
 void Player::wait()
@@ -170,15 +147,15 @@ void Player::wait()
 
 void Player::prime()
 {
-    std::array<float, tuning::decode_chunk_samples> chunk{};
+    std::array<float, tuning::decode_chunk_samples> block{};
 
-    while (buffer_.size_approx() + chunk.size() <= buffer_.capacity()) {
-        const std::size_t num_rendered{source_->render(chunk)};
+    while (buffer_.size_approx() + block.size() <= buffer_.capacity()) {
+        const std::size_t num_decoded{source_->render(block)};
 
-        if (num_rendered == 0)
+        if (num_decoded == 0)
             break;
 
-        head_.push(buffer_.push(std::span{chunk}.first(num_rendered)));
+        head_.push(buffer_.push(std::span{block}.first(num_decoded)));
     }
 }
 
@@ -188,9 +165,7 @@ void Player::apply_seek()
 
     // What is buffered belongs to the old position. Marking it stale is all the decoding side
     // can do: the space comes free when the output has stepped over it.
-    const bool was_playing{state() == PlayerState::playing};
-
-    output_.stop();
+    stop_output();
     buffer_.mark_discard();
 
     source_->seek(claim.target);
@@ -200,60 +175,120 @@ void Player::apply_seek()
 
     prime();
 
-    if (was_playing && !output_.start())
-        finish(PlayerState::stopped);
+    // Whatever was asked for while the seek was being carried out.
+    follow_playback();
+}
+
+void Player::stop_output() noexcept
+{
+    if (!output_started_)
+        return;
+
+    output_.stop();
+    output_started_ = false;
+}
+
+void Player::follow_playback()
+{
+    const bool wanted{playback_.playing()};
+
+    if (wanted == output_started_)
+        return;
+
+    if (!wanted) {
+        stop_output();
+        return;
+    }
+
+    if (output_.start()) {
+        output_started_ = true;
+        return;
+    }
+
+    // An output that will not start is a fault rather than a pause, and leaves nothing to play
+    // through.
+    playback_.finish(Playback::State::stopped);
 }
 
 void Player::run()
 {
-    const auto stopping = [this] {
-        return state() == PlayerState::stopped;
-    };
-    std::array<float, tuning::decode_chunk_samples> chunk{};
+    std::array<float, tuning::decode_chunk_samples> block{};
 
-    const auto seeking = [this] {
-        return head_.seek_outstanding();
-    };
+    // What the last decode left, and how much of it has gone into the buffer. A block that would
+    // not fit is kept here rather than waited out, so nothing below is ever held up by more than
+    // one decode.
+    std::size_t num_decoded{0};
+    std::size_t num_handed{0};
+    bool exhausted{false};
 
-    while (!stopping()) {
-        if (seeking())
+    while (playback_.state() != Playback::State::stopped) {
+        // Every turn, because a listener's thread only moves the state: this is the one place a
+        // pause reaches the device, and the only one before the waits below.
+        follow_playback();
+
+        if (head_.seek_outstanding()) {
             apply_seek();
 
-        const std::size_t num_rendered{source_->render(chunk)};
-
-        if (num_rendered == 0)
-            break;
-
-        for (std::size_t num_written = 0; num_written < num_rendered && !stopping();) {
-            const std::size_t num_taken{
-                buffer_.push(std::span{chunk}.subspan(num_written, num_rendered - num_written))};
-
-            num_written += num_taken;
-            head_.push(num_taken);
-
-            if (num_written < num_rendered) {
-                // A seek makes the rest of this block stale, so it is abandoned rather than
-                // waited out - the buffer is full precisely when a listener is most likely to
-                // be moving around in the track.
-                if (seeking())
-                    break;
-
-                std::this_thread::sleep_for(tuning::decode_poll_interval);
-            }
+            // The block was decoded at the place that has just been left.
+            num_decoded = 0;
+            num_handed = 0;
+            exhausted = false;
         }
+
+        // Only once the last block has gone over in full, so that what would not fit is handed
+        // over rather than decoded again.
+        if (!exhausted && num_handed == num_decoded) {
+            num_decoded = source_->render(block);
+            num_handed = 0;
+            exhausted = num_decoded == 0;
+        }
+
+        if (exhausted) {
+            // Reaching the end of the source leaves what is buffered still to be heard; being
+            // stopped does not, and being paused is neither - it waits to be resumed.
+            if (played_out())
+                break;
+
+            std::this_thread::sleep_for(tuning::decode_poll_interval);
+            continue;
+        }
+
+        const std::size_t num_left{num_decoded - num_handed};
+        const std::size_t num_taken{buffer_.push(std::span{block}.subspan(num_handed, num_left))};
+
+        // A full buffer is a wait on the device rather than on the source, and the one above is
+        // the same wait: both are answered by the poll interval and by nothing else.
+        if (num_taken == 0) {
+            std::this_thread::sleep_for(tuning::decode_poll_interval);
+            continue;
+        }
+
+        num_handed += num_taken;
+
+        // The playhead counts what was handed over, not what was decoded: it is what the device
+        // will play, and `played_out` above is measured against it.
+        head_.push(num_taken);
     }
 
-    // Reaching the end of the source leaves what is buffered still to be heard; being stopped does
-    // not. The device's own count says when it has been, and an output that has died says so by
-    // no longer running, which is the difference between waiting and hanging.
+    stop_output();
+    playback_.finish(Playback::State::ended);
+}
+
+bool Player::played_out() const noexcept
+{
+    // A device that was never started, or that a pause has silenced, still has what is buffered
+    // left to play.
+    if (!output_started_)
+        return false;
+
+    // An output that has died says so by no longer running, which is the difference between
+    // waiting and hanging.
+    if (!output_.running())
+        return true;
+
     const audio::StreamSpec spec{source_->spec()};
 
-    while (!stopping() && output_.running() &&
-        output_.frames_played() < spec.frames_per(head_.num_pushed()))
-        std::this_thread::sleep_for(tuning::decode_poll_interval);
-
-    output_.stop();
-    finish(PlayerState::ended);
+    return output_.frames_played() >= spec.frames_per(head_.num_pushed());
 }
 
 } // namespace wiola::engine

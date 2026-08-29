@@ -168,7 +168,7 @@ void MainWindow::toggle_playback()
         return;
 
     // Pausing cannot fail, so a refusal is always an output that would not open.
-    const bool pausing{session_.state() == engine::PlayerState::playing};
+    const bool pausing{session_.state() == engine::Playback::State::playing};
 
     show_status(session_.toggle() || pausing ? QString{} : QString{"no playback device"});
 }

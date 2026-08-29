@@ -23,34 +23,15 @@
 #include <audio/output.hpp>
 #include <codec/decoder.hpp>
 #include <core/macros.hpp>
+#include <engine/playback.hpp>
 #include <engine/playhead.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 #include <utils/units.hpp>
 
-#include <atomic>
-#include <cstddef>
 #include <memory>
 #include <thread>
 
 namespace wiola::engine {
-
-/**
- * What the transport is doing.
- *
- * This is decided here rather than read back from the device. The device can stop on its own -
- * an output can be lost, or an audio server can give up on a stream - and that is a fault to be
- * noticed, not a change of what the listener asked for.
- *
- * `ended` and `stopped` are both final and differ in why: a source that ran out is the cue to
- * play the next thing, while a listener who pressed stop is not.
- */
-enum class PlayerState {
-    idle,
-    playing,
-    paused,
-    ended,
-    stopped,
-};
 
 /**
  * Plays one decoder, feeding it to a device from a thread of its own.
@@ -82,11 +63,13 @@ public:
     [[nodiscard]] bool start();
 
     /// Silences playback, keeping the position and everything already decoded, so that resuming
-    /// is immediate. False when there was nothing playing to silence.
+    /// is immediate. The device is silenced by the decoding thread rather than here, so a caller
+    /// is never held up by one. False when there was nothing playing to silence.
     [[nodiscard]] bool pause() noexcept;
 
-    /// Plays on from where `pause` left off. False unless the player is paused, or when the
-    /// output could not be started again. Resuming is not a way to begin.
+    /// Plays on from where `pause` left off, again by way of the decoding thread. False unless
+    /// the player is paused. Resuming is not a way to begin, and an output that will not start
+    /// again ends playback rather than being reported here: `state()` reads as stopped.
     [[nodiscard]] bool resume() noexcept;
 
     /// Ends playback at once, without playing out what is already buffered. Does nothing if
@@ -102,10 +85,10 @@ public:
     /// Blocks until playback has ended.
     void wait();
 
-    /// What the transport is doing.
-    [[nodiscard]] PlayerState state() const noexcept;
+    /// What playback is doing.
+    [[nodiscard]] Playback::State state() const noexcept;
 
-    /// Whether the transport is playing. Says nothing about whether the device agrees; when the
+    /// Whether a track is playing. Says nothing about whether the device agrees; when the
     /// two disagree the output has failed underneath us.
     [[nodiscard]] bool playing() const noexcept;
 
@@ -127,18 +110,31 @@ private:
     /// The decoding thread: keeps the buffer fed until the source is spent.
     void run();
 
+    /// Whether the device has played everything handed to it, or has died trying. False while
+    /// anything is still to be heard, which a pause counts as.
+    [[nodiscard]] bool played_out() const noexcept;
+
     /// Performs a requested seek, discarding what was decoded for the old position.
     void apply_seek();
 
-    /// Settles on a final state. A listener who asked to stop outranks a source that ran out, so
-    /// whichever happened first is what stays.
-    void finish(PlayerState reason) noexcept;
+    /// Starts or stops the output so that it does what playback says. The decoding thread
+    /// is the only one that does so while it runs, which is what leaves the output and the
+    /// buffer with a single thread handling them.
+    void follow_playback();
+
+    /// Silences the output if it was started. The decoding thread's, as above.
+    void stop_output() noexcept;
 
     std::unique_ptr<codec::Decoder> source_;
-    std::atomic<PlayerState> state_{PlayerState::idle};
+    Playback playback_;
     Playhead head_;
     lockfree::SPSCRingBuffer<float>& buffer_;
     audio::Output& output_;
+
+    /// What the output was last asked for. The decoding thread's while it runs, and seeded by
+    /// `start` before there is one.
+    bool output_started_{false};
+
     std::jthread thread_;
 };
 

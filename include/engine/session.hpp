@@ -65,7 +65,7 @@ public:
 
     [[nodiscard]] bool loaded() const noexcept;
 
-    /// Starts, pauses or resumes, whichever the transport is due. False when the output could not
+    /// Starts, pauses or resumes, whichever playback is due. False when the output could not
     /// be opened, and when there is nothing loaded.
     bool toggle();
 
@@ -75,7 +75,7 @@ public:
     /// Moves playback to `position`, measured from the start of the track.
     void seek(units::Time position) noexcept;
 
-    [[nodiscard]] PlayerState state() const noexcept;
+    [[nodiscard]] Playback::State state() const noexcept;
     [[nodiscard]] bool playing() const noexcept;
     [[nodiscard]] units::Time time_played() const noexcept;
     [[nodiscard]] units::Time total_time() const noexcept;
