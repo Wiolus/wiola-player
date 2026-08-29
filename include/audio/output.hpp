@@ -46,9 +46,6 @@ public:
     /// Frames played since the last reset, which is what has been heard.
     [[nodiscard]] virtual Frames frames_played() const noexcept = 0;
 
-    /// Sets that count back to zero. Only legal while the output is stopped.
-    virtual void reset_frames_played() noexcept = 0;
-
 protected:
     Output() = default;
 };

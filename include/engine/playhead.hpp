@@ -51,16 +51,20 @@ public:
     /// What a seek would have to carry out now.
     [[nodiscard]] Claim claim() const noexcept;
 
-    /// Playback starts again at `frame_index`, carrying out what `claim` held. What was counted
-    /// before no longer applies.
-    void begin_at(audio::Frames frame_index, const Claim& claim) noexcept;
+    /// Playback starts again at `frame_index`, carrying out what `claim` held. `frames_played`
+    /// is what the output had counted by then, which is what the position is measured from
+    /// afterwards - the output's own count is never wound back, since the thread that plays it
+    /// is the only one that may write it. What was counted before no longer applies.
+    void begin_at(audio::Frames frame_index, audio::Frames frames_played,
+        const Claim& claim) noexcept;
 
     /// Samples handed to the output since playback last began somewhere.
     void push(std::size_t num_samples) noexcept;
 
     [[nodiscard]] std::size_t num_pushed() const noexcept;
 
-    /// Where playback is, given what the output says it has played.
+    /// Where playback is, given what the output says it has played. Read as one, so that a
+    /// reader never pairs a place with a count from before playback began there.
     [[nodiscard]] audio::Frames position(audio::Frames frames_played) const noexcept;
 
 private:
@@ -68,6 +72,7 @@ private:
     std::atomic<std::size_t> seeks_applied_{0};
     std::atomic<std::size_t> seek_target_{0};
     std::atomic<std::size_t> base_{0};
+    std::atomic<std::size_t> frames_at_begin_{0};
     std::size_t num_pushed_{0};
 };
 

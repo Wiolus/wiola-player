@@ -112,11 +112,6 @@ Frames Device::frames_played() const noexcept
     return Frames{frames_played_.load(std::memory_order_relaxed)};
 }
 
-void Device::reset_frames_played() noexcept
-{
-    frames_played_.store(0, std::memory_order_relaxed);
-}
-
 std::size_t Device::num_underruns() const noexcept
 {
     return num_underruns_.load(std::memory_order_relaxed);

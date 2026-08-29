@@ -79,9 +79,6 @@ public:
     /// own position runs ahead of it by whatever the buffer is holding.
     [[nodiscard]] Frames frames_played() const noexcept override;
 
-    /// Sets that count back to zero. Only legal while the device is stopped.
-    void reset_frames_played() noexcept override;
-
     /// Callbacks that found the buffer short and had to emit silence.
     [[nodiscard]] std::size_t num_underruns() const noexcept;
 

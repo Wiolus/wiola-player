@@ -91,8 +91,6 @@ public:
         return wiola::audio::Frames{frames_.load()};
     }
 
-    void reset_frames_played() noexcept override { frames_.store(0); }
-
     /// Says that `num_frames` more have been heard.
     void play(wiola::audio::Frames num_frames) noexcept { frames_.fetch_add(num_frames.count()); }
 
@@ -137,8 +135,6 @@ public:
     {
         return wiola::audio::Frames{frames_.load()};
     }
-
-    void reset_frames_played() noexcept override { frames_.store(0); }
 
 private:
     void pull()
@@ -189,8 +185,6 @@ public:
     {
         return wiola::audio::Frames{frames_.load()};
     }
-
-    void reset_frames_played() noexcept override { frames_.store(0); }
 
     /// From here on, remember who touches it.
     void watch() noexcept { watching_.store(true); }
