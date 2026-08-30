@@ -20,13 +20,13 @@
 
 #pragma once
 
+#include "decode_loop.hpp"
+#include "playhead.hpp"
 #include <audio/output.hpp>
 #include <audio/stream_spec.hpp>
 #include <codec/decoder.hpp>
 #include <core/macros.hpp>
-#include <engine/decode_loop.hpp>
 #include <engine/playback.hpp>
-#include <engine/playhead.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 #include <utils/units.hpp>
 

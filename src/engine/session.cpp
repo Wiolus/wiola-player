@@ -20,6 +20,9 @@
 
 #include <engine/session.hpp>
 
+#include "loader.hpp"
+#include "player.hpp"
+
 #include "tuning.hpp"
 
 #include <audio/buffer_source.hpp>
@@ -64,6 +67,7 @@ Session::Session()
 
 Session::Session(OutputFactory make_output)
     : make_output_{std::move(make_output)}
+    , loader_{std::make_unique<Loader>()}
 {
 }
 
@@ -71,7 +75,7 @@ Session::~Session() = default;
 
 codec::OpenResult Session::load(const std::filesystem::path& path)
 {
-    loader_.start(path);
+    loader_->start(path);
     last_result_ = codec::OpenResult::loading;
 
     return last_result_;
@@ -79,7 +83,7 @@ codec::OpenResult Session::load(const std::filesystem::path& path)
 
 void Session::poll()
 {
-    std::optional<codec::Opened> opened{loader_.take()};
+    std::optional<codec::Opened> opened{loader_->take()};
 
     if (!opened.has_value())
         return;
@@ -105,7 +109,7 @@ void Session::poll()
 
 bool Session::loading() const noexcept
 {
-    return loader_.busy();
+    return loader_->busy();
 }
 
 codec::OpenResult Session::last_result() const noexcept

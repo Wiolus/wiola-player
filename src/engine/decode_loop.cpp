@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <engine/decode_loop.hpp>
+#include "decode_loop.hpp"
 
 #include "tuning.hpp"
 
