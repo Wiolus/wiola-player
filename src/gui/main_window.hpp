@@ -24,6 +24,7 @@
 #include "seek_bar.hpp"
 #include "volume_control.hpp"
 
+#include <codec/open.hpp>
 #include <engine/session.hpp>
 #include <utils/units.hpp>
 
@@ -56,10 +57,9 @@ public:
 
     ~MainWindow() override;
 
-    /// Loads `path`, replacing whatever was playing. False when the file cannot be read, in which
-    /// case what was playing is stopped and nothing takes its place. Either way the window says
-    /// what happened.
-    bool load(const std::filesystem::path& path);
+    /// Begins loading `path`. Reading a file takes as long as it takes, so what is playing keeps
+    /// playing and the window says what happened once it has been read.
+    void load(const std::filesystem::path& path);
 
 private:
     /// Asks for a file and loads it.
@@ -86,6 +86,9 @@ private:
     /// Moves playback to `fraction` of the loaded track.
     void seek_to(double fraction);
 
+    /// Takes up a load that has finished, and says how it went.
+    void take_up_load();
+
     /// Reads the engine and refreshes what is shown.
     void refresh();
 
@@ -96,6 +99,12 @@ private:
     [[nodiscard]] bool loaded() const noexcept { return session_.loaded(); }
 
     engine::Session session_;
+
+    /// The file being read, so that its name can be shown once it has been.
+    std::filesystem::path opening_;
+
+    /// What the window has already said about a load, so that it says it once.
+    codec::OpenResult said_{codec::OpenResult::opened};
 
     /// The file a run leaves things in.
     QSettings settings_;

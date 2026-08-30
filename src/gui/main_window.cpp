@@ -46,6 +46,9 @@ QString as_status(codec::OpenResult result)
     case codec::OpenResult::damaged:
         return QString{"that file is damaged"};
 
+    case codec::OpenResult::unreadable:
+        return QString{"cannot read that file"};
+
     default:
         return QString{"cannot read that file"};
     }
@@ -137,17 +140,35 @@ MainWindow::MainWindow()
 
 MainWindow::~MainWindow() = default;
 
-bool MainWindow::load(const std::filesystem::path& path)
+void MainWindow::load(const std::filesystem::path& path)
 {
-    const codec::OpenResult result{session_.load(path)};
+    opening_ = path;
+    said_ = session_.load(path);
 
-    show_status(loaded() ? QString{} : as_status(result));
-    setWindowTitle(loaded() ? QString::fromStdString(path.filename().string())
-                            : QString{"Wiola Player"});
-    position_bar_->set_fraction(0.0);
+    show_status(QString{"opening "} + QString::fromStdString(path.filename().string()) + "...");
     refresh();
+}
 
-    return loaded();
+void MainWindow::take_up_load()
+{
+    session_.poll();
+
+    const codec::OpenResult result{session_.last_result()};
+
+    // Said once: a window that repeated itself every turn would overwrite whatever else it has
+    // to say.
+    if (result == said_ || result == codec::OpenResult::loading)
+        return;
+
+    said_ = result;
+
+    const bool opened{result == codec::OpenResult::opened};
+
+    show_status(opened ? QString{} : as_status(result));
+    setWindowTitle(opened ? QString::fromStdString(opening_.filename().string()) : windowTitle());
+
+    if (opened)
+        position_bar_->set_fraction(0.0);
 }
 
 void MainWindow::choose_track()
@@ -226,6 +247,8 @@ void MainWindow::seek_to(double fraction)
 
 void MainWindow::refresh()
 {
+    take_up_load();
+
     play_button_->setEnabled(loaded());
     stop_button_->setEnabled(loaded());
     position_bar_->setEnabled(loaded());
