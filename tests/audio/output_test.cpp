@@ -20,58 +20,22 @@
 
 #include <audio/output.hpp>
 
+#include <fakes/output.hpp>
+
 #include <gtest/gtest.h>
 
 #include <utility>
 
 namespace {
 
-using wiola::audio::Frames;
 using wiola::audio::Output;
-
-/// An output that says how often it was driven, and can refuse to start the way a lost device
-/// does.
-class CountingOutput final : public Output {
-public:
-    explicit CountingOutput(bool starts) noexcept
-        : starts_{starts}
-    {
-    }
-
-    [[nodiscard]] int num_starts() const noexcept { return num_starts_; }
-
-    [[nodiscard]] int num_stops() const noexcept { return num_stops_; }
-
-    [[nodiscard]] bool running() const noexcept override { return running_; }
-
-    [[nodiscard]] Frames frames_played() const noexcept override { return Frames{}; }
-
-private:
-    bool start() noexcept override
-    {
-        ++num_starts_;
-        running_ = starts_;
-
-        return starts_;
-    }
-
-    void stop() noexcept override
-    {
-        ++num_stops_;
-        running_ = false;
-    }
-
-    bool starts_;
-    bool running_{false};
-    int num_starts_{0};
-    int num_stops_{0};
-};
+using wiola::testing::FakeOutput;
 
 } // namespace
 
 TEST(OutputControl, StartsAndStopsWhatItWasTakenFrom)
 {
-    CountingOutput output{true};
+    FakeOutput output;
     Output::Control control{output.control()};
 
     EXPECT_TRUE(control.start());
@@ -86,7 +50,8 @@ TEST(OutputControl, StartsAndStopsWhatItWasTakenFrom)
 
 TEST(OutputControl, SaysWhenTheOutputWouldNotStart)
 {
-    CountingOutput output{false};
+    FakeOutput output;
+    output.refuse_starts();
     Output::Control control{output.control()};
 
     EXPECT_FALSE(control.start());
@@ -98,7 +63,7 @@ TEST(OutputControl, SaysWhenTheOutputWouldNotStart)
 /// control: a second is inert, which shows as a device that will not start.
 TEST(OutputControl, HandsOutOneControlOnly)
 {
-    CountingOutput output{true};
+    FakeOutput output;
     Output::Control first{output.control()};
     Output::Control second{output.control()};
 
@@ -117,7 +82,7 @@ TEST(OutputControl, HandsOutOneControlOnly)
 /// reach it.
 TEST(OutputControl, LeavesNothingBehindWhenItIsMoved)
 {
-    CountingOutput output{true};
+    FakeOutput output;
     Output::Control control{output.control()};
     Output::Control moved{std::move(control)};
 
@@ -130,8 +95,8 @@ TEST(OutputControl, LeavesNothingBehindWhenItIsMoved)
 
 TEST(OutputControl, LeavesNothingBehindWhenItIsMoveAssigned)
 {
-    CountingOutput output{true};
-    CountingOutput other{true};
+    FakeOutput output;
+    FakeOutput other;
 
     Output::Control control{output.control()};
     Output::Control target{other.control()};

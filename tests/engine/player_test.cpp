@@ -30,6 +30,8 @@
 #include <codec/open.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 
+#include <fakes/output.hpp>
+
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -73,183 +75,6 @@ bool eventually(Predicate predicate, std::chrono::milliseconds limit = 5s)
 
 } // namespace
 
-/// An output that counts only what a test says it has played.
-class ManualOutput final : public wiola::audio::Output {
-public:
-    bool start() noexcept override
-    {
-        running_.store(true);
-        return true;
-    }
-
-    void stop() noexcept override { running_.store(false); }
-
-    [[nodiscard]] bool running() const noexcept override { return running_.load(); }
-
-    [[nodiscard]] wiola::audio::Frames frames_played() const noexcept override
-    {
-        return wiola::audio::Frames{frames_.load()};
-    }
-
-    /// Says that `num_frames` more have been heard.
-    void play(wiola::audio::Frames num_frames) noexcept { frames_.fetch_add(num_frames.count()); }
-
-private:
-    std::atomic<bool> running_{false};
-    std::atomic<std::size_t> frames_{0};
-};
-
-/// What a device does without the sound card: pulls its source on a thread of its own and counts
-/// what it took. It pulls as fast as it is answered, so a track is played through in the time it
-/// takes to decode it.
-class DrainingOutput final : public wiola::audio::Output {
-public:
-    explicit DrainingOutput(wiola::audio::Source& source) noexcept
-        : source_{source}
-    {
-    }
-
-    ~DrainingOutput() override { stop(); }
-
-    bool start() noexcept override
-    {
-        if (running_.exchange(true))
-            return true;
-
-        thread_ = std::thread{[this] { pull(); }};
-
-        return true;
-    }
-
-    void stop() noexcept override
-    {
-        running_.store(false);
-
-        if (thread_.joinable())
-            thread_.join();
-    }
-
-    [[nodiscard]] bool running() const noexcept override { return running_.load(); }
-
-    [[nodiscard]] wiola::audio::Frames frames_played() const noexcept override
-    {
-        return wiola::audio::Frames{frames_.load()};
-    }
-
-private:
-    void pull()
-    {
-        const wiola::audio::StreamSpec spec{source_.spec()};
-        std::array<float, 512> block{};
-
-        while (running_.load()) {
-            const std::size_t num_rendered{source_.render(block)};
-
-            if (num_rendered == 0) {
-                std::this_thread::sleep_for(1ms);
-                continue;
-            }
-
-            frames_.fetch_add(spec.frames_per(num_rendered).count());
-        }
-    }
-
-    wiola::audio::Source& source_;
-    std::atomic<bool> running_{false};
-    std::atomic<std::size_t> frames_{0};
-    std::thread thread_;
-};
-
-/// An output that remembers which threads started or stopped it, once a test starts watching.
-/// The rule is that the caller opens the device and the decoding thread has it from then on;
-/// this is what lets a test check that rather than trust it.
-class ThreadWatchingOutput final : public wiola::audio::Output {
-public:
-    bool start() noexcept override
-    {
-        note();
-        running_.store(true);
-
-        return true;
-    }
-
-    void stop() noexcept override
-    {
-        note();
-        running_.store(false);
-    }
-
-    [[nodiscard]] bool running() const noexcept override { return running_.load(); }
-
-    [[nodiscard]] wiola::audio::Frames frames_played() const noexcept override
-    {
-        return wiola::audio::Frames{frames_.load()};
-    }
-
-    /// From here on, remember who touches it.
-    void watch() noexcept { watching_.store(true); }
-
-    [[nodiscard]] std::vector<std::thread::id> touching_threads() const
-    {
-        const std::lock_guard guard{mutex_};
-
-        return ids_;
-    }
-
-private:
-    void note() noexcept
-    {
-        if (!watching_.load())
-            return;
-
-        const std::lock_guard guard{mutex_};
-
-        if (std::ranges::find(ids_, std::this_thread::get_id()) == ids_.end())
-            ids_.push_back(std::this_thread::get_id());
-    }
-
-    mutable std::mutex mutex_;
-    std::vector<std::thread::id> ids_;
-    std::atomic<bool> watching_{false};
-    std::atomic<bool> running_{false};
-    std::atomic<std::size_t> frames_{0};
-};
-
-/// An output that can be made to behave like a device that has been lost: refusing to start
-/// again, or stopping without being asked. It plays nothing, so a track never runs out from
-/// under a test that is asking about faults.
-class FaultyOutput final : public wiola::audio::Output {
-public:
-    /// Every start from here on fails, the way a device that has gone away does.
-    void refuse_starts() noexcept { refusing_.store(true); }
-
-    /// Stops answering, without anyone having asked it to.
-    void die() noexcept { running_.store(false); }
-
-    [[nodiscard]] bool running() const noexcept override { return running_.load(); }
-
-    [[nodiscard]] wiola::audio::Frames frames_played() const noexcept override
-    {
-        return wiola::audio::Frames{};
-    }
-
-private:
-    bool start() noexcept override
-    {
-        if (refusing_.load())
-            return false;
-
-        running_.store(true);
-
-        return true;
-    }
-
-    void stop() noexcept override { running_.store(false); }
-
-    std::atomic<bool> refusing_{false};
-    std::atomic<bool> running_{false};
-};
-
 /// What a player is given, wired the way a session wires it, with the sound card left out.
 struct Rig {
     explicit Rig(std::unique_ptr<wiola::codec::Decoder> source)
@@ -262,7 +87,7 @@ struct Rig {
 
     wiola::lockfree::SPSCRingBuffer<float> buffer;
     wiola::audio::BufferSource decoded;
-    DrainingOutput output;
+    wiola::testing::FakeOutput output;
     Player player;
 };
 
@@ -630,7 +455,7 @@ TEST(Player, SeeksWhileTheLastOfItIsStillBeingPlayed)
         spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
 
     // An output that plays nothing holds the player in that gap for as long as the test needs.
-    ManualOutput output;
+    wiola::testing::FakeOutput output;
     Player player{std::move(source), buffer.producer(), output};
 
     ASSERT_TRUE(player.start());
@@ -718,7 +543,7 @@ TEST(Player, RunsOnAnyOutput)
     const StreamSpec spec{source->spec()};
     wiola::lockfree::SPSCRingBuffer<float> buffer{
         spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
-    ManualOutput output;
+    wiola::testing::FakeOutput output;
     Player player{std::move(source), buffer.producer(), output};
 
     ASSERT_TRUE(player.start());
@@ -741,7 +566,7 @@ TEST(Player, FollowsTheOutputRatherThanTheDecoder)
     const StreamSpec spec{source->spec()};
     wiola::lockfree::SPSCRingBuffer<float> buffer{
         spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
-    ManualOutput output;
+    wiola::testing::FakeOutput output;
     Player player{std::move(source), buffer.producer(), output};
 
     ASSERT_TRUE(player.start());
@@ -795,7 +620,7 @@ TEST(Player, TouchesTheOutputFromTheDecodingThreadAlone)
     const StreamSpec spec{source->spec()};
     wiola::lockfree::SPSCRingBuffer<float> buffer{
         spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
-    ThreadWatchingOutput output;
+    wiola::testing::FakeOutput output;
     Player player{std::move(source), buffer.producer(), output};
 
     ASSERT_TRUE(player.start());
@@ -831,7 +656,7 @@ TEST(Player, ReportsAFaultWhenTheOutputWillNotStartAgain)
     const StreamSpec spec{source->spec()};
     wiola::lockfree::SPSCRingBuffer<float> buffer{
         spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
-    FaultyOutput output;
+    wiola::testing::FakeOutput output;
     Player player{std::move(source), buffer.producer(), output};
 
     ASSERT_TRUE(player.start());
@@ -862,7 +687,7 @@ TEST(Player, ReportsAFaultWhenTheDeviceStopsOnItsOwn)
     const StreamSpec spec{source->spec()};
     wiola::lockfree::SPSCRingBuffer<float> buffer{
         spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
-    FaultyOutput output;
+    wiola::testing::FakeOutput output;
     Player player{std::move(source), buffer.producer(), output};
 
     ASSERT_TRUE(player.start());
