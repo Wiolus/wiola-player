@@ -21,10 +21,12 @@
 #include "wav_fixture.hpp"
 
 #include <audio/output.hpp>
+
 #include <audio/source.hpp>
 #include <audio/stream_spec.hpp>
 #include <codec/open.hpp>
 #include <engine/session.hpp>
+#include <fakes/output.hpp>
 #include <utils/units.hpp>
 
 #include <gtest/gtest.h>
@@ -45,71 +47,6 @@ using State = wiola::engine::Playback::State;
 using wiola::engine::Session;
 namespace units = wiola::units;
 
-/// An output that opens anywhere, and drains what it is given on a thread of its own.
-class TestOutput final : public wiola::audio::Output {
-public:
-    TestOutput(wiola::audio::Source& source, bool consuming) noexcept
-        : source_{source}
-        , consuming_{consuming}
-    {
-    }
-
-    ~TestOutput() override { stop(); }
-
-    bool start() noexcept override
-    {
-        if (running_.exchange(true))
-            return true;
-
-        thread_ = std::thread{[this] { pull(); }};
-
-        return true;
-    }
-
-    void stop() noexcept override
-    {
-        running_.store(false);
-
-        if (thread_.joinable())
-            thread_.join();
-    }
-
-    [[nodiscard]] bool running() const noexcept override { return running_.load(); }
-
-    [[nodiscard]] Frames frames_played() const noexcept override { return Frames{frames_.load()}; }
-
-private:
-    void pull()
-    {
-        const wiola::audio::StreamSpec spec{source_.spec()};
-        std::array<float, 512> block{};
-
-        while (running_.load()) {
-            // An output that plays nothing is how a test keeps a track from running out while it
-            // asks about something else.
-            if (!consuming_) {
-                std::this_thread::sleep_for(1ms);
-                continue;
-            }
-
-            const std::size_t num_rendered{source_.render(block)};
-
-            if (num_rendered == 0) {
-                std::this_thread::sleep_for(1ms);
-                continue;
-            }
-
-            frames_.fetch_add(spec.frames_per(num_rendered).count());
-        }
-    }
-
-    wiola::audio::Source& source_;
-    bool consuming_;
-    std::atomic<bool> running_{false};
-    std::atomic<std::size_t> frames_{0};
-    std::thread thread_;
-};
-
 /// Loads and waits for it, the way a window that draws does: asking, then taking the answer up
 /// on a later turn.
 OpenResult load_and_wait(Session& session, const std::filesystem::path& path)
@@ -129,7 +66,8 @@ struct Fixture {
     Fixture()
         : session{[this](wiola::audio::Source& source) {
             ++num_outputs;
-            return std::make_unique<TestOutput>(source, consuming);
+            return consuming ? std::make_unique<wiola::testing::FakeOutput>(source)
+                             : std::make_unique<wiola::testing::FakeOutput>();
         }}
     {
     }
