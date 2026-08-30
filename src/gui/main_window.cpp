@@ -142,7 +142,6 @@ MainWindow::~MainWindow() = default;
 
 void MainWindow::load(const std::filesystem::path& path)
 {
-    opening_ = path;
     said_ = session_.load(path);
 
     show_status(QString{"opening "} + QString::fromStdString(path.filename().string()) + "...");
@@ -165,7 +164,8 @@ void MainWindow::take_up_load()
     const bool opened{result == codec::OpenResult::opened};
 
     show_status(opened ? QString{} : as_status(result));
-    setWindowTitle(opened ? QString::fromStdString(opening_.filename().string()) : windowTitle());
+    setWindowTitle(opened ? QString::fromStdString(session_.track().filename().string())
+                          : windowTitle());
 
     if (opened)
         position_bar_->set_fraction(0.0);

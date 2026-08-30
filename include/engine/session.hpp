@@ -79,6 +79,10 @@ public:
 
     [[nodiscard]] bool loaded() const noexcept;
 
+    /// The file that is loaded, or nothing when none is. A load that fails leaves it as it was,
+    /// along with the track it names.
+    [[nodiscard]] const std::filesystem::path& track() const noexcept;
+
     /// Starts, pauses or resumes, whichever playback is due. False when the output could not
     /// be opened, and when there is nothing loaded.
     bool toggle();
@@ -107,6 +111,11 @@ private:
     audio::Equalizer& equalizer_{chain_.add<audio::Equalizer>(audio::StreamSpec{})};
     audio::Volume& volume_{chain_.add<audio::Volume>()};
     std::unique_ptr<Loader> loader_;
+
+    /// What is being read, and what was read: the second becomes the first once a file has
+    /// opened and taken the place of whatever was playing.
+    std::filesystem::path opening_;
+    std::filesystem::path track_;
     codec::OpenResult last_result_{codec::OpenResult::opened};
     OutputFactory make_output_;
     std::unique_ptr<Pipeline> pipeline_;

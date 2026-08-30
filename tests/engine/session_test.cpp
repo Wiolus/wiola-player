@@ -131,6 +131,39 @@ TEST(Session, RefusesAFileItCannotRead)
 /// a window that says something else is loaded.
 /// A file that will not open is no reason to silence the one that is playing: the listener still
 /// has the track they had, and is told what went wrong with the other.
+TEST(Session, NamesNoTrackBeforeOneIsLoaded)
+{
+    const Fixture fixture;
+
+    EXPECT_TRUE(fixture.session.track().empty());
+}
+
+TEST(Session, NamesTheTrackItLoaded)
+{
+    Fixture fixture;
+
+    const std::filesystem::path path{wiola::testing::write_wav("wiola_session.wav")};
+
+    ASSERT_EQ(load_and_wait(fixture.session, path), OpenResult::opened);
+
+    EXPECT_EQ(fixture.session.track(), path);
+}
+
+/// The name follows what is playing, not what was asked for: a file that would not open leaves
+/// both alone.
+TEST(Session, KeepsTheNameOfTheTrackAFailedLoadDidNotReplace)
+{
+    Fixture fixture;
+
+    const std::filesystem::path path{wiola::testing::write_wav("wiola_session.wav")};
+
+    ASSERT_EQ(load_and_wait(fixture.session, path), OpenResult::opened);
+    ASSERT_EQ(load_and_wait(fixture.session, std::filesystem::path{"no-such-track.wav"}),
+        OpenResult::unreadable);
+
+    EXPECT_EQ(fixture.session.track(), path);
+}
+
 TEST(Session, KeepsWhatWasLoadedWhenTheNextFileFails)
 {
     Fixture fixture;
