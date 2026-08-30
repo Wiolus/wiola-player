@@ -102,6 +102,20 @@ private:
 };
 
 /// A session that plays nowhere real, and counts the outputs it was asked to build.
+/// Loads and waits for it, the way a window that draws does: asking, then taking the answer up
+/// on a later turn.
+OpenResult load_and_wait(Session& session, const std::filesystem::path& path)
+{
+    session.load(path);
+
+    while (session.loading())
+        std::this_thread::yield();
+
+    session.poll();
+
+    return session.last_result();
+}
+
 struct Fixture {
     Fixture()
         : session{[this](wiola::audio::Source& source) {
@@ -144,7 +158,7 @@ TEST(Session, LoadsATrack)
 {
     Fixture fixture;
 
-    ASSERT_EQ(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")),
+    ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
         OpenResult::opened);
 
     EXPECT_TRUE(fixture.session.loaded());
@@ -157,7 +171,7 @@ TEST(Session, RefusesAFileItCannotRead)
 {
     Fixture fixture;
 
-    EXPECT_EQ(fixture.session.load(std::filesystem::path{"no-such-track.wav"}),
+    EXPECT_EQ(load_and_wait(fixture.session, std::filesystem::path{"no-such-track.wav"}),
         OpenResult::unreadable);
     EXPECT_FALSE(fixture.session.loaded());
     EXPECT_EQ(fixture.num_outputs, 0U);
@@ -165,17 +179,46 @@ TEST(Session, RefusesAFileItCannotRead)
 
 /// What was playing goes when a file that cannot be read is opened, rather than playing on under
 /// a window that says something else is loaded.
-TEST(Session, DropsWhatWasLoadedWhenTheNextFileFails)
+/// A file that will not open is no reason to silence the one that is playing: the listener still
+/// has the track they had, and is told what went wrong with the other.
+TEST(Session, KeepsWhatWasLoadedWhenTheNextFileFails)
 {
     Fixture fixture;
 
-    ASSERT_EQ(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")),
+    ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
         OpenResult::opened);
-    EXPECT_EQ(fixture.session.load(std::filesystem::path{"no-such-track.wav"}),
+    ASSERT_TRUE(fixture.session.toggle());
+    ASSERT_EQ(fixture.session.state(), State::playing);
+
+    EXPECT_EQ(load_and_wait(fixture.session, std::filesystem::path{"no-such-track.wav"}),
         OpenResult::unreadable);
 
-    EXPECT_FALSE(fixture.session.loaded());
-    EXPECT_EQ(fixture.session.state(), State::idle);
+    EXPECT_TRUE(fixture.session.loaded());
+    EXPECT_EQ(fixture.session.state(), State::playing);
+}
+
+/// Asking says nothing about the answer: what was playing is still playing until a file has been
+/// read all the way through.
+TEST(Session, KeepsPlayingWhileTheNextFileIsRead)
+{
+    Fixture fixture;
+
+    ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
+        OpenResult::opened);
+    ASSERT_TRUE(fixture.session.toggle());
+
+    EXPECT_EQ(fixture.session.load(wiola::testing::write_wav("wiola_other.wav")),
+        OpenResult::loading);
+    EXPECT_EQ(fixture.session.state(), State::playing);
+    EXPECT_TRUE(fixture.session.loaded());
+
+    while (fixture.session.loading())
+        std::this_thread::yield();
+
+    fixture.session.poll();
+
+    EXPECT_EQ(fixture.session.last_result(), OpenResult::opened);
+    EXPECT_EQ(fixture.session.state(), State::idle) << "the new track is loaded, not playing";
 }
 
 /// Everything a track is played through is cut for its format, so opening another one builds it
@@ -185,8 +228,8 @@ TEST(Session, BuildsAnOutputForEveryTrack)
     Fixture fixture;
     const std::filesystem::path path{wiola::testing::write_wav("wiola_session.wav")};
 
-    ASSERT_EQ(fixture.session.load(path), OpenResult::opened);
-    ASSERT_EQ(fixture.session.load(path), OpenResult::opened);
+    ASSERT_EQ(load_and_wait(fixture.session, path), OpenResult::opened);
+    ASSERT_EQ(load_and_wait(fixture.session, path), OpenResult::opened);
 
     EXPECT_EQ(fixture.num_outputs, 2U);
 }
@@ -195,7 +238,7 @@ TEST(Session, PlaysAndPauses)
 {
     Fixture fixture;
 
-    ASSERT_EQ(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")),
+    ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
         OpenResult::opened);
 
     ASSERT_TRUE(fixture.session.toggle());
@@ -213,7 +256,7 @@ TEST(Session, StopsAtTheBeginning)
 {
     Fixture fixture;
 
-    ASSERT_EQ(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")),
+    ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
         OpenResult::opened);
     ASSERT_TRUE(fixture.session.toggle());
 
@@ -228,7 +271,7 @@ TEST(Session, SeeksWhereItIsAsked)
 {
     Fixture fixture;
 
-    ASSERT_EQ(fixture.session.load(wiola::testing::write_wav("wiola_session.wav")),
+    ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
         OpenResult::opened);
 
     fixture.session.seek(units::Time{1.0});
@@ -245,7 +288,7 @@ TEST(Session, KeepsItsSettingsAcrossTracks)
     fixture.session.volume().set_gain(0.25F);
     fixture.session.equalizer().set_band_gain(3, 6.0F);
 
-    ASSERT_EQ(fixture.session.load(path), OpenResult::opened);
+    ASSERT_EQ(load_and_wait(fixture.session, path), OpenResult::opened);
 
     EXPECT_FLOAT_EQ(fixture.session.volume().gain(), 0.25F);
     EXPECT_FLOAT_EQ(fixture.session.equalizer().band_gain(3), 6.0F);

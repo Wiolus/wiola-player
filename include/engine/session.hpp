@@ -27,6 +27,7 @@
 #include <audio/volume.hpp>
 #include <codec/open.hpp>
 #include <core/macros.hpp>
+#include <engine/loader.hpp>
 #include <engine/player.hpp>
 #include <utils/units.hpp>
 
@@ -59,9 +60,21 @@ public:
 
     ~Session();
 
-    /// Loads `path`, replacing whatever was playing. Anything but `opened` leaves nothing loaded
-    /// and says why.
+    /// Begins loading `path`. Reading a file is not quick enough to wait for, so this returns
+    /// `loading` and whatever is playing keeps playing; `poll` is what finishes the job. A file
+    /// that will not open leaves the track that was playing alone, and says why through
+    /// `last_result`.
     codec::OpenResult load(const std::filesystem::path& path);
+
+    /// Takes up a finished load, replacing whatever was playing. For the thread that called
+    /// `load`, as often as it likes: a caller that draws should call it as it draws.
+    void poll();
+
+    /// Whether a file is still being read.
+    [[nodiscard]] bool loading() const noexcept;
+
+    /// How the last load went, which is `loading` until one has finished.
+    [[nodiscard]] codec::OpenResult last_result() const noexcept;
 
     [[nodiscard]] bool loaded() const noexcept;
 
@@ -88,6 +101,8 @@ private:
     struct Pipeline;
 
     audio::Chain chain_{audio::StreamSpec{}};
+    Loader loader_;
+    codec::OpenResult last_result_{codec::OpenResult::opened};
     OutputFactory make_output_;
     std::unique_ptr<Pipeline> pipeline_;
 };

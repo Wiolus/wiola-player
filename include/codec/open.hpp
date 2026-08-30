@@ -31,6 +31,9 @@ namespace wiola::codec {
 enum class OpenResult {
     opened,
 
+    /// Still being read. Whatever was playing keeps playing until it is.
+    loading,
+
     /// Nothing could be read from it: it is missing, unreadable or empty.
     unreadable,
 

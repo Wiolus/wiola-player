@@ -30,6 +30,9 @@
 #include <codec/open.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 
+#include <memory>
+#include <optional>
+
 #include <utility>
 
 namespace wiola::engine {
@@ -68,14 +71,28 @@ Session::~Session() = default;
 
 codec::OpenResult Session::load(const std::filesystem::path& path)
 {
-    codec::Opened opened{codec::open_file(path)};
+    loader_.start(path);
+    last_result_ = codec::OpenResult::loading;
 
-    if (!opened) {
-        pipeline_.reset();
-        return opened.result;
+    return last_result_;
+}
+
+void Session::poll()
+{
+    std::optional<codec::Opened> opened{loader_.take()};
+
+    if (!opened.has_value())
+        return;
+
+    if (!*opened) {
+        // Nothing is torn down: a file that would not open is no reason to silence the one that
+        // did.
+        last_result_ = opened->result;
+
+        return;
     }
 
-    std::unique_ptr<codec::Decoder> source{std::move(opened.decoder)};
+    std::unique_ptr<codec::Decoder> source{std::move(opened->decoder)};
     const audio::StreamSpec spec{source->spec()};
 
     // The old pipeline goes first: its device reads the chain that configuring one rebuilds.
@@ -83,7 +100,17 @@ codec::OpenResult Session::load(const std::filesystem::path& path)
     chain_.configure(spec);
     pipeline_ = std::make_unique<Pipeline>(std::move(source), chain_, make_output_);
 
-    return codec::OpenResult::opened;
+    last_result_ = codec::OpenResult::opened;
+}
+
+bool Session::loading() const noexcept
+{
+    return loader_.busy();
+}
+
+codec::OpenResult Session::last_result() const noexcept
+{
+    return last_result_;
 }
 
 bool Session::loaded() const noexcept
