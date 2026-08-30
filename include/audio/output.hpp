@@ -21,9 +21,8 @@
 #pragma once
 
 #include <audio/stream_spec.hpp>
+#include <core/borrowed.hpp>
 #include <core/macros.hpp>
-
-#include <utility>
 
 #include <cstddef>
 
@@ -46,30 +45,15 @@ public:
     class Control {
     public:
         NO_COPY_SEMANTIC(Control);
-
-        Control(Control&& other) noexcept
-            : output_{std::exchange(other.output_, nullptr)}
-        {
-        }
-
-        Control& operator=(Control&& other) noexcept
-        {
-            output_ = std::exchange(other.output_, nullptr);
-
-            return *this;
-        }
+        DEFAULT_MOVE_SEMANTIC(Control);
 
         ~Control() = default;
 
         /// Begins playing what the output pulls. False when there is none to be had.
-        [[nodiscard]] bool start() noexcept { return output_ != nullptr && output_->start(); }
+        [[nodiscard]] bool start() noexcept;
 
         /// Halts playing. Starting again is the caller's to ask for.
-        void stop() noexcept
-        {
-            if (output_ != nullptr)
-                output_->stop();
-        }
+        void stop() noexcept;
 
     private:
         friend class Output;
@@ -77,11 +61,11 @@ public:
         Control() noexcept = default;
 
         explicit Control(Output& output) noexcept
-            : output_{&output}
+            : output_{output}
         {
         }
 
-        Output* output_{nullptr};
+        core::Borrowed<Output> output_;
     };
 
     NO_COPY_SEMANTIC(Output);
@@ -92,15 +76,7 @@ public:
     /// The end that drives it. There is one: whoever takes it first has the device, and every
     /// one taken after that is inert, so a second driver is a device that will not start rather
     /// than two threads starting one.
-    [[nodiscard]] Control control() noexcept
-    {
-        if (control_taken_)
-            return Control{};
-
-        control_taken_ = true;
-
-        return Control{*this};
-    }
+    [[nodiscard]] Control control() noexcept;
 
     [[nodiscard]] virtual bool running() const noexcept = 0;
 
@@ -117,5 +93,26 @@ private:
 
     bool control_taken_{false};
 };
+
+inline bool Output::Control::start() noexcept
+{
+    return output_ && output_->start();
+}
+
+inline void Output::Control::stop() noexcept
+{
+    if (output_)
+        output_->stop();
+}
+
+inline Output::Control Output::control() noexcept
+{
+    if (control_taken_)
+        return Control{};
+
+    control_taken_ = true;
+
+    return Control{*this};
+}
 
 } // namespace wiola::audio

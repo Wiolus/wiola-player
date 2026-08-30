@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <core/borrowed.hpp>
 #include <core/cache_line.hpp>
 #include <core/macros.hpp>
 
@@ -108,12 +109,14 @@ public:
     private:
         friend class SPSCRingBuffer;
 
+        Producer() noexcept = default;
+
         explicit Producer(SPSCRingBuffer& ring) noexcept
-            : ring_{&ring}
+            : ring_{ring}
         {
         }
 
-        SPSCRingBuffer* ring_;
+        core::Borrowed<SPSCRingBuffer> ring_;
     };
 
     /// The end that empties the buffer, for the one thread that does. Handed out for the same
@@ -136,18 +139,20 @@ public:
     private:
         friend class SPSCRingBuffer;
 
+        Consumer() noexcept = default;
+
         explicit Consumer(SPSCRingBuffer& ring) noexcept
-            : ring_{&ring}
+            : ring_{ring}
         {
         }
 
-        SPSCRingBuffer* ring_;
+        core::Borrowed<SPSCRingBuffer> ring_;
     };
 
-    /// The two ends. One each per buffer, taken where the buffer is wired up.
-    [[nodiscard]] Producer producer() noexcept { return Producer{*this}; }
-
-    [[nodiscard]] Consumer consumer() noexcept { return Consumer{*this}; }
+    /// The two ends. One each per buffer, taken where the buffer is wired up: a second of
+    /// either is inert, so two threads on one end is not a state this can be asked into.
+    [[nodiscard]] Producer producer() noexcept;
+    [[nodiscard]] Consumer consumer() noexcept;
 
     [[nodiscard]] std::size_t capacity() const noexcept;
 
@@ -158,6 +163,9 @@ public:
 private:
     friend class Producer;
     friend class Consumer;
+
+    bool producer_taken_{false};
+    bool consumer_taken_{false};
 
     std::size_t push(std::span<const T> src) noexcept;
     std::size_t pop(std::span<T> dst) noexcept;
@@ -207,61 +215,86 @@ SPSCRingBuffer<T>::SPSCRingBuffer(std::size_t minimum_capacity)
 template<RingElement T>
 std::size_t SPSCRingBuffer<T>::Producer::push(std::span<const T> src) noexcept
 {
-    return ring_->push(src);
+    return ring_ ? ring_->push(src) : 0;
 }
 
 template<RingElement T>
 bool SPSCRingBuffer<T>::Producer::try_push(const T& value) noexcept
 {
-    return ring_->try_push(value);
+    return ring_ && ring_->try_push(value);
 }
 
 template<RingElement T>
 auto SPSCRingBuffer<T>::Producer::acquire_write() noexcept -> WriteRegion
 {
-    return ring_->acquire_write();
+    return ring_ ? ring_->acquire_write() : WriteRegion{};
 }
 
 template<RingElement T>
 void SPSCRingBuffer<T>::Producer::commit_write(std::size_t num_elements) noexcept
 {
-    ring_->commit_write(num_elements);
+    if (ring_)
+        ring_->commit_write(num_elements);
 }
 
 template<RingElement T>
 void SPSCRingBuffer<T>::Producer::mark_discard() noexcept
 {
-    ring_->mark_discard();
+    if (ring_)
+        ring_->mark_discard();
 }
 
 template<RingElement T>
 std::size_t SPSCRingBuffer<T>::Producer::space_approx() const noexcept
 {
-    return ring_->capacity() - ring_->size_approx();
+    return ring_ ? ring_->capacity() - ring_->size_approx() : 0;
 }
 
 template<RingElement T>
 std::size_t SPSCRingBuffer<T>::Consumer::pop(std::span<T> dst) noexcept
 {
-    return ring_->pop(dst);
+    return ring_ ? ring_->pop(dst) : 0;
 }
 
 template<RingElement T>
 std::optional<T> SPSCRingBuffer<T>::Consumer::try_pop() noexcept
 {
-    return ring_->try_pop();
+    return ring_ ? ring_->try_pop() : std::nullopt;
 }
 
 template<RingElement T>
 auto SPSCRingBuffer<T>::Consumer::acquire_read() noexcept -> ReadRegion
 {
-    return ring_->acquire_read();
+    return ring_ ? ring_->acquire_read() : ReadRegion{};
 }
 
 template<RingElement T>
 void SPSCRingBuffer<T>::Consumer::commit_read(std::size_t num_elements) noexcept
 {
-    ring_->commit_read(num_elements);
+    if (ring_)
+        ring_->commit_read(num_elements);
+}
+
+template<RingElement T>
+auto SPSCRingBuffer<T>::producer() noexcept -> Producer
+{
+    if (producer_taken_)
+        return Producer{};
+
+    producer_taken_ = true;
+
+    return Producer{*this};
+}
+
+template<RingElement T>
+auto SPSCRingBuffer<T>::consumer() noexcept -> Consumer
+{
+    if (consumer_taken_)
+        return Consumer{};
+
+    consumer_taken_ = true;
+
+    return Consumer{*this};
 }
 
 template<RingElement T>

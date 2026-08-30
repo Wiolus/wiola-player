@@ -30,6 +30,7 @@
 #include <span>
 #include <stop_token>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -608,4 +609,67 @@ TEST(SPSCRingBuffer, NeverCarriesWhatWasMarkedStale)
 
     // Otherwise the run said nothing: every mark landed on an empty buffer and discarded nothing.
     EXPECT_GT(num_skipped, 0) << "no mark ever discarded anything";
+}
+
+/// One end each, for the one thread that uses it: a second is inert, so two threads filling one
+/// buffer is not a state this can be asked into.
+TEST(SPSCRingBuffer, HandsOutOneProducerOnly)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+    auto first{buffer.producer()};
+    auto second{buffer.producer()};
+
+    EXPECT_EQ(second.push(std::array{1, 2}), 0u);
+    EXPECT_TRUE(buffer.empty_approx()) << "a second producer reached the buffer";
+
+    EXPECT_EQ(first.push(std::array{1, 2}), 2u);
+}
+
+TEST(SPSCRingBuffer, HandsOutOneConsumerOnly)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+    auto producer{buffer.producer()};
+    auto first{buffer.consumer()};
+    auto second{buffer.consumer()};
+
+    ASSERT_EQ(producer.push(std::array{1, 2}), 2u);
+
+    std::array<int, 2> read{};
+
+    EXPECT_EQ(second.pop(read), 0u);
+    EXPECT_EQ(buffer.size_approx(), 2u) << "a second consumer reached the buffer";
+
+    EXPECT_EQ(first.pop(read), 2u);
+}
+
+/// Moving is how an end passes to another thread, so what is left behind must not still reach it.
+TEST(SPSCRingBuffer, LeavesNothingBehindWhenTheProducerIsMoved)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+    auto producer{buffer.producer()};
+    auto moved{std::move(producer)};
+
+    // NOLINTNEXTLINE(bugprone-use-after-move) - the point of the test
+    EXPECT_EQ(producer.push(std::array{1, 2}), 0u);
+    EXPECT_TRUE(buffer.empty_approx()) << "the producer that was moved from reached the buffer";
+
+    EXPECT_EQ(moved.push(std::array{1, 2}), 2u);
+}
+
+TEST(SPSCRingBuffer, LeavesNothingBehindWhenTheConsumerIsMoved)
+{
+    wiola::lockfree::SPSCRingBuffer<int> buffer{8};
+    auto producer{buffer.producer()};
+    auto consumer{buffer.consumer()};
+    auto moved{std::move(consumer)};
+
+    ASSERT_EQ(producer.push(std::array{1, 2}), 2u);
+
+    std::array<int, 2> read{};
+
+    // NOLINTNEXTLINE(bugprone-use-after-move) - the point of the test
+    EXPECT_EQ(consumer.pop(read), 0u);
+    EXPECT_EQ(buffer.size_approx(), 2u) << "the consumer that was moved from reached the buffer";
+
+    EXPECT_EQ(moved.pop(read), 2u);
 }
