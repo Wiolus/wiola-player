@@ -37,6 +37,7 @@ Player::Player(std::unique_ptr<codec::Decoder> source,
     : source_{std::move(source)}
     , buffer_{std::move(buffer)}
     , output_{output}
+    , control_{output.control()}
 {
 }
 
@@ -77,7 +78,7 @@ bool Player::start()
 
     prime();
 
-    if (!output_.start())
+    if (!control_.start())
         return false;
 
     output_started_ = true;
@@ -182,7 +183,7 @@ void Player::stop_output() noexcept
     if (!output_started_)
         return;
 
-    output_.stop();
+    control_.stop();
     output_started_ = false;
 }
 
@@ -198,7 +199,7 @@ void Player::follow_playback()
         return;
     }
 
-    if (output_.start()) {
+    if (control_.start()) {
         output_started_ = true;
         return;
     }

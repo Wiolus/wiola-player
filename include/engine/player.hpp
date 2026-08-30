@@ -131,6 +131,10 @@ private:
     lockfree::SPSCRingBuffer<float>::Producer buffer_;
     audio::Output& output_;
 
+    /// The end that starts and stops the device. Taken here because the player is what drives
+    /// it; what may drive it when is the decoding thread's business, below.
+    audio::Output::Control control_;
+
     /// What the output was last asked for. The decoding thread's while it runs, and seeded by
     /// `start` before there is one.
     bool output_started_{false};

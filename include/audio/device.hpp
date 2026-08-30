@@ -61,14 +61,6 @@ public:
     NO_MOVE_SEMANTIC(Device);
     ~Device();
 
-    /// Starts the callback, opening the output the first time. False when no device is
-    /// available. Starting an already running device does nothing.
-    [[nodiscard]] bool start() noexcept override;
-
-    /// Halts the callback, keeping the output open so that starting again is immediate. The
-    /// output itself is only given back when the device is destroyed.
-    void stop() noexcept override;
-
     /// What the output is doing, asked of the audio stack each time.
     [[nodiscard]] DeviceState state() const noexcept;
 
@@ -85,6 +77,10 @@ public:
     [[nodiscard]] StreamSpec spec() const noexcept;
 
 private:
+    /// Driving it is the control's; these are what it drives.
+    [[nodiscard]] bool start() noexcept override;
+    void stop() noexcept override;
+
     struct Backend;
 
     void render(std::span<float> output) noexcept;
