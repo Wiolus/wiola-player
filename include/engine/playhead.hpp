@@ -74,6 +74,12 @@ public:
 
         ~Applier() = default;
 
+        /// Whether a seek has been asked for and not yet carried out.
+        [[nodiscard]] bool seek_outstanding() const noexcept
+        {
+            return head_ != nullptr && head_->seek_outstanding();
+        }
+
         /// What a seek would have to carry out now.
         [[nodiscard]] Claim claim() const noexcept
         {
