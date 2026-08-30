@@ -21,8 +21,10 @@
 #pragma once
 
 #include <audio/output.hpp>
+#include <audio/stream_spec.hpp>
 #include <codec/decoder.hpp>
 #include <core/macros.hpp>
+#include <engine/decode_loop.hpp>
 #include <engine/playback.hpp>
 #include <engine/playhead.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
@@ -104,44 +106,19 @@ public:
     [[nodiscard]] units::Time time_played() const noexcept;
 
 private:
-    /// Fills the buffer before the device is started, so the first callbacks find frames waiting.
-    void prime();
-
-    /// The decoding thread: keeps the buffer fed until the source is spent.
-    void run();
-
-    /// Whether the device has played everything handed to it, or has died trying. False while
-    /// anything is still to be heard, which a pause counts as.
-    [[nodiscard]] bool played_out() const noexcept;
-
-    /// Performs a requested seek, discarding what was decoded for the old position.
-    void apply_seek();
-
-    /// Starts or stops the output so that it does what playback says. The decoding thread
-    /// is the only one that does so while it runs, which is what leaves the output and the
-    /// buffer with a single thread handling them.
-    void follow_playback();
-
-    /// Silences the output if it was started. The decoding thread's, as above.
-    void stop_output() noexcept;
-
-    std::unique_ptr<codec::Decoder> source_;
     Playback playback_;
     Playhead head_;
 
-    /// The end that carries seeks out and counts what was handed over. Taken here for the same
-    /// reason as the output's control: the player is what does that work.
-    Playhead::Applier applier_;
-    lockfree::SPSCRingBuffer<float>::Producer buffer_;
+    /// Read from, never driven: starting and stopping it is the decoding loop's.
     audio::Output& output_;
 
-    /// The end that starts and stops the device. Taken here because the player is what drives
-    /// it; what may drive it when is the decoding thread's business, below.
-    audio::Output::Control control_;
+    /// The source's own, taken once. What a track is does not change while it is loaded, and
+    /// asking the source would mean reaching into what the loop below owns.
+    audio::StreamSpec spec_;
+    audio::Frames num_frames_;
 
-    /// What the output was last asked for. The decoding thread's while it runs, and seeded by
-    /// `start` before there is one.
-    bool output_started_{false};
+    /// The audio path, whole. Nothing above this line can reach into it.
+    DecodeLoop loop_;
 
     std::jthread thread_;
 };
