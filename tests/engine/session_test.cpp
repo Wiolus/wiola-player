@@ -48,8 +48,9 @@ namespace units = wiola::units;
 /// An output that opens anywhere, and drains what it is given on a thread of its own.
 class TestOutput final : public wiola::audio::Output {
 public:
-    explicit TestOutput(wiola::audio::Source& source) noexcept
+    TestOutput(wiola::audio::Source& source, bool consuming) noexcept
         : source_{source}
+        , consuming_{consuming}
     {
     }
 
@@ -84,6 +85,13 @@ private:
         std::array<float, 512> block{};
 
         while (running_.load()) {
+            // An output that plays nothing is how a test keeps a track from running out while it
+            // asks about something else.
+            if (!consuming_) {
+                std::this_thread::sleep_for(1ms);
+                continue;
+            }
+
             const std::size_t num_rendered{source_.render(block)};
 
             if (num_rendered == 0) {
@@ -96,12 +104,12 @@ private:
     }
 
     wiola::audio::Source& source_;
+    bool consuming_;
     std::atomic<bool> running_{false};
     std::atomic<std::size_t> frames_{0};
     std::thread thread_;
 };
 
-/// A session that plays nowhere real, and counts the outputs it was asked to build.
 /// Loads and waits for it, the way a window that draws does: asking, then taking the answer up
 /// on a later turn.
 OpenResult load_and_wait(Session& session, const std::filesystem::path& path)
@@ -116,14 +124,18 @@ OpenResult load_and_wait(Session& session, const std::filesystem::path& path)
     return session.last_result();
 }
 
+/// A session that plays nowhere real, and counts the outputs it was asked to build.
 struct Fixture {
     Fixture()
         : session{[this](wiola::audio::Source& source) {
             ++num_outputs;
-            return std::make_unique<TestOutput>(source);
+            return std::make_unique<TestOutput>(source, consuming);
         }}
     {
     }
+
+    /// Set before loading, when a test needs a track that cannot run out from under it.
+    bool consuming{true};
 
     std::size_t num_outputs{0};
     Session session;
@@ -185,6 +197,10 @@ TEST(Session, KeepsWhatWasLoadedWhenTheNextFileFails)
 {
     Fixture fixture;
 
+    // The track must still be playing when this test asks, so the output plays none of it: one
+    // that drains at the speed it is fed runs a track out in the time these lines take.
+    fixture.consuming = false;
+
     ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
         OpenResult::opened);
     ASSERT_TRUE(fixture.session.toggle());
@@ -202,6 +218,10 @@ TEST(Session, KeepsWhatWasLoadedWhenTheNextFileFails)
 TEST(Session, KeepsPlayingWhileTheNextFileIsRead)
 {
     Fixture fixture;
+
+    // The track must still be playing when this test asks, so the output plays none of it: one
+    // that drains at the speed it is fed runs a track out in the time these lines take.
+    fixture.consuming = false;
 
     ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
         OpenResult::opened);
