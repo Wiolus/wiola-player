@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "wav_fixture.hpp"
+#include <fixtures/wav.hpp>
 
 #include <audio/output.hpp>
 
