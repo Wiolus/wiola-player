@@ -22,11 +22,11 @@
 
 #include <audio/stream_spec.hpp>
 
+#include <core/borrowed.hpp>
 #include <core/macros.hpp>
 
 #include <atomic>
 #include <cstddef>
-#include <utility>
 
 namespace wiola::engine {
 
@@ -59,32 +59,15 @@ public:
     class Applier {
     public:
         NO_COPY_SEMANTIC(Applier);
-
-        Applier(Applier&& other) noexcept
-            : head_{std::exchange(other.head_, nullptr)}
-        {
-        }
-
-        Applier& operator=(Applier&& other) noexcept
-        {
-            head_ = std::exchange(other.head_, nullptr);
-
-            return *this;
-        }
+        DEFAULT_MOVE_SEMANTIC(Applier);
 
         ~Applier() = default;
 
         /// Whether a seek has been asked for and not yet carried out.
-        [[nodiscard]] bool seek_outstanding() const noexcept
-        {
-            return head_ != nullptr && head_->seek_outstanding();
-        }
+        [[nodiscard]] bool seek_outstanding() const noexcept;
 
         /// What a seek would have to carry out now.
-        [[nodiscard]] Claim claim() const noexcept
-        {
-            return head_ != nullptr ? head_->claim() : Claim{};
-        }
+        [[nodiscard]] Claim claim() const noexcept;
 
         /// Playback starts again at `frame_index`, carrying out what `claim` held.
         /// `frames_played` is what the output had counted by then, which is what the position is
@@ -92,24 +75,13 @@ public:
         /// thread that plays it is the only one that may write it. What was counted before no
         /// longer applies.
         void begin_at(audio::Frames frame_index, audio::Frames frames_played,
-            const Claim& claim) noexcept
-        {
-            if (head_ != nullptr)
-                head_->begin_at(frame_index, frames_played, claim);
-        }
+            const Claim& claim) noexcept;
 
         /// Counts `num_samples` more as handed to the output.
-        void push(std::size_t num_samples) noexcept
-        {
-            if (head_ != nullptr)
-                head_->push(num_samples);
-        }
+        void push(std::size_t num_samples) noexcept;
 
         /// Samples handed to the output since playback last began somewhere.
-        [[nodiscard]] std::size_t num_pushed() const noexcept
-        {
-            return head_ != nullptr ? head_->num_pushed() : 0;
-        }
+        [[nodiscard]] std::size_t num_pushed() const noexcept;
 
     private:
         friend class Playhead;
@@ -117,24 +89,16 @@ public:
         Applier() noexcept = default;
 
         explicit Applier(Playhead& head) noexcept
-            : head_{&head}
+            : head_{head}
         {
         }
 
-        Playhead* head_{nullptr};
+        core::Borrowed<Playhead> head_;
     };
 
     /// The end that carries seeks out. There is one: whoever takes it first does that work, and
     /// every one taken after is inert.
-    [[nodiscard]] Applier applier() noexcept
-    {
-        if (applier_taken_)
-            return Applier{};
-
-        applier_taken_ = true;
-
-        return Applier{*this};
-    }
+    [[nodiscard]] Applier applier() noexcept;
 
     /// Asks for playback to move to `frame_index`. Any thread: this only says where to go.
     void request_seek(audio::Frames frame_index) noexcept;
@@ -165,5 +129,43 @@ private:
     std::atomic<std::size_t> frames_at_begin_{0};
     std::size_t num_pushed_{0};
 };
+
+inline bool Playhead::Applier::seek_outstanding() const noexcept
+{
+    return head_ && head_->seek_outstanding();
+}
+
+inline Playhead::Claim Playhead::Applier::claim() const noexcept
+{
+    return head_ ? head_->claim() : Claim{};
+}
+
+inline void Playhead::Applier::begin_at(audio::Frames frame_index, audio::Frames frames_played,
+    const Claim& claim) noexcept
+{
+    if (head_)
+        head_->begin_at(frame_index, frames_played, claim);
+}
+
+inline void Playhead::Applier::push(std::size_t num_samples) noexcept
+{
+    if (head_)
+        head_->push(num_samples);
+}
+
+inline std::size_t Playhead::Applier::num_pushed() const noexcept
+{
+    return head_ ? head_->num_pushed() : 0;
+}
+
+inline Playhead::Applier Playhead::applier() noexcept
+{
+    if (applier_taken_)
+        return Applier{};
+
+    applier_taken_ = true;
+
+    return Applier{*this};
+}
 
 } // namespace wiola::engine
