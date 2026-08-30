@@ -20,7 +20,7 @@
 
 #include <audio/source.hpp>
 #include <audio/stream_spec.hpp>
-#include <audio/tone.hpp>
+#include <fakes/tone.hpp>
 #include <utils/units.hpp>
 
 #include <gtest/gtest.h>
@@ -34,7 +34,7 @@
 
 namespace {
 
-using wiola::audio::SineSource;
+using wiola::testing::SineSource;
 using namespace wiola::units;
 using wiola::audio::StreamSpec;
 

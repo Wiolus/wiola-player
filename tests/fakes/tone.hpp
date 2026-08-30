@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Sine tone generator used to exercise the playback path.
+ * @brief A sine tone for tests, to play through something real.
  * @author Roman Glaz
  * @copyright © 2026, <vokerlee@gmail.com>
  *
@@ -18,27 +18,48 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/tone.hpp>
+#pragma once
+
+#include <audio/source.hpp>
+#include <audio/stream_spec.hpp>
+#include <utils/units.hpp>
 
 #include <cmath>
+#include <cstddef>
 #include <numbers>
+#include <span>
 
-namespace wiola::audio {
+namespace wiola::testing {
 
-namespace {
+/// Generates a constant-frequency sine, the same signal on every channel.
+class SineSource final : public audio::Source {
+public:
+    SineSource(audio::StreamSpec spec, units::Frequency frequency, float amplitude = 0.2F) noexcept;
 
-constexpr double two_pi{2.0 * std::numbers::pi};
+    /// Writes whole frames only: channels alternate within a frame, never one array per channel
+    /// as a planar layout would. A partial trailing frame is left untouched. Returns how many
+    /// samples were written, which for a tone is every whole frame the span holds.
+    std::size_t render(std::span<float> interleaved) noexcept override;
+    [[nodiscard]] audio::StreamSpec spec() const noexcept override;
 
-} // namespace
+private:
+    const audio::StreamSpec spec_{};
+    double phase_{0.0};
+    double phase_step_;
+    float amplitude_;
+};
 
-SineSource::SineSource(StreamSpec spec, units::Frequency frequency, float amplitude) noexcept
+inline constexpr double two_pi{2.0 * std::numbers::pi};
+
+inline SineSource::SineSource(audio::StreamSpec spec, units::Frequency frequency,
+    float amplitude) noexcept
     : spec_{spec}
     , phase_step_{two_pi * (frequency / spec.sample_rate)}
     , amplitude_{amplitude}
 {
 }
 
-std::size_t SineSource::render(std::span<float> interleaved) noexcept
+inline std::size_t SineSource::render(std::span<float> interleaved) noexcept
 {
     const std::size_t num_channels{spec_.num_channels};
     std::size_t num_written{0};
@@ -60,9 +81,9 @@ std::size_t SineSource::render(std::span<float> interleaved) noexcept
     return num_written;
 }
 
-StreamSpec SineSource::spec() const noexcept
+inline audio::StreamSpec SineSource::spec() const noexcept
 {
     return spec_;
 }
 
-} // namespace wiola::audio
+} // namespace wiola::testing
