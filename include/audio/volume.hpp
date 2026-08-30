@@ -20,6 +20,9 @@
 
 #pragma once
 
+#include <audio/stage.hpp>
+#include <audio/stream_spec.hpp>
+
 #include <atomic>
 #include <span>
 
@@ -27,14 +30,20 @@ namespace wiola::audio {
 
 /// One gain over everything: 0 is silence, 1 the samples as they arrived, and up to
 /// `max_volume_boost` more than arrived.
-class Volume {
+class Volume final : public Stage {
 public:
     /// Clamped to that range, and anything that is not a number is taken as silence.
     void set_gain(float gain) noexcept;
 
     [[nodiscard]] float gain() const noexcept;
 
-    void process(std::span<float> samples) noexcept;
+    /// Nothing here follows the stream, so this is what it costs to say so.
+    void configure(StreamSpec spec) noexcept override;
+
+    void process(std::span<float> samples) noexcept override;
+
+    /// Whether the last gain asked for more than arrived.
+    [[nodiscard]] bool lifted() const noexcept override;
 
 private:
     std::atomic<float> gain_{1.0F};

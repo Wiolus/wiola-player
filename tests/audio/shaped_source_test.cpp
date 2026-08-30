@@ -19,9 +19,11 @@
  */
 
 #include <audio/chain.hpp>
+
 #include <audio/shaped_source.hpp>
 #include <audio/source.hpp>
 #include <audio/stream_spec.hpp>
+#include <fixtures/shaping.hpp>
 #include <utils/units.hpp>
 
 #include <gtest/gtest.h>
@@ -72,8 +74,8 @@ private:
 TEST(ShapedSource, ReportsTheSpecOfWhatItWraps)
 {
     FixedSource inner{mono, 1.0F, 8};
-    Chain chain{mono};
-    ShapedSource source{inner, chain};
+    wiola::testing::Shaping shaping{mono};
+    ShapedSource source{inner, shaping.chain};
 
     EXPECT_EQ(source.spec(), mono);
 }
@@ -81,8 +83,8 @@ TEST(ShapedSource, ReportsTheSpecOfWhatItWraps)
 TEST(ShapedSource, LeavesSamplesAloneWhileNothingIsAsked)
 {
     FixedSource inner{stereo, 0.5F, 8};
-    Chain chain{stereo};
-    ShapedSource source{inner, chain};
+    wiola::testing::Shaping shaping{stereo};
+    ShapedSource source{inner, shaping.chain};
 
     std::array<float, 8> block{};
 
@@ -95,10 +97,10 @@ TEST(ShapedSource, LeavesSamplesAloneWhileNothingIsAsked)
 TEST(ShapedSource, AppliesTheChain)
 {
     FixedSource inner{stereo, 0.8F, 8};
-    Chain chain{stereo};
-    ShapedSource source{inner, chain};
+    wiola::testing::Shaping shaping{stereo};
+    ShapedSource source{inner, shaping.chain};
 
-    chain.volume().set_gain(0.5F);
+    shaping.volume.set_gain(0.5F);
 
     std::array<float, 8> block{};
     source.render(block);
@@ -110,8 +112,8 @@ TEST(ShapedSource, AppliesTheChain)
 TEST(ShapedSource, GivesWhatItWasGiven)
 {
     FixedSource inner{stereo, 0.5F, 4};
-    Chain chain{stereo};
-    ShapedSource source{inner, chain};
+    wiola::testing::Shaping shaping{stereo};
+    ShapedSource source{inner, shaping.chain};
 
     std::array<float, 8> block{};
 
@@ -123,10 +125,10 @@ TEST(ShapedSource, GivesWhatItWasGiven)
 TEST(ShapedSource, ShapesOnlyWhatTheInnerSourceGave)
 {
     FixedSource inner{stereo, 0.8F, 4};
-    Chain chain{stereo};
-    ShapedSource source{inner, chain};
+    wiola::testing::Shaping shaping{stereo};
+    ShapedSource source{inner, shaping.chain};
 
-    chain.volume().set_gain(0.5F);
+    shaping.volume.set_gain(0.5F);
 
     std::array<float, 8> block{};
     block.fill(42.0F);
@@ -140,14 +142,14 @@ TEST(ShapedSource, ShapesOnlyWhatTheInnerSourceGave)
 TEST(ShapedSource, TakesTheSettingAsItIsWhenAsked)
 {
     FixedSource inner{stereo, 0.8F, 8};
-    Chain chain{stereo};
-    ShapedSource source{inner, chain};
+    wiola::testing::Shaping shaping{stereo};
+    ShapedSource source{inner, shaping.chain};
 
     std::array<float, 8> first{};
     std::array<float, 8> second{};
 
     source.render(first);
-    chain.volume().set_gain(0.0F);
+    shaping.volume.set_gain(0.0F);
     source.render(second);
 
     EXPECT_FLOAT_EQ(first[0], 0.8F);
@@ -157,8 +159,8 @@ TEST(ShapedSource, TakesTheSettingAsItIsWhenAsked)
 TEST(ShapedSource, AnswersAsASource)
 {
     FixedSource inner{stereo, 0.5F, 8};
-    Chain chain{stereo};
-    ShapedSource shaped{inner, chain};
+    wiola::testing::Shaping shaping{stereo};
+    ShapedSource shaped{inner, shaping.chain};
     Source& source{shaped};
 
     std::array<float, 8> block{};

@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <audio/stage.hpp>
 #include <audio/stream_spec.hpp>
 #include <audio/tuning.hpp>
 #include <core/macros.hpp>
@@ -61,7 +62,7 @@ struct BandLayout {
  * Settings are written from another thread and take effect on the next call, never partway
  * through one.
  */
-class Equalizer {
+class Equalizer final : public Stage {
 public:
     explicit Equalizer(StreamSpec spec, BandLayout layout = {});
 
@@ -72,7 +73,7 @@ public:
 
     /// Takes the format the samples are in. Settings are kept. Not to be called while the output
     /// is running: it rebuilds what `process` reads.
-    void configure(StreamSpec spec);
+    void configure(StreamSpec spec) override;
 
     /// Where the bands sit, whether or not the format can carry them all. A gain is kept for
     /// every one it names.
@@ -101,11 +102,14 @@ public:
     [[nodiscard]] bool enabled() const noexcept;
 
     /// Applies the current settings to whole frames of `samples`, in place.
-    void process(std::span<float> samples) noexcept;
+    void process(std::span<float> samples) noexcept override;
 
     /// Whether the last `process` changed anything, and so could have lifted a sample past what
     /// an output takes.
     [[nodiscard]] bool shaping() const noexcept;
+
+    /// Whether the bands it just applied could have lifted a sample past full scale.
+    [[nodiscard]] bool lifted() const noexcept override;
 
 private:
     struct Bands;

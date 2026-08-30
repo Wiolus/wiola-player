@@ -39,6 +39,13 @@ float Volume::gain() const noexcept
     return gain_.load(std::memory_order_relaxed);
 }
 
+void Volume::configure(StreamSpec /*spec*/) noexcept { }
+
+bool Volume::lifted() const noexcept
+{
+    return gain() > 1.0F;
+}
+
 void Volume::process(std::span<float> samples) noexcept
 {
     const float gain{gain_.load(std::memory_order_relaxed)};
