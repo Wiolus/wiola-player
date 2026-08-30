@@ -20,7 +20,8 @@
 
 #include <engine/player.hpp>
 
-#include "wav_fixture.hpp"
+#include <fixtures/rig.hpp>
+#include <fixtures/wav.hpp>
 
 #include <audio/buffer_source.hpp>
 #include <audio/chain.hpp>
@@ -56,6 +57,7 @@ using namespace wiola::units::literals;
 using wiola::audio::Chain;
 using wiola::audio::StreamSpec;
 using wiola::engine::Player;
+using wiola::testing::Rig;
 using State = wiola::engine::Playback::State;
 namespace units = wiola::units;
 
@@ -74,22 +76,6 @@ bool eventually(Predicate predicate, std::chrono::milliseconds limit = 5s)
 }
 
 } // namespace
-
-/// What a player is given, wired the way a session wires it, with the sound card left out.
-struct Rig {
-    explicit Rig(std::unique_ptr<wiola::codec::Decoder> source)
-        : buffer{source->spec().samples_per(units::Time{std::chrono::milliseconds{250}})}
-        , decoded{source->spec(), buffer.consumer()}
-        , output{decoded}
-        , player{std::move(source), buffer.producer(), output}
-    {
-    }
-
-    wiola::lockfree::SPSCRingBuffer<float> buffer;
-    wiola::audio::BufferSource decoded;
-    wiola::testing::FakeOutput output;
-    Player player;
-};
 
 TEST(Player, PlaysToTheEndOnItsOwn)
 {

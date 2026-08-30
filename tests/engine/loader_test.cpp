@@ -20,7 +20,7 @@
 
 #include <engine/loader.hpp>
 
-#include "wav_fixture.hpp"
+#include <fixtures/wav.hpp>
 
 #include <codec/open.hpp>
 
