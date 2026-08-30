@@ -79,7 +79,6 @@ TEST(SPSCRingBuffer, PushIsShortWhenFull)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
     auto producer{buffer.producer()};
-    auto consumer{buffer.consumer()};
     const std::array src{1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F};
 
     EXPECT_EQ(producer.push(src), 4u);
@@ -89,7 +88,6 @@ TEST(SPSCRingBuffer, PushIsShortWhenFull)
 TEST(SPSCRingBuffer, PopIsEmptyWhenDrained)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
-    auto producer{buffer.producer()};
     auto consumer{buffer.consumer()};
     std::array<float, 2> dst{};
 
@@ -275,7 +273,6 @@ TEST(SPSCRingBuffer, RefusesOneMoreThanFits)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{2};
     auto producer{buffer.producer()};
-    auto consumer{buffer.consumer()};
 
     EXPECT_TRUE(producer.try_push(1.0F));
     EXPECT_TRUE(producer.try_push(2.0F));
@@ -288,7 +285,6 @@ TEST(SPSCRingBuffer, IsShortWhenFullWhateverItHolds)
 {
     wiola::lockfree::SPSCRingBuffer<int> buffer{4};
     auto producer{buffer.producer()};
-    auto consumer{buffer.consumer()};
     const std::array src{1, 2, 3, 4, 5, 6};
 
     EXPECT_EQ(producer.push(src), 4u);
@@ -299,7 +295,6 @@ TEST(SPSCRingBuffer, OffersEverySlotToAWriter)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
     auto producer{buffer.producer()};
-    auto consumer{buffer.consumer()};
     const auto region = producer.acquire_write();
 
     EXPECT_EQ(region.size(), 4u);
@@ -447,7 +442,6 @@ TEST(SPSCRingBuffer, LeavesTheBufferAloneWhenNothingIsCommitted)
 TEST(SPSCRingBuffer, OffersNothingToAReaderOfAnEmptyBuffer)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{4};
-    auto producer{buffer.producer()};
     auto consumer{buffer.consumer()};
     const auto region = consumer.acquire_read();
 
@@ -460,7 +454,6 @@ TEST(SPSCRingBuffer, OffersNothingToAWriterOfAFullBuffer)
 {
     wiola::lockfree::SPSCRingBuffer<float> buffer{2};
     auto producer{buffer.producer()};
-    auto consumer{buffer.consumer()};
     const std::array src{1.0F, 2.0F};
 
     ASSERT_EQ(producer.push(src), 2u);
