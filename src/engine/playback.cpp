@@ -22,6 +22,17 @@
 
 namespace wiola::engine {
 
+namespace {
+
+/// The states nothing but `begin` moves out of.
+bool settled(Playback::State state) noexcept
+{
+    return state == Playback::State::ended || state == Playback::State::stopped ||
+        state == Playback::State::faulted;
+}
+
+} // namespace
+
 Playback::State Playback::state() const noexcept
 {
     return state_.load(std::memory_order_acquire);
@@ -34,9 +45,7 @@ bool Playback::playing() const noexcept
 
 bool Playback::finished() const noexcept
 {
-    const State current{state()};
-
-    return current == State::ended || current == State::stopped;
+    return settled(state());
 }
 
 bool Playback::begin() noexcept
@@ -73,7 +82,7 @@ void Playback::finish(State reason) noexcept
 {
     State current{state_.load(std::memory_order_relaxed)};
 
-    while (current != State::ended && current != State::stopped &&
+    while (!settled(current) &&
         !state_.compare_exchange_weak(current, reason, std::memory_order_acq_rel,
             std::memory_order_relaxed)) { }
 }

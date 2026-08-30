@@ -136,7 +136,7 @@ void DecodeLoop::follow_playback()
 
     // An output that will not start is a fault rather than a pause, and leaves nothing to play
     // through.
-    playback_.finish(Playback::State::stopped);
+    playback_.finish(Playback::State::faulted);
 }
 
 void DecodeLoop::run()
@@ -150,10 +150,20 @@ void DecodeLoop::run()
     std::size_t num_handed{0};
     bool exhausted{false};
 
-    while (playback_.state() != Playback::State::stopped) {
+    // Any final state ends this: a listener's stop, a device that went away, or the end of the
+    // track below.
+    while (!playback_.finished()) {
         // Every turn, because a listener's thread only moves the state: this is the one place a
         // pause reaches the device, and the only one before the waits below.
         follow_playback();
+
+        // A device that was started and is no longer running was not stopped by anything here.
+        // Waiting on one that has gone away is how playback looks like it is still going with
+        // nothing coming out of it.
+        if (output_started_ && !output_.running()) {
+            playback_.finish(Playback::State::faulted);
+            break;
+        }
 
         if (applier_.seek_outstanding()) {
             apply_seek();
@@ -209,11 +219,6 @@ bool DecodeLoop::played_out() const noexcept
     // left to play.
     if (!output_started_)
         return false;
-
-    // An output that has died says so by no longer running, which is the difference between
-    // waiting and hanging.
-    if (!output_.running())
-        return true;
 
     return output_.frames_played() >= source_->spec().frames_per(applier_.num_pushed());
 }

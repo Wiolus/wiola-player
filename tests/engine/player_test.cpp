@@ -215,6 +215,41 @@ private:
     std::atomic<std::size_t> frames_{0};
 };
 
+/// An output that can be made to behave like a device that has been lost: refusing to start
+/// again, or stopping without being asked. It plays nothing, so a track never runs out from
+/// under a test that is asking about faults.
+class FaultyOutput final : public wiola::audio::Output {
+public:
+    /// Every start from here on fails, the way a device that has gone away does.
+    void refuse_starts() noexcept { refusing_.store(true); }
+
+    /// Stops answering, without anyone having asked it to.
+    void die() noexcept { running_.store(false); }
+
+    [[nodiscard]] bool running() const noexcept override { return running_.load(); }
+
+    [[nodiscard]] wiola::audio::Frames frames_played() const noexcept override
+    {
+        return wiola::audio::Frames{};
+    }
+
+private:
+    bool start() noexcept override
+    {
+        if (refusing_.load())
+            return false;
+
+        running_.store(true);
+
+        return true;
+    }
+
+    void stop() noexcept override { running_.store(false); }
+
+    std::atomic<bool> refusing_{false};
+    std::atomic<bool> running_{false};
+};
+
 /// What a player is given, wired the way a session wires it, with the sound card left out.
 struct Rig {
     explicit Rig(std::unique_ptr<wiola::codec::Decoder> source)
@@ -784,4 +819,61 @@ TEST(Player, TouchesTheOutputFromTheDecodingThreadAlone)
 
     ASSERT_EQ(touching.size(), 1u) << "more than one thread started or stopped the output";
     EXPECT_NE(touching.front(), std::this_thread::get_id());
+}
+
+/// A device that will not start again is a fault, not a listener pressing stop: the two look the
+/// same to a window that can only read the state, and only one of them is worth saying.
+TEST(Player, ReportsAFaultWhenTheOutputWillNotStartAgain)
+{
+    auto source = wiola::testing::open_fixture();
+    ASSERT_NE(source, nullptr);
+
+    const StreamSpec spec{source->spec()};
+    wiola::lockfree::SPSCRingBuffer<float> buffer{
+        spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
+    FaultyOutput output;
+    Player player{std::move(source), buffer.producer(), output};
+
+    ASSERT_TRUE(player.start());
+    ASSERT_TRUE(player.pause());
+
+    // The device is silenced by the decoding thread, so the refusal is set once it has been:
+    // otherwise a pause and a resume can both land before that thread looks.
+    ASSERT_TRUE(eventually([&output] { return !output.running(); }));
+
+    output.refuse_starts();
+
+    ASSERT_TRUE(player.resume());
+
+    EXPECT_TRUE(eventually([&player] { return player.finished(); }));
+    EXPECT_EQ(player.state(), State::faulted);
+
+    player.stop();
+    player.wait();
+}
+
+/// A device that stops answering while a track plays is noticed, rather than left to look like
+/// playback that carries on with nothing coming out.
+TEST(Player, ReportsAFaultWhenTheDeviceStopsOnItsOwn)
+{
+    auto source = wiola::testing::open_fixture();
+    ASSERT_NE(source, nullptr);
+
+    const StreamSpec spec{source->spec()};
+    wiola::lockfree::SPSCRingBuffer<float> buffer{
+        spec.samples_per(units::Time{std::chrono::milliseconds{250}})};
+    FaultyOutput output;
+    Player player{std::move(source), buffer.producer(), output};
+
+    ASSERT_TRUE(player.start());
+    ASSERT_TRUE(player.playing());
+
+    output.die();
+
+    EXPECT_TRUE(eventually([&player] { return player.finished(); }))
+        << "playback carried on with a device that had stopped";
+    EXPECT_EQ(player.state(), State::faulted);
+
+    player.stop();
+    player.wait();
 }
