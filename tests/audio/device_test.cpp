@@ -95,20 +95,21 @@ TEST(Device, KeepsTheOutputBetweenStops)
 {
     SineSource tone{stereo, 440_Hz};
     Device device{tone};
+    auto control{device.control()};
 
-    if (!device.start())
+    if (!control.start())
         GTEST_SKIP() << "no playback device on this machine";
 
     EXPECT_EQ(device.state(), DeviceState::running);
 
-    device.stop();
+    control.stop();
     EXPECT_EQ(device.state(), DeviceState::stopped);
 
-    ASSERT_TRUE(device.start());
+    ASSERT_TRUE(control.start());
     EXPECT_EQ(device.state(), DeviceState::running);
 
-    device.stop();
-    device.stop();
+    control.stop();
+    control.stop();
     EXPECT_EQ(device.state(), DeviceState::stopped);
 }
 
@@ -116,13 +117,14 @@ TEST(Device, AsksItsSourceForFramesWhileRunning)
 {
     CountingSource source{stereo, 1.0};
     Device device{source};
+    auto control{device.control()};
 
-    if (!device.start())
+    if (!control.start())
         GTEST_SKIP() << "no playback device on this machine";
 
     EXPECT_TRUE(device.running());
     std::this_thread::sleep_for(std::chrono::milliseconds{120});
-    device.stop();
+    control.stop();
 
     EXPECT_FALSE(device.running());
     EXPECT_GT(source.num_asked(), 0u);
@@ -134,12 +136,13 @@ TEST(Device, CountsACallbackTheSourceCouldNotFill)
 {
     CountingSource source{stereo, 0.5};
     Device device{source};
+    auto control{device.control()};
 
-    if (!device.start())
+    if (!control.start())
         GTEST_SKIP() << "no playback device on this machine";
 
     std::this_thread::sleep_for(std::chrono::milliseconds{120});
-    device.stop();
+    control.stop();
 
     EXPECT_GT(device.num_underruns(), 0u);
     EXPECT_LT(device.frames_played(), stereo.frames_per(source.num_asked()));

@@ -1,3 +1,4 @@
+wiola_add_test(audio_output_test SOURCES output_test.cpp)
 wiola_add_test(
     audio_shaped_source_test
     SOURCES shaped_source_test.cpp
