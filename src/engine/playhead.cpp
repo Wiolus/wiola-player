@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <engine/playhead.hpp>
+#include "playhead.hpp"
 
 namespace wiola::engine {
 

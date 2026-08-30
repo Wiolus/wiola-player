@@ -20,11 +20,11 @@
 
 #pragma once
 
+#include "playhead.hpp"
 #include <audio/output.hpp>
 #include <codec/decoder.hpp>
 #include <core/macros.hpp>
 #include <engine/playback.hpp>
-#include <engine/playhead.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 
 #include <memory>

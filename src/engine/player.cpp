@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <engine/player.hpp>
+#include "player.hpp"
 
 #include <audio/stream_spec.hpp>
 #include <utils/units.hpp>

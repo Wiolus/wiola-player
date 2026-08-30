@@ -27,8 +27,7 @@
 #include <audio/volume.hpp>
 #include <codec/open.hpp>
 #include <core/macros.hpp>
-#include <engine/loader.hpp>
-#include <engine/player.hpp>
+#include <engine/playback.hpp>
 #include <utils/units.hpp>
 
 #include <filesystem>
@@ -36,6 +35,8 @@
 #include <memory>
 
 namespace wiola::engine {
+
+class Loader;
 
 /**
  * Builds what a track is played through, and keeps it built while it plays.
@@ -101,7 +102,7 @@ private:
     struct Pipeline;
 
     audio::Chain chain_{audio::StreamSpec{}};
-    Loader loader_;
+    std::unique_ptr<Loader> loader_;
     codec::OpenResult last_result_{codec::OpenResult::opened};
     OutputFactory make_output_;
     std::unique_ptr<Pipeline> pipeline_;
