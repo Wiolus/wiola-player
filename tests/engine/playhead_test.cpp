@@ -27,6 +27,7 @@
 #include <chrono>
 #include <cstddef>
 #include <thread>
+#include <utility>
 
 namespace {
 
@@ -48,11 +49,12 @@ constexpr Frames target_of(std::size_t index) noexcept
 
 TEST(Playhead, StartsAtTheBeginning)
 {
-    const Playhead head;
+    Playhead head;
+    auto applier{head.applier()};
 
     EXPECT_EQ(head.position(Frames{0}), Frames{0});
     EXPECT_FALSE(head.seek_outstanding());
-    EXPECT_EQ(head.num_pushed(), 0U);
+    EXPECT_EQ(applier.num_pushed(), 0U);
 }
 
 TEST(Playhead, FollowsWhatTheOutputPlayed)
@@ -65,8 +67,9 @@ TEST(Playhead, FollowsWhatTheOutputPlayed)
 TEST(Playhead, CountsFromWherePlaybackBegan)
 {
     Playhead head;
+    auto applier{head.applier()};
 
-    head.begin_at(Frames{500}, Frames{}, head.claim());
+    applier.begin_at(Frames{500}, Frames{}, applier.claim());
 
     EXPECT_EQ(head.position(Frames{100}), Frames{600});
 }
@@ -74,12 +77,13 @@ TEST(Playhead, CountsFromWherePlaybackBegan)
 TEST(Playhead, HoldsASeekUntilItIsCarriedOut)
 {
     Playhead head;
+    auto applier{head.applier()};
 
     head.request_seek(Frames{4000});
 
     EXPECT_TRUE(head.seek_outstanding());
 
-    head.begin_at(Frames{4000}, Frames{}, head.claim());
+    applier.begin_at(Frames{4000}, Frames{}, applier.claim());
 
     EXPECT_FALSE(head.seek_outstanding());
 }
@@ -89,13 +93,14 @@ TEST(Playhead, HoldsASeekUntilItIsCarriedOut)
 TEST(Playhead, ReportsASeekBeforeItIsCarriedOut)
 {
     Playhead head;
+    auto applier{head.applier()};
 
-    head.begin_at(Frames{1000}, Frames{}, head.claim());
+    applier.begin_at(Frames{1000}, Frames{}, applier.claim());
     head.request_seek(Frames{8000});
 
     EXPECT_EQ(head.position(Frames{500}), Frames{8000});
 
-    head.begin_at(Frames{8000}, Frames{}, head.claim());
+    applier.begin_at(Frames{8000}, Frames{}, applier.claim());
 
     EXPECT_EQ(head.position(Frames{0}), Frames{8000});
 }
@@ -105,13 +110,14 @@ TEST(Playhead, ReportsASeekBeforeItIsCarriedOut)
 TEST(Playhead, KeepsASeekAskedForWhileOneIsCarriedOut)
 {
     Playhead head;
+    auto applier{head.applier()};
 
     head.request_seek(Frames{2000});
 
-    const Playhead::Claim claim{head.claim()};
+    const Playhead::Claim claim{applier.claim()};
 
     head.request_seek(Frames{9000});
-    head.begin_at(claim.target, Frames{}, claim);
+    applier.begin_at(claim.target, Frames{}, claim);
 
     EXPECT_TRUE(head.seek_outstanding());
     EXPECT_EQ(head.position(Frames{0}), Frames{9000});
@@ -120,50 +126,54 @@ TEST(Playhead, KeepsASeekAskedForWhileOneIsCarriedOut)
 TEST(Playhead, TakesTheLatestPlaceAsked)
 {
     Playhead head;
+    auto applier{head.applier()};
 
     head.request_seek(Frames{100});
     head.request_seek(Frames{700});
 
-    EXPECT_EQ(head.claim().target, Frames{700});
+    EXPECT_EQ(applier.claim().target, Frames{700});
     EXPECT_EQ(head.position(Frames{0}), Frames{700});
 }
 
 TEST(Playhead, CountsWhatWasPushed)
 {
     Playhead head;
+    auto applier{head.applier()};
 
-    head.push(64);
-    head.push(32);
+    applier.push(64);
+    applier.push(32);
 
-    EXPECT_EQ(head.num_pushed(), 96U);
+    EXPECT_EQ(applier.num_pushed(), 96U);
 }
 
 /// What was pushed for the old place has not been heard and never will be.
 TEST(Playhead, ForgetsWhatWasPushedWhenPlaybackBeginsElsewhere)
 {
     Playhead head;
+    auto applier{head.applier()};
 
-    head.push(4096);
-    head.begin_at(Frames{2000}, Frames{}, head.claim());
+    applier.push(4096);
+    applier.begin_at(Frames{2000}, Frames{}, applier.claim());
 
-    EXPECT_EQ(head.num_pushed(), 0U);
+    EXPECT_EQ(applier.num_pushed(), 0U);
 }
 
 TEST(Playhead, ClaimsNothingWhenNoSeekWasAsked)
 {
     Playhead head;
+    auto applier{head.applier()};
 
-    head.push(10);
+    applier.push(10);
 
-    const Playhead::Claim claim{head.claim()};
+    const Playhead::Claim claim{applier.claim()};
 
     EXPECT_FALSE(claim.outstanding);
 
     // Beginning where it already is leaves the position alone and the count reset.
-    head.begin_at(Frames{0}, Frames{}, claim);
+    applier.begin_at(Frames{0}, Frames{}, claim);
 
     EXPECT_EQ(head.position(Frames{50}), Frames{50});
-    EXPECT_EQ(head.num_pushed(), 0U);
+    EXPECT_EQ(applier.num_pushed(), 0U);
 }
 
 /// The output counts on and is never wound back, so beginning somewhere means measuring from
@@ -171,8 +181,9 @@ TEST(Playhead, ClaimsNothingWhenNoSeekWasAsked)
 TEST(Playhead, CountsFromWhatTheOutputHadAlreadyPlayed)
 {
     Playhead head;
+    auto applier{head.applier()};
 
-    head.begin_at(Frames{1000}, Frames{700}, head.claim());
+    applier.begin_at(Frames{1000}, Frames{700}, applier.claim());
 
     EXPECT_EQ(head.position(Frames{700}), Frames{1000});
     EXPECT_EQ(head.position(Frames{750}), Frames{1050});
@@ -181,14 +192,64 @@ TEST(Playhead, CountsFromWhatTheOutputHadAlreadyPlayed)
 TEST(Playhead, MeasuresFromTheLatestPlaceItBeganAt)
 {
     Playhead head;
+    auto applier{head.applier()};
 
-    head.begin_at(Frames{1000}, Frames{700}, head.claim());
+    applier.begin_at(Frames{1000}, Frames{700}, applier.claim());
     ASSERT_EQ(head.position(Frames{800}), Frames{1100});
 
-    head.begin_at(Frames{5000}, Frames{800}, head.claim());
+    applier.begin_at(Frames{5000}, Frames{800}, applier.claim());
 
     EXPECT_EQ(head.position(Frames{800}), Frames{5000});
     EXPECT_EQ(head.position(Frames{900}), Frames{5100});
+}
+
+/// Two threads counting pushes race on a number that is not atomic, so there is one applier: a
+/// second is inert, which shows as a seek nobody carries out.
+TEST(Playhead, HandsOutOneApplierOnly)
+{
+    Playhead head;
+    auto first{head.applier()};
+    auto second{head.applier()};
+
+    head.request_seek(Frames{500});
+
+    EXPECT_FALSE(second.claim().outstanding) << "a second applier reached the playhead";
+
+    second.push(64);
+    EXPECT_EQ(second.num_pushed(), 0U);
+    EXPECT_EQ(first.num_pushed(), 0U);
+
+    // The one taken first does the work.
+    const Playhead::Claim claim{first.claim()};
+    ASSERT_TRUE(claim.outstanding);
+
+    first.begin_at(claim.target, Frames{}, claim);
+    EXPECT_FALSE(head.seek_outstanding());
+}
+
+/// Moving is how the work passes to another thread, so what is left behind must not still do it.
+TEST(Playhead, LeavesNothingBehindWhenTheApplierIsMoved)
+{
+    Playhead head;
+    auto applier{head.applier()};
+    auto moved{std::move(applier)};
+
+    head.request_seek(Frames{500});
+
+    // NOLINTNEXTLINE(bugprone-use-after-move) - the point of the test
+    EXPECT_FALSE(applier.claim().outstanding) << "the applier that was moved from still claims";
+
+    applier.push(64); // NOLINT(bugprone-use-after-move) - as above
+    EXPECT_EQ(applier.num_pushed(), 0U);
+
+    const Playhead::Claim claim{moved.claim()};
+    ASSERT_TRUE(claim.outstanding);
+
+    moved.begin_at(claim.target, Frames{}, claim);
+    moved.push(64);
+
+    EXPECT_EQ(moved.num_pushed(), 64U);
+    EXPECT_EQ(head.position(Frames{}), Frames{500});
 }
 
 /// What the playhead is for: one thread asking for places while another carries them out, with
@@ -196,6 +257,7 @@ TEST(Playhead, MeasuresFromTheLatestPlaceItBeganAt)
 TEST(Playhead, CarriesEverySeekBetweenTwoThreads)
 {
     Playhead head;
+    auto applier{head.applier()};
     std::atomic<bool> asking{true};
 
     const std::jthread seeker{[&head, &asking](const std::stop_token& stop) {
@@ -212,10 +274,10 @@ TEST(Playhead, CarriesEverySeekBetweenTwoThreads)
         ASSERT_LT(std::chrono::steady_clock::now(), deadline)
             << "at " << head.position(Frames{}).count();
 
-        const Playhead::Claim claim{head.claim()};
+        const Playhead::Claim claim{applier.claim()};
 
         if (claim.outstanding)
-            head.begin_at(claim.target, Frames{}, claim);
+            applier.begin_at(claim.target, Frames{}, claim);
         else
             std::this_thread::yield();
     }
@@ -229,6 +291,7 @@ TEST(Playhead, CarriesEverySeekBetweenTwoThreads)
 TEST(Playhead, NeverReportsAPlaceItHasLeft)
 {
     Playhead head;
+    auto applier{head.applier()};
     std::atomic<bool> asking{true};
 
     const std::jthread reader{[&head, &asking] {
@@ -245,10 +308,10 @@ TEST(Playhead, NeverReportsAPlaceItHasLeft)
     for (std::size_t i = 1; i <= num_threaded_seeks; ++i) {
         head.request_seek(target_of(i));
 
-        const Playhead::Claim claim{head.claim()};
+        const Playhead::Claim claim{applier.claim()};
 
         if (claim.outstanding)
-            head.begin_at(claim.target, Frames{}, claim);
+            applier.begin_at(claim.target, Frames{}, claim);
     }
 
     asking.store(false);

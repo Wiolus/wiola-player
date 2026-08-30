@@ -54,7 +54,6 @@ auto counted(std::size_t count)
 TEST(BufferSource, ReportsTheSpecItWasGiven)
 {
     SPSCRingBuffer<float> buffer{64};
-    auto producer{buffer.producer()};
     BufferSource source{stereo, buffer.consumer()};
 
     EXPECT_EQ(source.spec(), stereo);
@@ -63,7 +62,6 @@ TEST(BufferSource, ReportsTheSpecItWasGiven)
 TEST(BufferSource, GivesNothingFromAnEmptyBuffer)
 {
     SPSCRingBuffer<float> buffer{64};
-    auto producer{buffer.producer()};
     BufferSource source{stereo, buffer.consumer()};
 
     std::array<float, 8> block{};

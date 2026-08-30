@@ -128,6 +128,10 @@ private:
     std::unique_ptr<codec::Decoder> source_;
     Playback playback_;
     Playhead head_;
+
+    /// The end that carries seeks out and counts what was handed over. Taken here for the same
+    /// reason as the output's control: the player is what does that work.
+    Playhead::Applier applier_;
     lockfree::SPSCRingBuffer<float>::Producer buffer_;
     audio::Output& output_;
 

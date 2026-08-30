@@ -35,6 +35,7 @@ namespace wiola::engine {
 Player::Player(std::unique_ptr<codec::Decoder> source,
     lockfree::SPSCRingBuffer<float>::Producer buffer, audio::Output& output)
     : source_{std::move(source)}
+    , applier_{head_.applier()}
     , buffer_{std::move(buffer)}
     , output_{output}
     , control_{output.control()}
@@ -62,7 +63,7 @@ bool Player::start()
     // A seek asked for while nothing was decoding has no thread to take it up, so it waits here
     // instead of being thrown away: a listener who moves the slider before pressing play means
     // to begin there.
-    const Playhead::Claim claim{head_.claim()};
+    const Playhead::Claim claim{applier_.claim()};
     const audio::Frames start_frame{
         claim.outstanding ? std::min(claim.target, source_->num_frames()) : audio::Frames{}};
 
@@ -74,7 +75,7 @@ bool Player::start()
 
     // Measured from what the output has counted so far, since a count it keeps itself is one
     // nothing else may wind back.
-    head_.begin_at(start_frame, output_.frames_played(), claim);
+    applier_.begin_at(start_frame, output_.frames_played(), claim);
 
     prime();
 
@@ -154,13 +155,13 @@ void Player::prime()
         if (num_decoded == 0)
             break;
 
-        head_.push(buffer_.push(std::span{block}.first(num_decoded)));
+        applier_.push(buffer_.push(std::span{block}.first(num_decoded)));
     }
 }
 
 void Player::apply_seek()
 {
-    const Playhead::Claim claim{head_.claim()};
+    const Playhead::Claim claim{applier_.claim()};
 
     // What is buffered belongs to the old position. Marking it stale is all the decoding side
     // can do: the space comes free when the output has stepped over it.
@@ -170,7 +171,7 @@ void Player::apply_seek()
     source_->seek(claim.target);
 
     // The output is stopped, so what it has counted stands still while it is read.
-    head_.begin_at(claim.target, output_.frames_played(), claim);
+    applier_.begin_at(claim.target, output_.frames_played(), claim);
 
     prime();
 
@@ -266,7 +267,7 @@ void Player::run()
 
         // The playhead counts what was handed over, not what was decoded: it is what the device
         // will play, and `played_out` above is measured against it.
-        head_.push(num_taken);
+        applier_.push(num_taken);
     }
 
     stop_output();
@@ -287,7 +288,7 @@ bool Player::played_out() const noexcept
 
     const audio::StreamSpec spec{source_->spec()};
 
-    return output_.frames_played() >= spec.frames_per(head_.num_pushed());
+    return output_.frames_played() >= spec.frames_per(applier_.num_pushed());
 }
 
 } // namespace wiola::engine
