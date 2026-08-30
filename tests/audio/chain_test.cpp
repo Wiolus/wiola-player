@@ -19,8 +19,10 @@
  */
 
 #include <audio/chain.hpp>
+
 #include <audio/tuning.hpp>
 #include <fakes/tone.hpp>
+#include <fixtures/shaping.hpp>
 
 #include <gtest/gtest.h>
 
@@ -49,29 +51,29 @@ auto samples()
 
 TEST(Chain, StartsAtFullVolume)
 {
-    const Chain chain{stereo};
+    const wiola::testing::Shaping shaping{stereo};
 
-    EXPECT_FLOAT_EQ(chain.volume().gain(), 1.0F);
+    EXPECT_FLOAT_EQ(shaping.volume.gain(), 1.0F);
 }
 
 /// Full volume is the samples as they arrived, not something multiplied by one.
 TEST(Chain, LeavesSamplesUntouchedAtFullVolume)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
     auto buffer{samples()};
 
-    chain.process(buffer);
+    shaping.chain.process(buffer);
 
     EXPECT_EQ(buffer, samples());
 }
 
 TEST(Chain, ScalesEverySample)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
     auto buffer{samples()};
 
-    chain.volume().set_gain(0.5F);
-    chain.process(buffer);
+    shaping.volume.set_gain(0.5F);
+    shaping.chain.process(buffer);
 
     EXPECT_FLOAT_EQ(buffer[0], 0.5F);
     EXPECT_FLOAT_EQ(buffer[1], -0.25F);
@@ -81,11 +83,11 @@ TEST(Chain, ScalesEverySample)
 
 TEST(Chain, SilencesAtZero)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
     auto buffer{samples()};
 
-    chain.volume().set_gain(0.0F);
-    chain.process(buffer);
+    shaping.volume.set_gain(0.0F);
+    shaping.chain.process(buffer);
 
     for (const float sample : buffer)
         EXPECT_FLOAT_EQ(sample, 0.0F);
@@ -93,36 +95,36 @@ TEST(Chain, SilencesAtZero)
 
 TEST(Chain, HoldsTheSettingAcrossCalls)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
     auto first{samples()};
     auto second{samples()};
 
-    chain.volume().set_gain(0.25F);
-    chain.process(first);
-    chain.process(second);
+    shaping.volume.set_gain(0.25F);
+    shaping.chain.process(first);
+    shaping.chain.process(second);
 
     EXPECT_EQ(first, second);
-    EXPECT_FLOAT_EQ(chain.volume().gain(), 0.25F);
+    EXPECT_FLOAT_EQ(shaping.volume.gain(), 0.25F);
 }
 
 /// A listener may ask for more than arrived, but only so much more.
 TEST(Chain, RefusesMoreThanTheMostItMayLift)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
 
-    chain.volume().set_gain(4.0F);
+    shaping.volume.set_gain(4.0F);
 
-    EXPECT_FLOAT_EQ(chain.volume().gain(), wiola::audio::tuning::max_volume_boost);
+    EXPECT_FLOAT_EQ(shaping.volume.gain(), wiola::audio::tuning::max_volume_boost);
 }
 
 /// Past what an output takes there is nothing to hear, so what is lifted past it is flattened.
 TEST(Chain, FlattensWhatALiftPutPastFullScale)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
     auto buffer{samples()};
 
-    chain.volume().set_gain(1.4F);
-    chain.process(buffer);
+    shaping.volume.set_gain(1.4F);
+    shaping.chain.process(buffer);
 
     EXPECT_FLOAT_EQ(buffer[0], 1.0F);
     EXPECT_FLOAT_EQ(buffer[1], -0.7F);
@@ -131,107 +133,107 @@ TEST(Chain, FlattensWhatALiftPutPastFullScale)
 
 TEST(Chain, TakesAnythingBelowZeroAsSilence)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
 
-    chain.volume().set_gain(-2.0F);
+    shaping.volume.set_gain(-2.0F);
 
-    EXPECT_FLOAT_EQ(chain.volume().gain(), 0.0F);
+    EXPECT_FLOAT_EQ(shaping.volume.gain(), 0.0F);
 
-    chain.volume().set_gain(std::numeric_limits<float>::quiet_NaN());
+    shaping.volume.set_gain(std::numeric_limits<float>::quiet_NaN());
 
-    EXPECT_FLOAT_EQ(chain.volume().gain(), 0.0F);
+    EXPECT_FLOAT_EQ(shaping.volume.gain(), 0.0F);
 }
 
 TEST(Chain, AcceptsNothingToDo)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
 
-    chain.volume().set_gain(0.5F);
-    chain.process(std::span<float>{});
+    shaping.volume.set_gain(0.5F);
+    shaping.chain.process(std::span<float>{});
 }
 
 TEST(Chain, KeepsTheFormatItWasGiven)
 {
-    const Chain chain{stereo};
+    const wiola::testing::Shaping shaping{stereo};
 
-    EXPECT_EQ(chain.spec(), stereo);
+    EXPECT_EQ(shaping.chain.spec(), stereo);
 }
 
 TEST(Chain, LaysOutOneBandPerOctave)
 {
-    const Chain chain{stereo};
+    const wiola::testing::Shaping shaping{stereo};
 
-    ASSERT_EQ(chain.equalizer().num_bands(), 10u);
-    EXPECT_EQ(chain.equalizer().band_center(0), 31.25_Hz);
-    EXPECT_EQ(chain.equalizer().band_center(9), 16_kHz);
+    ASSERT_EQ(shaping.equalizer.num_bands(), 10u);
+    EXPECT_EQ(shaping.equalizer.band_center(0), 31.25_Hz);
+    EXPECT_EQ(shaping.equalizer.band_center(9), 16_kHz);
 
-    for (std::size_t i = 1; i < chain.equalizer().num_bands(); ++i)
-        EXPECT_DOUBLE_EQ(chain.equalizer().band_center(i) / chain.equalizer().band_center(i - 1),
+    for (std::size_t i = 1; i < shaping.equalizer.num_bands(); ++i)
+        EXPECT_DOUBLE_EQ(shaping.equalizer.band_center(i) / shaping.equalizer.band_center(i - 1),
             2.0);
 }
 
 /// A band that close to half the sample rate cannot be given its width, so it is not offered.
 TEST(Chain, DropsBandsTheFormatCannotCarry)
 {
-    const Chain chain{
+    wiola::testing::Shaping shaping{
         StreamSpec{.sample_rate = 22050_Hz, .num_channels = 2}
     };
 
-    EXPECT_EQ(chain.equalizer().num_bands(), 9u);
-    EXPECT_EQ(chain.equalizer().band_center(8), 8_kHz);
+    EXPECT_EQ(shaping.equalizer.num_bands(), 9u);
+    EXPECT_EQ(shaping.equalizer.band_center(8), 8_kHz);
 }
 
 TEST(Chain, LeavesEveryBandWellBelowNyquist)
 {
     for (const Frequency rate : {8_kHz, 22050_Hz, 44100_Hz, 48_kHz, 96_kHz}) {
-        const Chain chain{
+        wiola::testing::Shaping shaping{
             StreamSpec{.sample_rate = rate, .num_channels = 2}
         };
 
-        for (std::size_t i = 0; i < chain.equalizer().num_bands(); ++i)
-            EXPECT_LT(chain.equalizer().band_center(i), rate / 2.0)
+        for (std::size_t i = 0; i < shaping.equalizer.num_bands(); ++i)
+            EXPECT_LT(shaping.equalizer.band_center(i), rate / 2.0)
                 << "at " << rate.to<Hz>() << " Hz";
     }
 }
 
 TEST(Chain, OffersNoBandsForAFormatItCannotUse)
 {
-    const Chain chain{
+    const wiola::testing::Shaping shaping{
         StreamSpec{.sample_rate = Frequency{}, .num_channels = 2}
     };
 
-    EXPECT_EQ(chain.equalizer().num_bands(), 0u);
+    EXPECT_EQ(shaping.equalizer.num_bands(), 0u);
 }
 
 /// The row of octave bands is a default, not the only layout a chain can be built with.
 TEST(Chain, TakesTheLayoutItIsGiven)
 {
     const BandLayout thirds{.first = 20_Hz, .count = 31, .ratio = 1.2599210498948732};
-    const Chain chain{stereo, thirds};
+    const wiola::testing::Shaping shaping{stereo, thirds};
 
-    EXPECT_EQ(chain.equalizer().band_center(0), 20_Hz);
-    EXPECT_NEAR(chain.equalizer().band_center(3).to<Hz>(), 40.0, 1e-9);
+    EXPECT_EQ(shaping.equalizer.band_center(0), 20_Hz);
+    EXPECT_NEAR(shaping.equalizer.band_center(3).to<Hz>(), 40.0, 1e-9);
 
     // Three of these to an octave, so the last of the 31 is ten octaves up, which is more than
     // 48 kHz can carry: the cap answers the same way whatever the layout asks for.
-    EXPECT_NEAR(chain.equalizer().band_center(30).to<Hz>(), 20480.0, 1e-6);
-    EXPECT_EQ(chain.equalizer().num_bands(), 30u);
+    EXPECT_NEAR(shaping.equalizer.band_center(30).to<Hz>(), 20480.0, 1e-6);
+    EXPECT_EQ(shaping.equalizer.num_bands(), 30u);
 }
 
 TEST(Chain, TakesANewFormatWithoutForgettingTheSetting)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
 
-    chain.volume().set_gain(0.5F);
-    chain.configure(StreamSpec{.sample_rate = 22050_Hz, .num_channels = 1});
+    shaping.volume.set_gain(0.5F);
+    shaping.chain.configure(StreamSpec{.sample_rate = 22050_Hz, .num_channels = 1});
 
-    EXPECT_FLOAT_EQ(chain.volume().gain(), 0.5F);
-    EXPECT_EQ(chain.spec().num_channels, 1u);
-    EXPECT_EQ(chain.equalizer().num_bands(), 9u);
+    EXPECT_FLOAT_EQ(shaping.volume.gain(), 0.5F);
+    EXPECT_EQ(shaping.chain.spec().num_channels, 1u);
+    EXPECT_EQ(shaping.equalizer.num_bands(), 9u);
 
-    chain.configure(stereo);
+    shaping.chain.configure(stereo);
 
-    EXPECT_EQ(chain.equalizer().num_bands(), 10u);
+    EXPECT_EQ(shaping.equalizer.num_bands(), 10u);
 }
 
 namespace {
@@ -278,21 +280,21 @@ double response_db(Chain& chain, Frequency tone)
 
 TEST(Chain, StartsWithEveryBandFlat)
 {
-    const Chain chain{stereo};
+    const wiola::testing::Shaping shaping{stereo};
 
-    for (std::size_t i = 0; i < chain.equalizer().num_bands(); ++i)
-        EXPECT_FLOAT_EQ(chain.equalizer().band_gain(i), 0.0F);
+    for (std::size_t i = 0; i < shaping.equalizer.num_bands(); ++i)
+        EXPECT_FLOAT_EQ(shaping.equalizer.band_gain(i), 0.0F);
 }
 
 /// A lifted band comes out where it was: the room it needed was taken from everything else.
 TEST(Chain, LiftsABandAboveTheRest)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
 
-    chain.equalizer().set_band_gain(5, 6.0F);
+    shaping.equalizer.set_band_gain(5, 6.0F);
 
-    const double lifted{response_db(chain, chain.equalizer().band_center(5))};
-    const double rest{response_db(chain, chain.equalizer().band_center(0))};
+    const double lifted{response_db(shaping.chain, shaping.equalizer.band_center(5))};
+    const double rest{response_db(shaping.chain, shaping.equalizer.band_center(0))};
 
     EXPECT_NEAR(lifted, 0.0, 0.2);
     EXPECT_NEAR(lifted - rest, 6.0, 0.3);
@@ -300,23 +302,23 @@ TEST(Chain, LiftsABandAboveTheRest)
 
 TEST(Chain, CutsWhatABandIsSetTo)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
 
-    chain.equalizer().set_band_gain(5, -6.0F);
+    shaping.equalizer.set_band_gain(5, -6.0F);
 
-    EXPECT_NEAR(response_db(chain, chain.equalizer().band_center(5)), -6.0, 0.2);
+    EXPECT_NEAR(response_db(shaping.chain, shaping.equalizer.band_center(5)), -6.0, 0.2);
 }
 
 /// A band reaches its neighbors, but by much less than it lifts its own center.
 TEST(Chain, LeavesTheNextBandMostlyAlone)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
 
-    chain.equalizer().set_band_gain(5, 6.0F);
+    shaping.equalizer.set_band_gain(5, 6.0F);
 
-    const double lifted{response_db(chain, chain.equalizer().band_center(5))};
-    const double neighbor{response_db(chain, chain.equalizer().band_center(6))};
-    const double rest{response_db(chain, chain.equalizer().band_center(0))};
+    const double lifted{response_db(shaping.chain, shaping.equalizer.band_center(5))};
+    const double neighbor{response_db(shaping.chain, shaping.equalizer.band_center(6))};
+    const double rest{response_db(shaping.chain, shaping.equalizer.band_center(0))};
 
     EXPECT_GT(neighbor, rest);
     EXPECT_LT(neighbor, lifted - 3.0);
@@ -324,117 +326,117 @@ TEST(Chain, LeavesTheNextBandMostlyAlone)
 
 TEST(Chain, LeavesSamplesUntouchedWhileFlat)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
     auto buffer{samples()};
 
-    chain.equalizer().set_band_gain(3, 6.0F);
-    chain.equalizer().set_band_gain(3, 0.0F);
-    chain.process(buffer);
+    shaping.equalizer.set_band_gain(3, 6.0F);
+    shaping.equalizer.set_band_gain(3, 0.0F);
+    shaping.chain.process(buffer);
 
     EXPECT_EQ(buffer, samples());
 }
 
 TEST(Chain, RefusesMoreThanABandMayDo)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
 
-    chain.equalizer().set_band_gain(2, 40.0F);
+    shaping.equalizer.set_band_gain(2, 40.0F);
 
-    EXPECT_FLOAT_EQ(chain.equalizer().band_gain(2), 12.0F);
+    EXPECT_FLOAT_EQ(shaping.equalizer.band_gain(2), 12.0F);
 
-    chain.equalizer().set_band_gain(2, -40.0F);
+    shaping.equalizer.set_band_gain(2, -40.0F);
 
-    EXPECT_FLOAT_EQ(chain.equalizer().band_gain(2), -12.0F);
+    EXPECT_FLOAT_EQ(shaping.equalizer.band_gain(2), -12.0F);
 }
 
 /// A gain outlives the format that could not carry its band.
 TEST(Chain, RemembersGainsOfBandsAFormatDrops)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
 
-    chain.equalizer().set_band_gain(9, 6.0F);
-    chain.configure(StreamSpec{.sample_rate = 22050_Hz, .num_channels = 2});
+    shaping.equalizer.set_band_gain(9, 6.0F);
+    shaping.chain.configure(StreamSpec{.sample_rate = 22050_Hz, .num_channels = 2});
 
-    ASSERT_EQ(chain.equalizer().num_bands(), 9u);
-    EXPECT_FLOAT_EQ(chain.equalizer().band_gain(9), 6.0F);
+    ASSERT_EQ(shaping.equalizer.num_bands(), 9u);
+    EXPECT_FLOAT_EQ(shaping.equalizer.band_gain(9), 6.0F);
 
-    chain.configure(stereo);
+    shaping.chain.configure(stereo);
 
-    const double restored{response_db(chain, chain.equalizer().band_center(9))};
-    const double rest{response_db(chain, chain.equalizer().band_center(0))};
+    const double restored{response_db(shaping.chain, shaping.equalizer.band_center(9))};
+    const double rest{response_db(shaping.chain, shaping.equalizer.band_center(0))};
 
     EXPECT_NEAR(restored - rest, 6.0, 0.5);
 }
 
 TEST(Chain, StartsWithTheEqualizerOnAndNoPreamp)
 {
-    const Chain chain{stereo};
+    const wiola::testing::Shaping shaping{stereo};
 
-    EXPECT_TRUE(chain.equalizer().enabled());
-    EXPECT_FLOAT_EQ(chain.equalizer().preamp(), 0.0F);
+    EXPECT_TRUE(shaping.equalizer.enabled());
+    EXPECT_FLOAT_EQ(shaping.equalizer.preamp(), 0.0F);
 }
 
 /// The cut is what a boost needs, so a lifted band comes out where it was and everything else
 /// comes down around it.
 TEST(Chain, TakesTheRoomABoostNeeds)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
 
-    chain.equalizer().set_band_gain(5, 6.0F);
+    shaping.equalizer.set_band_gain(5, 6.0F);
     // The cut is worked out where the samples are shaped.
     std::array<float, 2> block{};
-    chain.process(block);
+    shaping.chain.process(block);
 
-    EXPECT_FLOAT_EQ(chain.equalizer().preamp(), -6.0F);
-    EXPECT_NEAR(response_db(chain, chain.equalizer().band_center(5).hz() * 1_Hz), 0.0, 0.5);
+    EXPECT_FLOAT_EQ(shaping.equalizer.preamp(), -6.0F);
+    EXPECT_NEAR(response_db(shaping.chain, shaping.equalizer.band_center(5).hz() * 1_Hz), 0.0, 0.5);
 }
 
 /// Only a lift needs room: cutting a band asks for none.
 TEST(Chain, TakesNoRoomForACut)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
 
-    chain.equalizer().set_band_gain(5, -6.0F);
+    shaping.equalizer.set_band_gain(5, -6.0F);
     std::array<float, 2> block{};
-    chain.process(block);
+    shaping.chain.process(block);
 
-    EXPECT_FLOAT_EQ(chain.equalizer().preamp(), 0.0F);
+    EXPECT_FLOAT_EQ(shaping.equalizer.preamp(), 0.0F);
 }
 
 /// The room is for the largest lift, not for their sum.
 TEST(Chain, TakesTheRoomTheLargestBoostNeeds)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
 
-    chain.equalizer().set_band_gain(2, 3.0F);
-    chain.equalizer().set_band_gain(5, 9.0F);
+    shaping.equalizer.set_band_gain(2, 3.0F);
+    shaping.equalizer.set_band_gain(5, 9.0F);
     std::array<float, 2> block{};
-    chain.process(block);
+    shaping.chain.process(block);
 
-    EXPECT_FLOAT_EQ(chain.equalizer().preamp(), -9.0F);
+    EXPECT_FLOAT_EQ(shaping.equalizer.preamp(), -9.0F);
 }
 
 TEST(Chain, RunsNeitherBandsNorPreampWhileTurnedOff)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
     auto buffer{samples()};
 
-    chain.equalizer().set_band_gain(5, 6.0F);
-    chain.equalizer().set_enabled(false);
-    chain.process(buffer);
+    shaping.equalizer.set_band_gain(5, 6.0F);
+    shaping.equalizer.set_enabled(false);
+    shaping.chain.process(buffer);
 
     EXPECT_EQ(buffer, samples());
 }
 
 TEST(Chain, KeepsTheVolumeWhileTurnedOff)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
     auto buffer{samples()};
 
-    chain.equalizer().set_band_gain(5, 12.0F);
-    chain.equalizer().set_enabled(false);
-    chain.volume().set_gain(0.5F);
-    chain.process(buffer);
+    shaping.equalizer.set_band_gain(5, 12.0F);
+    shaping.equalizer.set_enabled(false);
+    shaping.volume.set_gain(0.5F);
+    shaping.chain.process(buffer);
 
     EXPECT_FLOAT_EQ(buffer[0], 0.5F);
     EXPECT_FLOAT_EQ(buffer[1], -0.25F);
@@ -443,15 +445,15 @@ TEST(Chain, KeepsTheVolumeWhileTurnedOff)
 /// A boosted band can ask for more than an output takes, and is not allowed to hand it over.
 TEST(Chain, KeepsBoostedSamplesInRange)
 {
-    Chain chain{stereo};
+    wiola::testing::Shaping shaping{stereo};
     wiola::testing::SineSource source{stereo, 1_kHz, 0.95F};
     std::vector<float> block(stereo.samples_per(wiola::audio::Frames{512}));
 
-    chain.equalizer().set_band_gain(5, 12.0F);
+    shaping.equalizer.set_band_gain(5, 12.0F);
 
     for (int i = 0; i < 20; ++i) {
         source.render(block);
-        chain.process(block);
+        shaping.chain.process(block);
 
         for (const float sample : block)
             EXPECT_LE(std::abs(sample), 1.0F);

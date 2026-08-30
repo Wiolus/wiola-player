@@ -94,14 +94,18 @@ public:
     [[nodiscard]] units::Time time_played() const noexcept;
     [[nodiscard]] units::Time total_time() const noexcept;
 
-    [[nodiscard]] audio::Volume& volume() noexcept { return chain_.volume(); }
+    [[nodiscard]] audio::Volume& volume() noexcept { return volume_; }
 
-    [[nodiscard]] audio::Equalizer& equalizer() noexcept { return chain_.equalizer(); }
+    [[nodiscard]] audio::Equalizer& equalizer() noexcept { return equalizer_; }
 
 private:
     struct Pipeline;
 
+    /// What a track is shaped by, and in what order: the bands first, then how loud, so that
+    /// what a listener asks for last is the last thing done to the sound.
     audio::Chain chain_{audio::StreamSpec{}};
+    audio::Equalizer& equalizer_{chain_.add<audio::Equalizer>(audio::StreamSpec{})};
+    audio::Volume& volume_{chain_.add<audio::Volume>()};
     std::unique_ptr<Loader> loader_;
     codec::OpenResult last_result_{codec::OpenResult::opened};
     OutputFactory make_output_;

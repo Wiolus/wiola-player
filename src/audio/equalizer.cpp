@@ -199,6 +199,11 @@ bool Equalizer::shaping() const noexcept
     return bands_->applied;
 }
 
+bool Equalizer::lifted() const noexcept
+{
+    return shaping();
+}
+
 float Equalizer::preamp() const noexcept
 {
     return bands_->preamp_db.load(std::memory_order_relaxed);

@@ -20,12 +20,14 @@
 
 #pragma once
 
-#include <audio/equalizer.hpp>
+#include <audio/stage.hpp>
 #include <audio/stream_spec.hpp>
-#include <audio/volume.hpp>
 #include <core/macros.hpp>
 
+#include <memory>
 #include <span>
+#include <utility>
+#include <vector>
 
 namespace wiola::audio {
 
@@ -40,32 +42,39 @@ namespace wiola::audio {
  */
 class Chain {
 public:
-    explicit Chain(StreamSpec spec, BandLayout layout = {});
+    explicit Chain(StreamSpec spec) noexcept;
 
     NO_COPY_SEMANTIC(Chain);
     NO_MOVE_SEMANTIC(Chain);
 
-    /// Takes the format the samples are in. Settings are kept. Not to be called while the output
-    /// is running: it rebuilds what `process` reads.
+    ~Chain() = default;
+
+    /// Builds a step of type `T` from `args` and puts it at the end, where it will run last.
+    /// Answers with the step itself, so whoever composed the chain can still reach the one it
+    /// has something to ask of. Not the playing thread's.
+    template<typename T, typename... Args>
+    T& add(Args&&... args)
+    {
+        auto stage = std::make_unique<T>(std::forward<Args>(args)...);
+        T& added{*stage};
+
+        stages_.push_back(std::move(stage));
+
+        return added;
+    }
+
+    /// Retunes every step for a stream of `spec`. Between tracks, never during one.
     void configure(StreamSpec spec);
 
     [[nodiscard]] StreamSpec spec() const noexcept;
 
-    /// Applies every stage to whole frames of `samples`, in place.
+    /// Runs every step over `samples`, in the order they were added, and puts back whatever a
+    /// step lifted past what an output takes.
     void process(std::span<float> samples) noexcept;
-
-    [[nodiscard]] Volume& volume() noexcept { return volume_; }
-
-    [[nodiscard]] const Volume& volume() const noexcept { return volume_; }
-
-    [[nodiscard]] Equalizer& equalizer() noexcept { return equalizer_; }
-
-    [[nodiscard]] const Equalizer& equalizer() const noexcept { return equalizer_; }
 
 private:
     StreamSpec spec_{};
-    Volume volume_;
-    Equalizer equalizer_;
+    std::vector<std::unique_ptr<Stage>> stages_;
 };
 
 } // namespace wiola::audio

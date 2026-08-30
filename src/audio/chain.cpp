@@ -21,19 +21,21 @@
 #include <audio/chain.hpp>
 
 #include <algorithm>
+#include <memory>
 
 namespace wiola::audio {
 
-Chain::Chain(StreamSpec spec, BandLayout layout)
+Chain::Chain(StreamSpec spec) noexcept
     : spec_{spec}
-    , equalizer_{spec, layout}
 {
 }
 
 void Chain::configure(StreamSpec spec)
 {
     spec_ = spec;
-    equalizer_.configure(spec);
+
+    for (const std::unique_ptr<Stage>& stage : stages_)
+        stage->configure(spec);
 }
 
 StreamSpec Chain::spec() const noexcept
@@ -43,12 +45,15 @@ StreamSpec Chain::spec() const noexcept
 
 void Chain::process(std::span<float> samples) noexcept
 {
-    equalizer_.process(samples);
-    volume_.process(samples);
+    bool lifted{false};
 
-    // Only a lift can reach past what an output takes: a band's, or a volume asked for beyond
-    // what arrived. Neither is known until both have run.
-    if (!equalizer_.shaping() && volume_.gain() <= 1.0F)
+    for (const std::unique_ptr<Stage>& stage : stages_) {
+        stage->process(samples);
+        lifted = lifted || stage->lifted();
+    }
+
+    // Only a lift can reach past what an output takes, and no step knows until it has run.
+    if (!lifted)
         return;
 
     for (float& sample : samples)
