@@ -100,9 +100,6 @@ private:
 
     engine::Session session_;
 
-    /// The file being read, so that its name can be shown once it has been.
-    std::filesystem::path opening_;
-
     /// What the window has already said about a load, so that it says it once.
     codec::OpenResult said_{codec::OpenResult::opened};
 

@@ -76,6 +76,7 @@ Session::~Session() = default;
 codec::OpenResult Session::load(const std::filesystem::path& path)
 {
     loader_->start(path);
+    opening_ = path;
     last_result_ = codec::OpenResult::loading;
 
     return last_result_;
@@ -104,6 +105,7 @@ void Session::poll()
     chain_.configure(spec);
     pipeline_ = std::make_unique<Pipeline>(std::move(source), chain_, make_output_);
 
+    track_ = opening_;
     last_result_ = codec::OpenResult::opened;
 }
 
@@ -115,6 +117,11 @@ bool Session::loading() const noexcept
 codec::OpenResult Session::last_result() const noexcept
 {
     return last_result_;
+}
+
+const std::filesystem::path& Session::track() const noexcept
+{
+    return track_;
 }
 
 bool Session::loaded() const noexcept
