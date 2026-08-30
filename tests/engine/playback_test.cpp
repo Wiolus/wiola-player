@@ -147,6 +147,41 @@ TEST(Playback, RefusesToPauseOrResumeWhatHasFinished)
     EXPECT_EQ(playback.state(), State::ended);
 }
 
+/// A device that went away is as final as a track that ran out, and outranks it if it got there
+/// first: what a listener needs to be told is that the device is gone.
+TEST(Playback, KeepsAFaultAsFinal)
+{
+    Playback playback;
+
+    ASSERT_TRUE(playback.begin());
+
+    playback.finish(State::faulted);
+
+    EXPECT_EQ(playback.state(), State::faulted);
+    EXPECT_TRUE(playback.finished());
+    EXPECT_FALSE(playback.playing());
+
+    playback.finish(State::ended);
+    EXPECT_EQ(playback.state(), State::faulted);
+
+    EXPECT_FALSE(playback.pause());
+    EXPECT_FALSE(playback.resume());
+    EXPECT_EQ(playback.state(), State::faulted);
+}
+
+/// A fault is not the end of the road: the listener may try the track again once the device is
+/// back.
+TEST(Playback, BeginsAgainAfterAFault)
+{
+    Playback playback;
+
+    ASSERT_TRUE(playback.begin());
+    playback.finish(State::faulted);
+
+    EXPECT_TRUE(playback.begin());
+    EXPECT_EQ(playback.state(), State::playing);
+}
+
 /// What this is for: a listener asking from one thread while playback ends on another.
 /// Once it is over it stays over, however many asks land on the moment it ended.
 TEST(Playback, NeverLeavesAFinalStateBehind)

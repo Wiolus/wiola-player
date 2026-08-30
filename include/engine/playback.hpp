@@ -49,8 +49,9 @@ public:
      * own - an output can be lost, or an audio server can give up on a stream - and that is a
      * fault to be noticed, not a change of what the listener asked for.
      *
-     * `ended` and `stopped` are both final and differ in why: a source that ran out is the cue
-     * to play the next thing, while a listener who pressed stop is not.
+     * The last three are final and differ in why. A source that ran out is the cue to play the
+     * next thing; a listener who pressed stop is not; and a device that went away is neither -
+     * it is a fault, and the only one of the three worth telling a listener about.
      */
     enum class State {
         idle,
@@ -58,6 +59,9 @@ public:
         paused,
         ended,
         stopped,
+
+        /// The device stopped answering, or would not start again.
+        faulted,
     };
 
     [[nodiscard]] State state() const noexcept;
@@ -79,7 +83,8 @@ public:
     /// Paused to playing. False unless playback is paused: resuming is not a way to begin.
     bool resume() noexcept;
 
-    /// Settles on `reason`, which must be `ended` or `stopped`. The first final state stays,
+    /// Settles on `reason`, which must be `ended`, `stopped` or `faulted`. The first final state
+    /// stays,
     /// whichever thread reached it: a listener's stop is not undone by the source running out a
     /// moment later, nor the other way about.
     void finish(State reason) noexcept;
