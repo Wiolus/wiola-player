@@ -6,7 +6,6 @@ wiola_add_library(
         device.cpp
         equalizer.cpp
         shaped_source.cpp
-        tone.cpp
         volume.cpp
     LIBS miniaudio
 )
