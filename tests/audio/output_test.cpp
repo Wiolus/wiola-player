@@ -110,3 +110,69 @@ TEST(OutputControl, LeavesNothingBehindWhenItIsMoveAssigned)
     EXPECT_EQ(output.num_starts(), 1);
     EXPECT_EQ(other.num_starts(), 0);
 }
+
+/// A device outlives the tracks played through it, so what drove it for one track gives it back
+/// for the next.
+TEST(OutputControl, HandsOutAnotherOnceTheHeldOneIsGone)
+{
+    FakeOutput output;
+
+    {
+        Output::Control first{output.control()};
+
+        ASSERT_TRUE(first.start());
+        ASSERT_EQ(output.num_starts(), 1);
+    }
+
+    Output::Control next{output.control()};
+
+    EXPECT_TRUE(next.start()) << "the device was not given back";
+    EXPECT_EQ(output.num_starts(), 2);
+}
+
+/// Moving one about does not give the device back: it is still held, just elsewhere.
+TEST(OutputControl, KeepsTheDeviceWhileTheControlIsMovedAbout)
+{
+    FakeOutput output;
+
+    Output::Control control{output.control()};
+    Output::Control moved{std::move(control)};
+
+    Output::Control second{output.control()};
+
+    EXPECT_FALSE(second.start()) << "moving a control gave the device away";
+    EXPECT_EQ(output.num_starts(), 0);
+
+    EXPECT_TRUE(moved.start());
+}
+
+/// The one that was moved from holds nothing, so its end is not the device coming free.
+TEST(OutputControl, GivesTheDeviceBackWhenTheOneHoldingItEnds)
+{
+    FakeOutput output;
+    Output::Control moved_from{output.control()};
+
+    {
+        const Output::Control holder{std::move(moved_from)};
+    }
+
+    Output::Control next{output.control()};
+
+    EXPECT_TRUE(next.start());
+    EXPECT_EQ(output.num_starts(), 1);
+}
+
+/// Being given another device to drive gives the first one back.
+TEST(OutputControl, GivesBackWhatItHeldWhenItIsGivenAnother)
+{
+    FakeOutput first;
+    FakeOutput second;
+
+    Output::Control control{first.control()};
+    control = second.control();
+
+    Output::Control back{first.control()};
+
+    EXPECT_TRUE(back.start()) << "the first device was never given back";
+    EXPECT_EQ(first.num_starts(), 1);
+}

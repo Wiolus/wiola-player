@@ -24,6 +24,8 @@
 #include <core/borrowed.hpp>
 #include <core/macros.hpp>
 
+#include <utility>
+
 #include <cstddef>
 
 namespace wiola::audio {
@@ -40,14 +42,30 @@ public:
      * thing that can be asked which it is in.
      *
      * Moving it hands the device to another thread. What is moved from, and any control taken
-     * after the first, does nothing at all.
+     * while another is still held, does nothing at all.
+     *
+     * Letting one go gives the device back, so the next thing to drive it can take one: a device
+     * outlives the tracks played through it, and each of them drives it in turn. Taking and
+     * giving back are for whoever owns the device, never for the thread that plays.
      */
     class Control {
     public:
         NO_COPY_SEMANTIC(Control);
-        DEFAULT_MOVE_SEMANTIC(Control);
 
-        ~Control() = default;
+        Control(Control&& other) noexcept = default;
+
+        Control& operator=(Control&& other) noexcept
+        {
+            if (this != &other) {
+                release();
+                output_ = std::move(other.output_);
+            }
+
+            return *this;
+        }
+
+        /// Gives the device back, so that something else may drive it.
+        ~Control() { release(); }
 
         /// Begins playing what the output pulls. False when there is none to be had.
         [[nodiscard]] bool start() noexcept;
@@ -65,6 +83,15 @@ public:
         {
         }
 
+        /// Gives back whatever it holds, and holds nothing afterwards.
+        void release() noexcept
+        {
+            if (output_)
+                output_->control_taken_ = false;
+
+            output_ = core::Borrowed<Output>{};
+        }
+
         core::Borrowed<Output> output_;
     };
 
@@ -73,9 +100,9 @@ public:
 
     virtual ~Output() = default;
 
-    /// The end that drives it. There is one: whoever takes it first has the device, and every
-    /// one taken after that is inert, so a second driver is a device that will not start rather
-    /// than two threads starting one.
+    /// The end that drives it. There is one at a time: while a control is held, another taken is
+    /// inert, so a second driver is a device that will not start rather than two threads starting
+    /// one. Letting the held one go frees the device for the next.
     [[nodiscard]] Control control() noexcept;
 
     [[nodiscard]] virtual bool running() const noexcept = 0;
