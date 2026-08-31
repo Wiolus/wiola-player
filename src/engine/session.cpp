@@ -75,8 +75,23 @@ Session::~Session() = default;
 
 codec::OpenResult Session::load(const std::filesystem::path& path)
 {
+    return begin_reading(path, Waiting::install);
+}
+
+codec::OpenResult Session::read_ahead(const std::filesystem::path& path)
+{
+    return begin_reading(path, Waiting::keep);
+}
+
+codec::OpenResult Session::begin_reading(const std::filesystem::path& path, Waiting waiting)
+{
+    // Whatever was read and not put on was read for a track nobody is waiting for any more.
+    ready_.reset();
+    ready_track_.clear();
+
     loader_->start(path);
     opening_ = path;
+    waiting_ = waiting;
     last_result_ = codec::OpenResult::loading;
 
     return last_result_;
@@ -97,7 +112,25 @@ void Session::poll()
         return;
     }
 
-    std::unique_ptr<codec::Decoder> source{std::move(opened->decoder)};
+    ready_ = std::move(opened->decoder);
+    ready_track_ = opening_;
+    last_result_ = codec::OpenResult::opened;
+
+    if (waiting_ == Waiting::install)
+        static_cast<void>(install());
+}
+
+bool Session::ready() const noexcept
+{
+    return ready_ != nullptr;
+}
+
+bool Session::install()
+{
+    if (!ready())
+        return false;
+
+    std::unique_ptr<codec::Decoder> source{std::move(ready_)};
     const audio::StreamSpec spec{source->spec()};
 
     // The old pipeline goes first: its device reads the chain that configuring one rebuilds.
@@ -105,8 +138,10 @@ void Session::poll()
     chain_.configure(spec);
     pipeline_ = std::make_unique<Pipeline>(std::move(source), chain_, make_output_);
 
-    track_ = opening_;
-    last_result_ = codec::OpenResult::opened;
+    track_ = ready_track_;
+    ready_track_.clear();
+
+    return true;
 }
 
 bool Session::loading() const noexcept

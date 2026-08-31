@@ -25,6 +25,7 @@
 #include <audio/output.hpp>
 #include <audio/source.hpp>
 #include <audio/volume.hpp>
+#include <codec/decoder.hpp>
 #include <codec/open.hpp>
 #include <core/macros.hpp>
 #include <engine/playback.hpp>
@@ -67,9 +68,21 @@ public:
     /// `last_result`.
     codec::OpenResult load(const std::filesystem::path& path);
 
-    /// Takes up a finished load, replacing whatever was playing. For the thread that called
-    /// `load`, as often as it likes: a caller that draws should call it as it draws.
+    /// Reads `path` and keeps it, without disturbing what is playing: what has been read waits
+    /// for `install`. For reading the next track while this one is still going.
+    codec::OpenResult read_ahead(const std::filesystem::path& path);
+
+    /// Takes up a finished load. For the thread that called `load`, as often as it likes: a
+    /// caller that draws should call it as it draws. What `load` asked for goes on at once; what
+    /// `read_ahead` asked for waits.
     void poll();
+
+    /// Whether a track has been read and is waiting to go on.
+    [[nodiscard]] bool ready() const noexcept;
+
+    /// Puts the track that was read in place of whatever is loaded, from its beginning and not
+    /// playing. False when nothing is waiting.
+    bool install();
 
     /// Whether a file is still being read.
     [[nodiscard]] bool loading() const noexcept;
@@ -105,6 +118,15 @@ public:
 private:
     struct Pipeline;
 
+    /// What a finished read is for.
+    enum class Waiting {
+        install,
+        keep,
+    };
+
+    /// Starts reading `path`, and says what is to be done with it once it has been read.
+    codec::OpenResult begin_reading(const std::filesystem::path& path, Waiting waiting);
+
     /// What a track is shaped by, and in what order: the bands first, then how loud, so that
     /// what a listener asks for last is the last thing done to the sound.
     audio::Chain chain_{audio::StreamSpec{}};
@@ -116,6 +138,12 @@ private:
     /// opened and taken the place of whatever was playing.
     std::filesystem::path opening_;
     std::filesystem::path track_;
+
+    Waiting waiting_{Waiting::install};
+
+    /// A track that has been read and not yet put on, with the name it goes by.
+    std::unique_ptr<codec::Decoder> ready_;
+    std::filesystem::path ready_track_;
     codec::OpenResult last_result_{codec::OpenResult::opened};
     OutputFactory make_output_;
     std::unique_ptr<Pipeline> pipeline_;
