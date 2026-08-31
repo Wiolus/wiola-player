@@ -118,6 +118,10 @@ public:
 private:
     struct Pipeline;
 
+    /// What a track is played through, for as long as one format lasts: the device, what it
+    /// pulls, and the relay that each track in turn is put behind.
+    struct Out;
+
     /// What a finished read is for.
     enum class Waiting {
         install,
@@ -146,6 +150,9 @@ private:
     std::filesystem::path ready_track_;
     codec::OpenResult last_result_{codec::OpenResult::opened};
     OutputFactory make_output_;
+    /// Declared before the pipeline, so that a player is let go while what it drives is still
+    /// there to be given back.
+    std::unique_ptr<Out> out_;
     std::unique_ptr<Pipeline> pipeline_;
 };
 
