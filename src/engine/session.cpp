@@ -146,9 +146,12 @@ bool Session::install()
     std::unique_ptr<codec::Decoder> source{std::move(ready_)};
     const audio::StreamSpec spec{source->spec()};
 
-    // The player goes first. Its end stops the device, joins the thread that was feeding it and
-    // gives the device back, so that what the device was reading is let go only once nothing can
-    // still be reading it.
+    // Nothing to play, before there is nothing to play from: a device asking after this hears
+    // silence rather than reading a track that has been let go. The player's end stops the device
+    // anyway, but that is an ordering to keep, and this is not.
+    if (out_)
+        out_->relay.point_at_nothing();
+
     pipeline_.reset();
 
     chain_.configure(spec);
