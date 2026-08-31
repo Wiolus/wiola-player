@@ -275,6 +275,30 @@ TEST(Session, KeepsPlayingWhileTheNextFileIsRead)
     EXPECT_EQ(fixture.session.state(), State::idle) << "the new track is loaded, not playing";
 }
 
+/// What a device is pointed at is never a track that has been let go: putting a track on takes
+/// the last one away first, so an ordering slip is silence rather than a read of what is gone.
+TEST(Session, PlaysNothingWhileOneTrackGivesWayToTheNext)
+{
+    Fixture fixture;
+    fixture.consuming = false;
+
+    ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
+        OpenResult::opened);
+    ASSERT_TRUE(fixture.session.toggle());
+
+    ASSERT_EQ(fixture.session.read_ahead(wiola::testing::write_wav("wiola_session_next.wav")),
+        OpenResult::loading);
+
+    while (fixture.session.loading())
+        std::this_thread::yield();
+
+    fixture.session.poll();
+    ASSERT_TRUE(fixture.session.ready());
+
+    EXPECT_TRUE(fixture.session.install());
+    EXPECT_EQ(fixture.session.state(), State::idle);
+}
+
 /// A device is opened for a format, and a track in the same one plays through the device that is
 /// already open: a track change that closed and opened a device would be heard.
 TEST(Session, KeepsTheDeviceAcrossTracksOfTheSameFormat)
