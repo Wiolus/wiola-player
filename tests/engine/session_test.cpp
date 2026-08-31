@@ -131,6 +131,69 @@ TEST(Session, RefusesAFileItCannotRead)
 /// a window that says something else is loaded.
 /// A file that will not open is no reason to silence the one that is playing: the listener still
 /// has the track they had, and is told what went wrong with the other.
+/// Reading ahead is for the track after this one: it is read and kept, and what is playing
+/// carries on until it is asked for.
+TEST(Session, KeepsATrackReadAheadUntilItIsAskedFor)
+{
+    Fixture fixture;
+    fixture.consuming = false;
+
+    const std::filesystem::path first{wiola::testing::write_wav("wiola_session.wav")};
+    const std::filesystem::path next{wiola::testing::write_wav("wiola_session_next.wav")};
+
+    ASSERT_EQ(load_and_wait(fixture.session, first), OpenResult::opened);
+    ASSERT_TRUE(fixture.session.toggle());
+
+    ASSERT_EQ(fixture.session.read_ahead(next), OpenResult::loading);
+
+    while (fixture.session.loading())
+        std::this_thread::yield();
+
+    fixture.session.poll();
+
+    EXPECT_TRUE(fixture.session.ready());
+    EXPECT_EQ(fixture.session.track(), first) << "reading ahead took over what was playing";
+    EXPECT_EQ(fixture.session.state(), State::playing);
+
+    EXPECT_TRUE(fixture.session.install());
+
+    EXPECT_FALSE(fixture.session.ready());
+    EXPECT_EQ(fixture.session.track(), next);
+    EXPECT_EQ(fixture.session.state(), State::idle) << "a track put on is loaded, not playing";
+}
+
+TEST(Session, InstallsNothingWhenNothingWasRead)
+{
+    Fixture fixture;
+
+    EXPECT_FALSE(fixture.session.ready());
+    EXPECT_FALSE(fixture.session.install());
+    EXPECT_FALSE(fixture.session.loaded());
+}
+
+/// A listener picking a file has said which track they meant, so one read ahead of them is
+/// dropped rather than played next.
+TEST(Session, DropsATrackReadAheadWhenAnotherIsPicked)
+{
+    Fixture fixture;
+
+    const std::filesystem::path ahead{wiola::testing::write_wav("wiola_session_ahead.wav")};
+    const std::filesystem::path picked{wiola::testing::write_wav("wiola_session.wav")};
+
+    ASSERT_EQ(fixture.session.read_ahead(ahead), OpenResult::loading);
+
+    while (fixture.session.loading())
+        std::this_thread::yield();
+
+    fixture.session.poll();
+    ASSERT_TRUE(fixture.session.ready());
+
+    ASSERT_EQ(load_and_wait(fixture.session, picked), OpenResult::opened);
+
+    EXPECT_FALSE(fixture.session.ready());
+    EXPECT_EQ(fixture.session.track(), picked);
+}
+
 TEST(Session, NamesNoTrackBeforeOneIsLoaded)
 {
     const Fixture fixture;
