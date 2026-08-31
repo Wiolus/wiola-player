@@ -275,15 +275,32 @@ TEST(Session, KeepsPlayingWhileTheNextFileIsRead)
     EXPECT_EQ(fixture.session.state(), State::idle) << "the new track is loaded, not playing";
 }
 
-/// Everything a track is played through is cut for its format, so opening another one builds it
-/// again.
-TEST(Session, BuildsAnOutputForEveryTrack)
+/// A device is opened for a format, and a track in the same one plays through the device that is
+/// already open: a track change that closed and opened a device would be heard.
+TEST(Session, KeepsTheDeviceAcrossTracksOfTheSameFormat)
 {
     Fixture fixture;
     const std::filesystem::path path{wiola::testing::write_wav("wiola_session.wav")};
 
     ASSERT_EQ(load_and_wait(fixture.session, path), OpenResult::opened);
     ASSERT_EQ(load_and_wait(fixture.session, path), OpenResult::opened);
+
+    EXPECT_EQ(fixture.num_outputs, 1U);
+}
+
+/// A format it cannot play is a device it has to open again: what is open was cut for the rate
+/// of the track before.
+TEST(Session, OpensAnotherDeviceWhenTheFormatChanges)
+{
+    Fixture fixture;
+
+    ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
+        OpenResult::opened);
+    ASSERT_EQ(fixture.num_outputs, 1U);
+
+    ASSERT_EQ(load_and_wait(fixture.session,
+                  wiola::testing::write_wav("wiola_session_48k.wav", 48000)),
+        OpenResult::opened);
 
     EXPECT_EQ(fixture.num_outputs, 2U);
 }

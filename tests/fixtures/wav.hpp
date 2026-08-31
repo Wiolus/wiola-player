@@ -47,14 +47,14 @@ inline void append(std::string& out, std::uint32_t value, std::size_t num_bytes)
 }
 
 /// Writes a few seconds of tone as a WAV file, and gives back where it put it.
-inline std::filesystem::path write_wav(const char* name)
+inline std::filesystem::path write_wav(const char* name, std::uint32_t rate = source_rate)
 {
-    const auto num_frames{static_cast<std::size_t>(source_seconds * source_rate)};
+    const auto num_frames{static_cast<std::size_t>(source_seconds * rate)};
 
     std::string samples;
     for (std::size_t i = 0; i < num_frames; ++i) {
         const auto value = static_cast<std::uint32_t>(static_cast<std::int16_t>(12000 *
-            std::sin(2 * std::numbers::pi * 440 * static_cast<double>(i) / source_rate)));
+            std::sin(2 * std::numbers::pi * 440 * static_cast<double>(i) / rate)));
 
         for (std::uint16_t channel = 0; channel < source_channels; ++channel)
             append(samples, value, 2);
@@ -63,8 +63,8 @@ inline std::filesystem::path write_wav(const char* name)
     std::string fmt;
     append(fmt, 1, 2);
     append(fmt, source_channels, 2);
-    append(fmt, source_rate, 4);
-    append(fmt, source_rate * source_channels * 2, 4);
+    append(fmt, rate, 4);
+    append(fmt, rate * source_channels * 2, 4);
     append(fmt, source_channels * 2, 2);
     append(fmt, 16, 2);
 

@@ -27,6 +27,7 @@
 
 #include <audio/buffer_source.hpp>
 #include <audio/device.hpp>
+#include <audio/relay.hpp>
 #include <audio/shaped_source.hpp>
 #include <audio/stream_spec.hpp>
 #include <codec/decoder.hpp>
@@ -43,21 +44,33 @@ namespace wiola::engine {
 /// Declared in the order they are wired, so that each is built before whoever reads it and torn
 /// down after.
 struct Session::Pipeline {
-    Pipeline(std::unique_ptr<codec::Decoder> source, audio::Chain& chain,
-        const OutputFactory& make_output)
+    Pipeline(std::unique_ptr<codec::Decoder> source, audio::Output& output)
         : buffer{source->spec().samples_per(tuning::buffer_duration)}
         , decoded{source->spec(), buffer.consumer()}
-        , shaped{decoded, chain}
-        , output{make_output(shaped)}
-        , player{std::move(source), buffer.producer(), *output}
+        , player{std::move(source), buffer.producer(), output}
     {
     }
 
     lockfree::SPSCRingBuffer<float> buffer;
     audio::BufferSource decoded;
+    Player player;
+};
+
+/// Built for a format and kept for as long as tracks come in it, so that a track change is a
+/// device stopping and starting rather than one closing and another opening.
+struct Session::Out {
+    Out(audio::StreamSpec spec, audio::Chain& chain, const OutputFactory& make_output)
+        : spec{spec}
+        , relay{spec}
+        , shaped{relay, chain}
+        , output{make_output(shaped)}
+    {
+    }
+
+    audio::StreamSpec spec;
+    audio::Relay relay;
     audio::ShapedSource shaped;
     std::unique_ptr<audio::Output> output;
-    Player player;
 };
 
 Session::Session()
@@ -133,10 +146,22 @@ bool Session::install()
     std::unique_ptr<codec::Decoder> source{std::move(ready_)};
     const audio::StreamSpec spec{source->spec()};
 
-    // The old pipeline goes first: its device reads the chain that configuring one rebuilds.
+    // The player goes first. Its end stops the device, joins the thread that was feeding it and
+    // gives the device back, so that what the device was reading is let go only once nothing can
+    // still be reading it.
     pipeline_.reset();
+
     chain_.configure(spec);
-    pipeline_ = std::make_unique<Pipeline>(std::move(source), chain_, make_output_);
+
+    // A device is opened for one format. Another of the same needs no more than the one that is
+    // already open.
+    if (!out_ || out_->spec != spec) {
+        out_.reset();
+        out_ = std::make_unique<Out>(spec, chain_, make_output_);
+    }
+
+    pipeline_ = std::make_unique<Pipeline>(std::move(source), *out_->output);
+    out_->relay.point_at(pipeline_->decoded);
 
     track_ = ready_track_;
     ready_track_.clear();
