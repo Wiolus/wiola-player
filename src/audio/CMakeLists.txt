@@ -5,6 +5,7 @@ wiola_add_library(
         chain.cpp
         device.cpp
         equalizer.cpp
+        relay.cpp
         shaped_source.cpp
         volume.cpp
     LIBS miniaudio
