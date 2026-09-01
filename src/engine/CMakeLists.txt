@@ -6,6 +6,7 @@ wiola_add_library(
         playback.cpp
         playhead.cpp
         player.cpp
+        playlist.cpp
         session.cpp
     LIBS wiola_audio wiola_codec
 )
