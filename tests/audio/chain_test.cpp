@@ -147,9 +147,17 @@ TEST(Chain, TakesAnythingBelowZeroAsSilence)
 TEST(Chain, AcceptsNothingToDo)
 {
     wiola::testing::Shaping shaping{stereo};
+    std::array block{1.0F, 1.0F};
 
     shaping.volume.set_gain(0.5F);
     shaping.chain.process(std::span<float>{});
+
+    // Nothing to do is not something to recover from: what comes after is shaped as it would
+    // have been.
+    shaping.chain.process(block);
+
+    EXPECT_FLOAT_EQ(block[0], 0.5F);
+    EXPECT_FLOAT_EQ(block[1], 0.5F);
 }
 
 TEST(Chain, KeepsTheFormatItWasGiven)

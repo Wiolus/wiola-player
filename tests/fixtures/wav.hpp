@@ -23,6 +23,7 @@
 #include <codec/decoder.hpp>
 #include <codec/open.hpp>
 
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -30,6 +31,7 @@
 #include <fstream>
 #include <memory>
 #include <numbers>
+#include <random>
 #include <string>
 
 namespace wiola::testing {
@@ -78,7 +80,16 @@ inline std::filesystem::path write_wav(const char* name, std::uint32_t rate = so
     append(file, static_cast<std::uint32_t>(body.size()), 4);
     file += body;
 
-    const std::filesystem::path path{std::filesystem::temp_directory_path() / name};
+    // A name of its own for every file written, and for every run that writes one: tests that
+    // shared a name would truncate each other's the moment a run is asked for in parallel, and
+    // the same goes for two test programs running at once.
+    static const unsigned long run{std::random_device{}()};
+    static std::atomic<unsigned> written{0};
+
+    const std::filesystem::path unique{std::filesystem::path{name}.stem().string() + "-" +
+        std::to_string(run) + "-" + std::to_string(written.fetch_add(1)) +
+        std::filesystem::path{name}.extension().string()};
+    const std::filesystem::path path{std::filesystem::temp_directory_path() / unique};
     std::ofstream out{path, std::ios::binary};
     out.write(file.data(), static_cast<std::streamsize>(file.size()));
     out.close();
