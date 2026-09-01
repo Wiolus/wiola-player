@@ -26,6 +26,7 @@
 #include <codec/open.hpp>
 
 #include <QFileDialog>
+#include <QFont>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
@@ -85,7 +86,9 @@ MainWindow::MainWindow()
     boost_button_ = new QPushButton{"+", this};
     volume_value_ = new QLabel{this};
     position_bar_ = new SeekBar{this};
-    time_label_ = new QLabel{this};
+    track_label_ = new QLabel{this};
+    elapsed_label_ = new QLabel{this};
+    total_label_ = new QLabel{this};
     status_label_ = new QLabel{this};
     volume_slider_ = new QSlider{Qt::Horizontal, this};
     refresh_timer_ = new QTimer{this};
@@ -108,23 +111,48 @@ MainWindow::MainWindow()
     volume_slider_->setFixedWidth(tuning::volume_slider_width);
     volume_slider_->setToolTip("Volume");
 
-    auto* controls = new QHBoxLayout;
-    controls->addWidget(open_button_);
-    controls->addWidget(previous_button_);
-    controls->addWidget(play_button_);
-    controls->addWidget(next_button_);
-    controls->addWidget(stop_button_);
-    controls->addWidget(repeat_button_);
-    controls->addWidget(shuffle_button_);
-    controls->addWidget(equalizer_button_);
-    controls->addWidget(time_label_);
-    controls->addWidget(volume_slider_);
-    controls->addWidget(volume_value_);
-    controls->addWidget(boost_button_);
+    QFont title{track_label_->font()};
+    title.setPointSize(title.pointSize() + tuning::track_name_point_size_step);
+    title.setBold(true);
+    track_label_->setFont(title);
+
+    // The one press that happens most, and the only one worth reaching for without looking.
+    play_button_->setMinimumWidth(tuning::play_button_width);
+
+    total_label_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+
+    // What is playing: its name, where it has reached, and how far that is through it.
+    auto* times = new QHBoxLayout;
+    times->addWidget(elapsed_label_);
+    times->addStretch();
+    times->addWidget(total_label_);
+
+    // How it plays. Everything here acts on the track that is on.
+    auto* transport = new QHBoxLayout;
+    transport->addWidget(previous_button_);
+    transport->addWidget(play_button_);
+    transport->addWidget(next_button_);
+    transport->addWidget(stop_button_);
+    transport->addStretch();
+    transport->addWidget(volume_slider_);
+    transport->addWidget(volume_value_);
+    transport->addWidget(boost_button_);
+
+    // What the list does. Repeat and shuffle change what plays next rather than how this one
+    // plays, which is why they are not up there with the transport.
+    auto* list = new QHBoxLayout;
+    list->addWidget(open_button_);
+    list->addWidget(repeat_button_);
+    list->addWidget(shuffle_button_);
+    list->addStretch();
+    list->addWidget(equalizer_button_);
 
     auto* layout = new QVBoxLayout{this};
+    layout->addWidget(track_label_);
     layout->addWidget(position_bar_);
-    layout->addLayout(controls);
+    layout->addLayout(times);
+    layout->addLayout(transport);
+    layout->addLayout(list);
 
     // Kept in the layout while it says nothing, so a message appearing does not resize the window.
     layout->addWidget(status_label_);
@@ -269,8 +297,11 @@ void MainWindow::take_up_load()
     if (session_.track() != named_) {
         named_ = session_.track();
 
-        setWindowTitle(named_.empty() ? QString{"Wiola Player"}
-                                      : QString::fromStdString(named_.filename().string()));
+        const QString name{named_.empty() ? QString{"no track"}
+                                          : QString::fromStdString(named_.filename().string())};
+
+        setWindowTitle(named_.empty() ? QString{"Wiola Player"} : name);
+        track_label_->setText(name);
         position_bar_->set_fraction(0.0);
         said_fault_ = false;
     }
@@ -362,7 +393,9 @@ void MainWindow::refresh()
 
     if (!loaded()) {
         play_button_->setText("Play");
-        time_label_->setText("no track");
+        track_label_->setText("no track");
+        elapsed_label_->clear();
+        total_label_->clear();
 
         return;
     }
@@ -375,7 +408,8 @@ void MainWindow::refresh()
         position_bar_->dragging() ? total * position_bar_->fraction() : session_.time_played()};
 
     play_button_->setText(session_.playing() ? "Pause" : "Play");
-    time_label_->setText(as_clock(shown) + " / " + as_clock(total));
+    elapsed_label_->setText(as_clock(shown));
+    total_label_->setText(as_clock(total));
 
     if (total == units::Time{})
         return;

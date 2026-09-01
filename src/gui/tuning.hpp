@@ -30,6 +30,12 @@ inline constexpr std::chrono::milliseconds engine_poll_interval{100};
 
 /// How tall the seek bar is drawn. Enough to aim a mouse at, and no more: it is a readout, not
 /// the point of the window.
+/// How much larger the name of what is playing is drawn than everything else, in points.
+inline constexpr int track_name_point_size_step{3};
+
+/// How wide the play button is drawn. Wider than the rest: it is the one that is pressed most.
+inline constexpr int play_button_width{90};
+
 inline constexpr int seek_bar_height{12};
 
 /// How wide the line marking the played edge of the seek bar is.
