@@ -20,8 +20,11 @@
 
 #include <engine/playlist.hpp>
 
+#include <utils/units.hpp>
+
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstddef>
 #include <filesystem>
 #include <set>
@@ -30,13 +33,21 @@
 namespace {
 
 using wiola::engine::Playlist;
+using wiola::engine::Track;
 using Repeat = wiola::engine::Playlist::Repeat;
 
 /// Three tracks, named so that a test can say which one it is standing at.
-std::vector<std::filesystem::path> three()
+std::vector<Track> three()
 {
-    return {std::filesystem::path{"first.wav"}, std::filesystem::path{"second.wav"},
-        std::filesystem::path{"third.wav"}};
+    return {Track::of(std::filesystem::path{"first.wav"}),
+        Track::of(std::filesystem::path{"second.wav"}),
+        Track::of(std::filesystem::path{"third.wav"})};
+}
+
+/// The file a track is, which is what a test says it stands at.
+const std::filesystem::path& path_of(const Playlist& playlist)
+{
+    return playlist.current().path;
 }
 
 } // namespace
@@ -47,7 +58,7 @@ TEST(Playlist, StandsNowhereWhileItIsEmpty)
 
     EXPECT_TRUE(playlist.empty());
     EXPECT_EQ(playlist.size(), 0U);
-    EXPECT_TRUE(playlist.current().empty());
+    EXPECT_TRUE(path_of(playlist).empty());
     EXPECT_FALSE(playlist.position().has_value());
 }
 
@@ -67,7 +78,7 @@ TEST(Playlist, StandsAtTheFirstOfWhatItIsGiven)
     playlist.set(three());
 
     EXPECT_EQ(playlist.size(), 3U);
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"first.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"first.wav"});
     EXPECT_EQ(playlist.position(), 0U);
 }
 
@@ -75,11 +86,11 @@ TEST(Playlist, StandsAtTheFirstTrackAdded)
 {
     Playlist playlist;
 
-    playlist.add(std::filesystem::path{"only.wav"});
-    playlist.add(std::filesystem::path{"after.wav"});
+    playlist.add(Track::of(std::filesystem::path{"only.wav"}));
+    playlist.add(Track::of(std::filesystem::path{"after.wav"}));
 
     EXPECT_EQ(playlist.size(), 2U);
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"only.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"only.wav"});
 }
 
 TEST(Playlist, WalksForwardsAndBack)
@@ -88,13 +99,13 @@ TEST(Playlist, WalksForwardsAndBack)
     playlist.set(three());
 
     ASSERT_TRUE(playlist.next());
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"second.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"second.wav"});
 
     ASSERT_TRUE(playlist.next());
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"third.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"third.wav"});
 
     ASSERT_TRUE(playlist.previous());
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"second.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"second.wav"});
 }
 
 /// The end of the list is the end of playback, and it stays where it stopped.
@@ -106,12 +117,12 @@ TEST(Playlist, GoesNoFurtherThanTheEnd)
     ASSERT_TRUE(playlist.go_to(2));
 
     EXPECT_FALSE(playlist.next());
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"third.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"third.wav"});
 
     ASSERT_TRUE(playlist.go_to(0));
 
     EXPECT_FALSE(playlist.previous());
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"first.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"first.wav"});
 }
 
 TEST(Playlist, ComesRoundWhenEverythingRepeats)
@@ -123,10 +134,10 @@ TEST(Playlist, ComesRoundWhenEverythingRepeats)
     ASSERT_TRUE(playlist.go_to(2));
 
     EXPECT_TRUE(playlist.next());
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"first.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"first.wav"});
 
     EXPECT_TRUE(playlist.previous());
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"third.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"third.wav"});
 }
 
 TEST(Playlist, StaysWhereItIsWhenOneTrackRepeats)
@@ -138,10 +149,10 @@ TEST(Playlist, StaysWhereItIsWhenOneTrackRepeats)
     ASSERT_TRUE(playlist.go_to(1));
 
     EXPECT_TRUE(playlist.next());
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"second.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"second.wav"});
 
     EXPECT_TRUE(playlist.previous());
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"second.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"second.wav"});
 }
 
 TEST(Playlist, StandsWhereItIsSent)
@@ -150,11 +161,11 @@ TEST(Playlist, StandsWhereItIsSent)
     playlist.set(three());
 
     EXPECT_TRUE(playlist.go_to(2));
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"third.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"third.wav"});
     EXPECT_EQ(playlist.position(), 2U);
 
     EXPECT_FALSE(playlist.go_to(3));
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"third.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"third.wav"});
 }
 
 /// Shuffling changes what comes next, not what is playing now.
@@ -168,7 +179,7 @@ TEST(Playlist, KeepsTheTrackItStandsAtWhenShuffled)
     playlist.shuffle(1234);
 
     EXPECT_TRUE(playlist.shuffled());
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"second.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"second.wav"});
     EXPECT_EQ(playlist.position(), 1U);
 }
 
@@ -183,10 +194,10 @@ TEST(Playlist, ShufflingIsAnOrderOverEveryTrack)
     // Back to the start of the order: shuffling means the first track is not first any more.
     while (playlist.previous()) { }
 
-    std::set<std::filesystem::path> seen{playlist.current()};
+    std::set<std::filesystem::path> seen{path_of(playlist)};
 
     while (playlist.next())
-        seen.insert(playlist.current());
+        seen.insert(path_of(playlist));
 
     EXPECT_EQ(seen.size(), 3U);
 }
@@ -202,7 +213,7 @@ TEST(Playlist, ShufflesTheSameWayForTheSameSeed)
         std::vector<std::filesystem::path> order;
 
         do
-            order.push_back(playlist.current());
+            order.push_back(path_of(playlist));
         while (playlist.next());
 
         return order;
@@ -222,13 +233,49 @@ TEST(Playlist, PutsThemBackInOrder)
     playlist.unshuffle();
 
     EXPECT_FALSE(playlist.shuffled());
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"third.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"third.wav"});
     EXPECT_EQ(playlist.position(), 2U);
 
     ASSERT_TRUE(playlist.go_to(0));
     ASSERT_TRUE(playlist.next());
 
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"second.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"second.wav"});
+}
+
+/// A track nothing is known about is a track with a name: the file's own.
+TEST(Playlist, NamesATrackAfterItsFileUntilItIsToldOtherwise)
+{
+    Playlist playlist;
+
+    playlist.add(Track::of(std::filesystem::path{"/music/first.wav"}));
+
+    EXPECT_EQ(playlist.current().title, "first.wav");
+    EXPECT_TRUE(playlist.current().artist.empty());
+    EXPECT_EQ(playlist.current().duration, wiola::units::Time{});
+}
+
+/// What is found out about a track later replaces what was assumed, and moves nothing.
+TEST(Playlist, TakesWhatIsFoundOutAboutATrack)
+{
+    Playlist playlist;
+    playlist.set(three());
+
+    ASSERT_TRUE(playlist.go_to(1));
+
+    Track told{Track::of(std::filesystem::path{"second.wav"})};
+    told.title = "Together Forever";
+    told.artist = "Rick Astley";
+    told.album = "Whenever You Need Somebody";
+    told.duration = wiola::units::Time{std::chrono::seconds{205}};
+
+    EXPECT_TRUE(playlist.describe(1, std::move(told)));
+
+    EXPECT_EQ(playlist.current().title, "Together Forever");
+    EXPECT_EQ(playlist.current().artist, "Rick Astley");
+    EXPECT_EQ(playlist.position(), 1U) << "saying what a track is moved the list";
+    EXPECT_EQ(playlist.size(), 3U);
+
+    EXPECT_FALSE(playlist.describe(3, Track{}));
 }
 
 TEST(Playlist, TakesATrackOut)
@@ -239,8 +286,8 @@ TEST(Playlist, TakesATrackOut)
     EXPECT_TRUE(playlist.remove(1));
 
     ASSERT_EQ(playlist.size(), 2U);
-    EXPECT_EQ(playlist.tracks().front(), std::filesystem::path{"first.wav"});
-    EXPECT_EQ(playlist.tracks().back(), std::filesystem::path{"third.wav"});
+    EXPECT_EQ(playlist.tracks().front().path, std::filesystem::path{"first.wav"});
+    EXPECT_EQ(playlist.tracks().back().path, std::filesystem::path{"third.wav"});
 
     EXPECT_FALSE(playlist.remove(2));
 }
@@ -254,7 +301,7 @@ TEST(Playlist, KeepsWhatItStandsAtWhenSomethingBeforeItGoes)
     ASSERT_TRUE(playlist.go_to(2));
     ASSERT_TRUE(playlist.remove(0));
 
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"third.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"third.wav"});
     EXPECT_EQ(playlist.position(), 1U);
 }
 
@@ -267,7 +314,7 @@ TEST(Playlist, StandsAtWhatFollowedTheTrackTakenOut)
     ASSERT_TRUE(playlist.go_to(1));
     ASSERT_TRUE(playlist.remove(1));
 
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"third.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"third.wav"});
     EXPECT_EQ(playlist.position(), 1U);
 }
 
@@ -280,7 +327,7 @@ TEST(Playlist, StandsAtTheEndWhenTheLastTrackGoes)
     ASSERT_TRUE(playlist.go_to(2));
     ASSERT_TRUE(playlist.remove(2));
 
-    EXPECT_EQ(playlist.current(), std::filesystem::path{"second.wav"});
+    EXPECT_EQ(path_of(playlist), std::filesystem::path{"second.wav"});
     EXPECT_EQ(playlist.position(), 1U);
 }
 
@@ -288,7 +335,7 @@ TEST(Playlist, StandsNowhereOnceTheLastTrackIsTakenOut)
 {
     Playlist playlist;
 
-    playlist.add(std::filesystem::path{"only.wav"});
+    playlist.add(Track::of(std::filesystem::path{"only.wav"}));
     ASSERT_TRUE(playlist.remove(0));
 
     EXPECT_TRUE(playlist.empty());
@@ -310,10 +357,10 @@ TEST(Playlist, KeepsAShuffledOrderWholeWhenATrackGoes)
     // Back to the start of the order, which after shuffling is not the start of the list.
     while (playlist.previous()) { }
 
-    std::set<std::filesystem::path> seen{playlist.current()};
+    std::set<std::filesystem::path> seen{path_of(playlist)};
 
     while (playlist.next())
-        seen.insert(playlist.current());
+        seen.insert(path_of(playlist));
 
     EXPECT_EQ(seen.size(), 2U);
     EXPECT_EQ(seen.count(std::filesystem::path{"second.wav"}), 0U);
@@ -328,5 +375,5 @@ TEST(Playlist, StandsNowhereOnceCleared)
 
     EXPECT_TRUE(playlist.empty());
     EXPECT_FALSE(playlist.position().has_value());
-    EXPECT_TRUE(playlist.current().empty());
+    EXPECT_TRUE(path_of(playlist).empty());
 }

@@ -81,8 +81,9 @@ Session::Session()
 }
 
 Session::Session(OutputFactory make_output)
-    : make_output_{std::move(make_output)}
-    , loader_{std::make_unique<Loader>()}
+    // In the order they are declared, which is the order they are built in whatever this says.
+    : loader_{std::make_unique<Loader>()}
+    , make_output_{std::move(make_output)}
 {
 }
 
@@ -91,19 +92,25 @@ Session::~Session() = default;
 codec::OpenResult Session::open(const std::filesystem::path& path)
 {
     // One file is a list of one: everything that plays, plays from the list.
-    playlist_.set({path});
+    playlist_.set({Track::of(path)});
 
     return begin_reading(path, Waiting::install);
 }
 
 codec::OpenResult Session::open(std::vector<std::filesystem::path> tracks)
 {
-    playlist_.set(std::move(tracks));
+    std::vector<Track> queued;
+    queued.reserve(tracks.size());
+
+    for (std::filesystem::path& track : tracks)
+        queued.push_back(Track::of(std::move(track)));
+
+    playlist_.set(std::move(queued));
 
     if (playlist_.empty())
         return last_result_;
 
-    return begin_reading(playlist_.current(), Waiting::install);
+    return begin_reading(playlist_.current().path, Waiting::install);
 }
 
 bool Session::next_track()
@@ -135,11 +142,11 @@ void Session::add(std::vector<std::filesystem::path> tracks)
     const bool was_empty{playlist_.empty()};
 
     for (std::filesystem::path& track : tracks)
-        playlist_.add(std::move(track));
+        playlist_.add(Track::of(std::move(track)));
 
     // Adding to an empty queue is the first thing a listener does, and they mean to play it.
     if (was_empty && !playlist_.empty() && !loaded())
-        static_cast<void>(begin_reading(playlist_.current(), Waiting::install));
+        static_cast<void>(begin_reading(playlist_.current().path, Waiting::install));
 }
 
 bool Session::remove(std::size_t index)
@@ -214,7 +221,7 @@ codec::OpenResult Session::begin_reading(const std::filesystem::path& path, Wait
 
 codec::OpenResult Session::read_current_track(bool playing)
 {
-    return begin_reading(playlist_.current(), playing ? Waiting::play : Waiting::install);
+    return begin_reading(playlist_.current().path, playing ? Waiting::play : Waiting::install);
 }
 
 void Session::catch_up()

@@ -30,16 +30,16 @@ namespace wiola::engine {
 namespace {
 
 /// What `current` answers with when it stands nowhere.
-const std::filesystem::path& nothing()
+const Track& nothing()
 {
-    static const std::filesystem::path empty;
+    static const Track empty;
 
     return empty;
 }
 
 } // namespace
 
-void Playlist::set(std::vector<std::filesystem::path> tracks)
+void Playlist::set(std::vector<Track> tracks)
 {
     tracks_ = std::move(tracks);
 
@@ -50,7 +50,7 @@ void Playlist::set(std::vector<std::filesystem::path> tracks)
     place_ = tracks_.empty() ? std::nullopt : std::optional<std::size_t>{0};
 }
 
-void Playlist::add(std::filesystem::path track)
+void Playlist::add(Track track)
 {
     tracks_.push_back(std::move(track));
 
@@ -122,17 +122,27 @@ std::size_t Playlist::size() const noexcept
     return tracks_.size();
 }
 
-const std::vector<std::filesystem::path>& Playlist::tracks() const noexcept
+const std::vector<Track>& Playlist::tracks() const noexcept
 {
     return tracks_;
 }
 
-const std::filesystem::path& Playlist::current() const noexcept
+const Track& Playlist::current() const noexcept
 {
     if (!place_.has_value())
         return nothing();
 
     return tracks_[order_[*place_]];
+}
+
+bool Playlist::describe(std::size_t index, Track track)
+{
+    if (index >= tracks_.size())
+        return false;
+
+    tracks_[index] = std::move(track);
+
+    return true;
 }
 
 std::optional<std::size_t> Playlist::position() const noexcept

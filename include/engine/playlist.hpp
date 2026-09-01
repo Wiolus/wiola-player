@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include <engine/track.hpp>
+
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -53,10 +55,10 @@ public:
     };
 
     /// Replaces everything with `tracks`, and stands at the first of them.
-    void set(std::vector<std::filesystem::path> tracks);
+    void set(std::vector<Track> tracks);
 
     /// Puts `track` at the end. A list that was empty stands at it.
-    void add(std::filesystem::path track);
+    void add(Track track);
 
     /// Takes the track that was put at `index` out. It stands afterwards at whatever followed
     /// the one removed, or at the last of what is left. False when there is no such track.
@@ -70,10 +72,14 @@ public:
 
     /// Every track, in the order they were given. Shuffling changes what plays next, not what
     /// this says: a listener looking at their list wants to see the list they made.
-    [[nodiscard]] const std::vector<std::filesystem::path>& tracks() const noexcept;
+    [[nodiscard]] const std::vector<Track>& tracks() const noexcept;
 
-    /// The track it stands at, or nothing when it stands nowhere.
-    [[nodiscard]] const std::filesystem::path& current() const noexcept;
+    /// The track it stands at, or one with nothing in it when it stands nowhere.
+    [[nodiscard]] const Track& current() const noexcept;
+
+    /// Says what has been found out about the track put at `index`, keeping where it is. False
+    /// when there is no such track.
+    bool describe(std::size_t index, Track track);
 
     /// Where it stands, counted along the list as it was given, or nothing when it stands
     /// nowhere. Shuffling changes what comes next, not what a track is called or where it was
@@ -106,7 +112,7 @@ private:
     /// Where in `order_` the track put at `index` now sits.
     [[nodiscard]] std::size_t place_of(std::size_t index) const noexcept;
 
-    std::vector<std::filesystem::path> tracks_;
+    std::vector<Track> tracks_;
 
     /// The order they are played in, as places in `tracks_`.
     std::vector<std::size_t> order_;
