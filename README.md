@@ -2,10 +2,10 @@
 
 # Wiola Player
 
-A small desktop music player for WAV, FLAC and MP3. One window, three buttons, a seek bar. On
-Windows it is a single executable: nothing to install, no DLLs to place beside it.
+A small desktop music player for WAV, FLAC and MP3. One window: play, seek, volume and a ten-band
+equalizer. On Windows it is a single executable: nothing to install, no DLLs to place beside it.
 
-![wiola-player playing a track on Windows](assets/wiola-demo.png)
+<img src="assets/wiola-demo.png" alt="wiola-player playing a track on Windows" width="410">
 
 ## Run it on Windows
 
@@ -24,11 +24,12 @@ steps.
 
 ## Using it
 
-**Open** chooses a track, **Play** starts it and turns into **Pause**, **Stop** returns to the
-beginning. The title bar shows the file that is loaded, and the bar above the buttons shows where
-you are in it - click it to jump. Elapsed and total time sit to the right.
+- **Open** picks a track, **Play** and **Stop** run it.
+- The bar shows where you are - click it to jump.
+- The slider sets the volume, **+** takes it to 140%.
+- **EQ** opens a ten-band equalizer, up to 12 dB a band.
 
-Tracks are chosen in the window, so there is nothing to type.
+The volume and the equalizer are kept for the next run.
 
 ## Contributing
 
