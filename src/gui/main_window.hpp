@@ -21,6 +21,7 @@
 #pragma once
 
 #include "equalizer_panel.hpp"
+#include "playlist_control.hpp"
 #include "playlist_view.hpp"
 #include "seek_bar.hpp"
 #include "volume_control.hpp"
@@ -149,6 +150,7 @@ private:
 
     /// The file a run leaves things in.
     QSettings settings_;
+    PlaylistControl playlist_;
     VolumeControl volume_;
     EqualizerControl equalizer_;
 
