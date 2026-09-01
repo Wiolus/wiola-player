@@ -512,8 +512,8 @@ TEST(Session, ShowsTheQueueInTheOrderItWasGiven)
     fixture.session.shuffle(true);
 
     ASSERT_EQ(fixture.session.playlist().tracks().size(), 2U);
-    EXPECT_EQ(fixture.session.playlist().tracks().front(), first);
-    EXPECT_EQ(fixture.session.playlist().tracks().back(), next);
+    EXPECT_EQ(fixture.session.playlist().tracks().front().path, first);
+    EXPECT_EQ(fixture.session.playlist().tracks().back().path, next);
 }
 
 TEST(Session, GoesNowhereBeyondTheEndsOfTheList)

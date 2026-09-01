@@ -104,8 +104,8 @@ TEST_F(PlaylistControl, PutsBackTheQueueTheLastRunLeft)
     EXPECT_EQ(control.restore(), 0U);
 
     ASSERT_EQ(restored.playlist().tracks().size(), 2U);
-    EXPECT_EQ(restored.playlist().tracks().front(), first);
-    EXPECT_EQ(restored.playlist().tracks().back(), next);
+    EXPECT_EQ(restored.playlist().tracks().front().path, first);
+    EXPECT_EQ(restored.playlist().tracks().back().path, next);
 }
 
 /// It stands where it stood, without playing: putting a queue back is not pressing play.
@@ -181,5 +181,5 @@ TEST_F(PlaylistControl, DropsTracksThatHaveGoneSince)
     EXPECT_EQ(control.restore(), 1U) << "the track that had gone was not counted";
 
     ASSERT_EQ(restored.playlist().tracks().size(), 1U);
-    EXPECT_EQ(restored.playlist().tracks().front(), kept);
+    EXPECT_EQ(restored.playlist().tracks().front().path, kept);
 }

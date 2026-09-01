@@ -68,7 +68,7 @@ void PlaylistView::keyPressEvent(QKeyEvent* event)
 
 void PlaylistView::show_playlist(const engine::Playlist& playlist)
 {
-    const std::vector<std::filesystem::path>& tracks{playlist.tracks()};
+    const std::vector<engine::Track>& tracks{playlist.tracks()};
     const std::size_t current{playlist.position().value_or(0)};
 
     const bool same{anything_shown_ && num_shown_ == tracks.size() && current_shown_ == current};
@@ -82,8 +82,8 @@ void PlaylistView::show_playlist(const engine::Playlist& playlist)
 
     clear();
 
-    for (const std::filesystem::path& track : tracks)
-        addItem(QString::fromStdString(track.filename().string()));
+    for (const engine::Track& track : tracks)
+        addItem(QString::fromStdString(track.title));
 
     if (!tracks.empty())
         setCurrentRow(static_cast<int>(current));
