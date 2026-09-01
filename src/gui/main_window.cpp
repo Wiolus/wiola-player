@@ -67,6 +67,7 @@ QString as_clock(units::Time time)
 MainWindow::MainWindow()
     // A file of its own on both platforms, rather than the registry on one of them.
     : settings_{QSettings::IniFormat, QSettings::UserScope, "wiola-player", "settings"}
+    , playlist_{session_, settings_}
     , volume_{session_.volume(), settings_}
     , equalizer_{session_.equalizer(), settings_}
 {
@@ -203,6 +204,9 @@ MainWindow::MainWindow()
     connect(refresh_timer_, &QTimer::timeout, this, &MainWindow::refresh);
     refresh_timer_->start(tuning::engine_poll_interval);
 
+    if (const std::size_t gone{playlist_.restore()}; gone != 0)
+        show_status(QString{"%1 queued track(s) are no longer where they were"}.arg(gone));
+
     refresh();
 }
 
@@ -217,6 +221,7 @@ void MainWindow::open(std::vector<std::filesystem::path> tracks)
 
     said_ = session_.open(std::move(tracks));
 
+    playlist_.save();
     show_status(QString{"opening "} + first + "...");
     refresh();
 }
@@ -249,6 +254,7 @@ void MainWindow::add_tracks()
         return;
 
     session_.add(std::move(tracks));
+    playlist_.save();
     refresh();
 }
 
@@ -257,12 +263,14 @@ void MainWindow::remove_chosen()
     for (const std::size_t row : playlist_view_->chosen_rows())
         static_cast<void>(session_.remove(row));
 
+    playlist_.save();
     refresh();
 }
 
 void MainWindow::clear_queue()
 {
     session_.clear();
+    playlist_.save();
     refresh();
 }
 
@@ -377,6 +385,9 @@ void MainWindow::take_up_load()
         track_label_->setText(name);
         position_bar_->set_fraction(0.0);
         said_fault_ = false;
+
+        // Where the queue stands has moved, which is worth keeping even if nothing was added.
+        playlist_.save();
     }
 
     // A device that goes away is not a listener pressing stop, and is the one thing about
