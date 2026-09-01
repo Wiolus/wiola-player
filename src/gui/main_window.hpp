@@ -37,6 +37,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <vector>
 
 namespace wiola::gui {
 
@@ -57,13 +58,27 @@ public:
 
     ~MainWindow() override;
 
-    /// Begins loading `path`. Reading a file takes as long as it takes, so what is playing keeps
-    /// playing and the window says what happened once it has been read.
-    void load(const std::filesystem::path& path);
+    /// Begins playing `tracks`, in the order given. Reading a file takes as long as it takes, so
+    /// what is playing keeps playing and the window says what happened once it has been read.
+    void open(std::vector<std::filesystem::path> tracks);
 
 private:
-    /// Asks for a file and loads it.
-    void choose_track();
+    /// Asks for files and plays them, in the order they were chosen.
+    void choose_tracks();
+
+    /// Plays the track before or after this one in the list.
+    void play_previous();
+    void play_next();
+
+    /// Steps between playing the list once, playing it round and round, and playing one track
+    /// over: the three a listener cycles through with one button.
+    void cycle_repeat();
+
+    /// Plays the list in the order it was given, or in one drawn at random.
+    void set_shuffled(bool shuffled);
+
+    /// Says which of the three repeats is on, and whether the order is shuffled.
+    void show_list_buttons();
 
     /// Starts playing, or resumes after a pause. The first press is what opens the device.
     void toggle_playback();
@@ -103,14 +118,24 @@ private:
     /// What the window has already said about a load, so that it says it once.
     codec::OpenResult said_{codec::OpenResult::opened};
 
+    /// What it has already said about playback going wrong, for the same reason.
+    bool said_fault_{false};
+
+    /// The track the title names, so that a list moving on renames it.
+    std::filesystem::path named_;
+
     /// The file a run leaves things in.
     QSettings settings_;
     VolumeControl volume_;
     EqualizerControl equalizer_;
 
     QPushButton* open_button_{nullptr};
+    QPushButton* previous_button_{nullptr};
     QPushButton* play_button_{nullptr};
+    QPushButton* next_button_{nullptr};
     QPushButton* stop_button_{nullptr};
+    QPushButton* repeat_button_{nullptr};
+    QPushButton* shuffle_button_{nullptr};
     SeekBar* position_bar_{nullptr};
     QSlider* volume_slider_{nullptr};
     QLabel* volume_value_{nullptr};

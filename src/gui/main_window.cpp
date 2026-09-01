@@ -73,8 +73,14 @@ MainWindow::MainWindow()
 
     // Every widget is given this window as its parent, so Qt owns them and destroys them with it.
     open_button_ = new QPushButton{"Open", this};
+    previous_button_ = new QPushButton{"<<", this};
     play_button_ = new QPushButton{"Play", this};
+    next_button_ = new QPushButton{">>", this};
     stop_button_ = new QPushButton{"Stop", this};
+    repeat_button_ = new QPushButton{"Repeat: off", this};
+    shuffle_button_ = new QPushButton{"Shuffle", this};
+
+    shuffle_button_->setCheckable(true);
     equalizer_button_ = new QPushButton{"EQ", this};
     boost_button_ = new QPushButton{"+", this};
     volume_value_ = new QLabel{this};
@@ -104,8 +110,12 @@ MainWindow::MainWindow()
 
     auto* controls = new QHBoxLayout;
     controls->addWidget(open_button_);
+    controls->addWidget(previous_button_);
     controls->addWidget(play_button_);
+    controls->addWidget(next_button_);
     controls->addWidget(stop_button_);
+    controls->addWidget(repeat_button_);
+    controls->addWidget(shuffle_button_);
     controls->addWidget(equalizer_button_);
     controls->addWidget(time_label_);
     controls->addWidget(volume_slider_);
@@ -119,7 +129,11 @@ MainWindow::MainWindow()
     // Kept in the layout while it says nothing, so a message appearing does not resize the window.
     layout->addWidget(status_label_);
 
-    connect(open_button_, &QPushButton::clicked, this, &MainWindow::choose_track);
+    connect(open_button_, &QPushButton::clicked, this, &MainWindow::choose_tracks);
+    connect(previous_button_, &QPushButton::clicked, this, &MainWindow::play_previous);
+    connect(next_button_, &QPushButton::clicked, this, &MainWindow::play_next);
+    connect(repeat_button_, &QPushButton::clicked, this, &MainWindow::cycle_repeat);
+    connect(shuffle_button_, &QPushButton::toggled, this, &MainWindow::set_shuffled);
     connect(play_button_, &QPushButton::clicked, this, &MainWindow::toggle_playback);
     connect(stop_button_, &QPushButton::clicked, this, &MainWindow::stop_playback);
 
@@ -140,12 +154,95 @@ MainWindow::MainWindow()
 
 MainWindow::~MainWindow() = default;
 
-void MainWindow::load(const std::filesystem::path& path)
+void MainWindow::open(std::vector<std::filesystem::path> tracks)
 {
-    said_ = session_.open(path);
+    if (tracks.empty())
+        return;
 
-    show_status(QString{"opening "} + QString::fromStdString(path.filename().string()) + "...");
+    const QString first{QString::fromStdString(tracks.front().filename().string())};
+
+    said_ = session_.open(std::move(tracks));
+
+    show_status(QString{"opening "} + first + "...");
     refresh();
+}
+
+void MainWindow::choose_tracks()
+{
+    const QStringList chosen{QFileDialog::getOpenFileNames(this, "Open tracks", QString{},
+        "Audio (*.wav *.wave *.flac *.mp3 *.mp2 *.mpga);;All files (*)")};
+
+    if (chosen.isEmpty())
+        return;
+
+    std::vector<std::filesystem::path> tracks;
+    tracks.reserve(static_cast<std::size_t>(chosen.size()));
+
+    for (const QString& name : chosen)
+        tracks.emplace_back(name.toStdString());
+
+    // Whether the files can be read is said by playing them.
+    open(std::move(tracks));
+}
+
+void MainWindow::play_previous()
+{
+    static_cast<void>(session_.previous_track());
+    refresh();
+}
+
+void MainWindow::play_next()
+{
+    static_cast<void>(session_.next_track());
+    refresh();
+}
+
+void MainWindow::cycle_repeat()
+{
+    using Repeat = engine::Playlist::Repeat;
+
+    switch (session_.repeat()) {
+    case Repeat::none:
+        session_.set_repeat(Repeat::all);
+        break;
+
+    case Repeat::all:
+        session_.set_repeat(Repeat::track);
+        break;
+
+    case Repeat::track:
+        session_.set_repeat(Repeat::none);
+        break;
+    }
+
+    show_list_buttons();
+}
+
+void MainWindow::set_shuffled(bool shuffled)
+{
+    session_.shuffle(shuffled);
+    show_list_buttons();
+}
+
+void MainWindow::show_list_buttons()
+{
+    using Repeat = engine::Playlist::Repeat;
+
+    switch (session_.repeat()) {
+    case Repeat::none:
+        repeat_button_->setText("Repeat: off");
+        break;
+
+    case Repeat::all:
+        repeat_button_->setText("Repeat: all");
+        break;
+
+    case Repeat::track:
+        repeat_button_->setText("Repeat: one");
+        break;
+    }
+
+    shuffle_button_->setChecked(session_.shuffled());
 }
 
 void MainWindow::take_up_load()
@@ -156,31 +253,37 @@ void MainWindow::take_up_load()
 
     // Said once: a window that repeated itself every turn would overwrite whatever else it has
     // to say.
-    if (result == said_ || result == codec::OpenResult::loading)
-        return;
+    if (result != said_ && result != codec::OpenResult::loading) {
+        said_ = result;
 
-    said_ = result;
+        const bool opened{result == codec::OpenResult::opened};
 
-    const bool opened{result == codec::OpenResult::opened};
+        show_status(opened ? QString{} : as_status(result));
 
-    show_status(opened ? QString{} : as_status(result));
-    setWindowTitle(opened ? QString::fromStdString(session_.track().filename().string())
-                          : windowTitle());
+        if (opened)
+            position_bar_->set_fraction(0.0);
+    }
 
-    if (opened)
+    // The title follows what is playing, so a list moving on to the next track renames the
+    // window without anyone asking it to.
+    if (session_.track() != named_) {
+        named_ = session_.track();
+
+        setWindowTitle(named_.empty() ? QString{"Wiola Player"}
+                                      : QString::fromStdString(named_.filename().string()));
         position_bar_->set_fraction(0.0);
-}
+        said_fault_ = false;
+    }
 
-void MainWindow::choose_track()
-{
-    const QString chosen{QFileDialog::getOpenFileName(this, "Open track", QString{},
-        "Audio (*.wav *.wave *.flac *.mp3 *.mp2 *.mpga);;All files (*)")};
+    // A device that goes away is not a listener pressing stop, and is the one thing about
+    // playback worth interrupting them for.
+    const bool faulted{session_.state() == engine::Playback::State::faulted};
 
-    if (chosen.isEmpty())
-        return;
+    if (faulted && !said_fault_) {
+        said_fault_ = true;
 
-    // Whether the file could be read is said by loading it.
-    load(std::filesystem::path{chosen.toStdString()});
+        show_status(QString{"lost the playback device"});
+    }
 }
 
 void MainWindow::toggle_playback()
@@ -192,6 +295,14 @@ void MainWindow::toggle_playback()
     const bool pausing{session_.state() == engine::Playback::State::playing};
 
     show_status(session_.play_or_pause() || pausing ? QString{} : QString{"no playback device"});
+}
+
+void MainWindow::stop_playback()
+{
+    if (!loaded())
+        return;
+
+    session_.stop();
 }
 
 void MainWindow::show_equalizer()
@@ -226,23 +337,15 @@ void MainWindow::set_boosted(bool boosted)
     show_volume();
 }
 
-void MainWindow::show_status(const QString& message)
-{
-    status_label_->setText(message);
-}
-
-void MainWindow::stop_playback()
-{
-    if (!loaded())
-        return;
-
-    session_.stop();
-}
-
 void MainWindow::seek_to(double fraction)
 {
     if (loaded())
         session_.seek(session_.total_time() * fraction);
+}
+
+void MainWindow::show_status(const QString& message)
+{
+    status_label_->setText(message);
 }
 
 void MainWindow::refresh()
@@ -252,6 +355,10 @@ void MainWindow::refresh()
     play_button_->setEnabled(loaded());
     stop_button_->setEnabled(loaded());
     position_bar_->setEnabled(loaded());
+    previous_button_->setEnabled(loaded());
+    next_button_->setEnabled(loaded());
+
+    show_list_buttons();
 
     if (!loaded()) {
         play_button_->setText("Play");
