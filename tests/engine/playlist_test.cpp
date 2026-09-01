@@ -179,7 +179,9 @@ TEST(Playlist, ShufflingIsAnOrderOverEveryTrack)
     playlist.set(three());
     playlist.set_repeat(Repeat::none);
     playlist.shuffle(99);
-    ASSERT_TRUE(playlist.go_to(0));
+
+    // Back to the start of the order: shuffling means the first track is not first any more.
+    while (playlist.previous()) { }
 
     std::set<std::filesystem::path> seen{playlist.current()};
 
@@ -227,6 +229,94 @@ TEST(Playlist, PutsThemBackInOrder)
     ASSERT_TRUE(playlist.next());
 
     EXPECT_EQ(playlist.current(), std::filesystem::path{"second.wav"});
+}
+
+TEST(Playlist, TakesATrackOut)
+{
+    Playlist playlist;
+    playlist.set(three());
+
+    EXPECT_TRUE(playlist.remove(1));
+
+    ASSERT_EQ(playlist.size(), 2U);
+    EXPECT_EQ(playlist.tracks().front(), std::filesystem::path{"first.wav"});
+    EXPECT_EQ(playlist.tracks().back(), std::filesystem::path{"third.wav"});
+
+    EXPECT_FALSE(playlist.remove(2));
+}
+
+/// Taking out what came before it does not move what it stands at.
+TEST(Playlist, KeepsWhatItStandsAtWhenSomethingBeforeItGoes)
+{
+    Playlist playlist;
+    playlist.set(three());
+
+    ASSERT_TRUE(playlist.go_to(2));
+    ASSERT_TRUE(playlist.remove(0));
+
+    EXPECT_EQ(playlist.current(), std::filesystem::path{"third.wav"});
+    EXPECT_EQ(playlist.position(), 1U);
+}
+
+/// Taking out the one it stands at leaves it standing at whatever followed.
+TEST(Playlist, StandsAtWhatFollowedTheTrackTakenOut)
+{
+    Playlist playlist;
+    playlist.set(three());
+
+    ASSERT_TRUE(playlist.go_to(1));
+    ASSERT_TRUE(playlist.remove(1));
+
+    EXPECT_EQ(playlist.current(), std::filesystem::path{"third.wav"});
+    EXPECT_EQ(playlist.position(), 1U);
+}
+
+/// Nothing followed the last one, so it stands at the end of what is left.
+TEST(Playlist, StandsAtTheEndWhenTheLastTrackGoes)
+{
+    Playlist playlist;
+    playlist.set(three());
+
+    ASSERT_TRUE(playlist.go_to(2));
+    ASSERT_TRUE(playlist.remove(2));
+
+    EXPECT_EQ(playlist.current(), std::filesystem::path{"second.wav"});
+    EXPECT_EQ(playlist.position(), 1U);
+}
+
+TEST(Playlist, StandsNowhereOnceTheLastTrackIsTakenOut)
+{
+    Playlist playlist;
+
+    playlist.add(std::filesystem::path{"only.wav"});
+    ASSERT_TRUE(playlist.remove(0));
+
+    EXPECT_TRUE(playlist.empty());
+    EXPECT_FALSE(playlist.position().has_value());
+}
+
+/// A shuffled order holds places in the list, so taking one out has to mend the rest of them.
+TEST(Playlist, KeepsAShuffledOrderWholeWhenATrackGoes)
+{
+    Playlist playlist;
+    playlist.set(three());
+    playlist.shuffle(3);
+
+    ASSERT_TRUE(playlist.remove(1));
+    ASSERT_EQ(playlist.size(), 2U);
+
+    playlist.set_repeat(Repeat::none);
+
+    // Back to the start of the order, which after shuffling is not the start of the list.
+    while (playlist.previous()) { }
+
+    std::set<std::filesystem::path> seen{playlist.current()};
+
+    while (playlist.next())
+        seen.insert(playlist.current());
+
+    EXPECT_EQ(seen.size(), 2U);
+    EXPECT_EQ(seen.count(std::filesystem::path{"second.wav"}), 0U);
 }
 
 TEST(Playlist, StandsNowhereOnceCleared)

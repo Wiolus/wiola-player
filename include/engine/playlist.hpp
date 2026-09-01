@@ -58,6 +58,10 @@ public:
     /// Puts `track` at the end. A list that was empty stands at it.
     void add(std::filesystem::path track);
 
+    /// Takes the track that was put at `index` out. It stands afterwards at whatever followed
+    /// the one removed, or at the last of what is left. False when there is no such track.
+    bool remove(std::size_t index);
+
     /// Empties it, leaving it standing nowhere.
     void clear() noexcept;
 

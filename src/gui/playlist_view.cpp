@@ -24,6 +24,8 @@
 
 #include <QString>
 
+#include <algorithm>
+
 #include <filesystem>
 #include <vector>
 
@@ -33,11 +35,35 @@ PlaylistView::PlaylistView(QWidget* parent)
     : QListWidget{parent}
 {
     setMinimumHeight(tuning::playlist_height);
-    setSelectionMode(QAbstractItemView::SingleSelection);
-    setToolTip("Double-click a track to play it");
+    setSelectionMode(QAbstractItemView::ExtendedSelection);
+    setToolTip("Double-click a track to play it; Delete takes it out of the queue");
 
     connect(this, &QListWidget::itemActivated, this,
         [this](QListWidgetItem* item) { emit track_chosen(static_cast<std::size_t>(row(item))); });
+}
+
+std::vector<std::size_t> PlaylistView::chosen_rows() const
+{
+    std::vector<std::size_t> rows;
+
+    for (const QListWidgetItem* item : selectedItems())
+        rows.push_back(static_cast<std::size_t>(row(item)));
+
+    // Last first, so that taking one out does not move the ones still to go.
+    std::ranges::sort(rows, std::ranges::greater{});
+
+    return rows;
+}
+
+void PlaylistView::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Delete) {
+        emit removal_asked();
+
+        return;
+    }
+
+    QListWidget::keyPressEvent(event);
 }
 
 void PlaylistView::show_playlist(const engine::Playlist& playlist)

@@ -90,6 +90,9 @@ MainWindow::MainWindow()
     play_button_->setFixedWidth(tuning::play_button_width);
     repeat_button_ = new QPushButton{"Repeat: off", this};
     shuffle_button_ = new QPushButton{"Shuffle", this};
+    add_button_ = new QPushButton{"Add", this};
+    remove_button_ = new QPushButton{"Remove", this};
+    clear_button_ = new QPushButton{"Clear", this};
 
     shuffle_button_->setCheckable(true);
     equalizer_button_ = new QPushButton{"EQ", this};
@@ -163,6 +166,15 @@ MainWindow::MainWindow()
     layout->addLayout(list);
     layout->addWidget(playlist_view_);
 
+    // What is done to the queue, under the queue it is done to.
+    auto* queue = new QHBoxLayout;
+    queue->addWidget(add_button_);
+    queue->addWidget(remove_button_);
+    queue->addWidget(clear_button_);
+    queue->addStretch();
+
+    layout->addLayout(queue);
+
     // Kept in the layout while it says nothing, so a message appearing does not resize the window.
     layout->addWidget(status_label_);
 
@@ -170,6 +182,10 @@ MainWindow::MainWindow()
     connect(previous_button_, &QPushButton::clicked, this, &MainWindow::play_previous);
     connect(next_button_, &QPushButton::clicked, this, &MainWindow::play_next);
     connect(playlist_view_, &PlaylistView::track_chosen, this, &MainWindow::play_chosen);
+    connect(playlist_view_, &PlaylistView::removal_asked, this, &MainWindow::remove_chosen);
+    connect(add_button_, &QPushButton::clicked, this, &MainWindow::add_tracks);
+    connect(remove_button_, &QPushButton::clicked, this, &MainWindow::remove_chosen);
+    connect(clear_button_, &QPushButton::clicked, this, &MainWindow::clear_queue);
     connect(repeat_button_, &QPushButton::clicked, this, &MainWindow::cycle_repeat);
     connect(shuffle_button_, &QPushButton::toggled, this, &MainWindow::set_shuffled);
     connect(play_button_, &QPushButton::clicked, this, &MainWindow::toggle_playback);
@@ -205,13 +221,10 @@ void MainWindow::open(std::vector<std::filesystem::path> tracks)
     refresh();
 }
 
-void MainWindow::choose_tracks()
+std::vector<std::filesystem::path> MainWindow::ask_for_tracks()
 {
-    const QStringList chosen{QFileDialog::getOpenFileNames(this, "Open tracks", QString{},
+    const QStringList chosen{QFileDialog::getOpenFileNames(this, "Choose tracks", QString{},
         "Audio (*.wav *.wave *.flac *.mp3 *.mp2 *.mpga);;All files (*)")};
-
-    if (chosen.isEmpty())
-        return;
 
     std::vector<std::filesystem::path> tracks;
     tracks.reserve(static_cast<std::size_t>(chosen.size()));
@@ -219,8 +232,38 @@ void MainWindow::choose_tracks()
     for (const QString& name : chosen)
         tracks.emplace_back(name.toStdString());
 
+    return tracks;
+}
+
+void MainWindow::choose_tracks()
+{
     // Whether the files can be read is said by playing them.
-    open(std::move(tracks));
+    open(ask_for_tracks());
+}
+
+void MainWindow::add_tracks()
+{
+    std::vector<std::filesystem::path> tracks{ask_for_tracks()};
+
+    if (tracks.empty())
+        return;
+
+    session_.add(std::move(tracks));
+    refresh();
+}
+
+void MainWindow::remove_chosen()
+{
+    for (const std::size_t row : playlist_view_->chosen_rows())
+        static_cast<void>(session_.remove(row));
+
+    refresh();
+}
+
+void MainWindow::clear_queue()
+{
+    session_.clear();
+    refresh();
 }
 
 void MainWindow::play_chosen(std::size_t index)
@@ -323,8 +366,9 @@ void MainWindow::take_up_load()
 
     // The title follows what is playing, so a list moving on to the next track renames the
     // window without anyone asking it to.
-    if (session_.track() != named_) {
+    if (session_.track() != named_ || session_.playlist().position() != named_place_) {
         named_ = session_.track();
+        named_place_ = session_.playlist().position();
 
         const QString name{named_.empty() ? QString{"no track"}
                                           : QString::fromStdString(named_.filename().string())};
