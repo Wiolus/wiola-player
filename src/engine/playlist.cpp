@@ -62,6 +62,48 @@ void Playlist::add(std::filesystem::path track)
         place_ = 0;
 }
 
+bool Playlist::remove(std::size_t index)
+{
+    if (index >= tracks_.size())
+        return false;
+
+    const std::optional<std::size_t> standing{position()};
+
+    tracks_.erase(tracks_.begin() + static_cast<std::ptrdiff_t>(index));
+
+    // The order holds places in the list, so the place taken out goes, and every place after it
+    // has moved down one.
+    order_.erase(std::ranges::find(order_, index));
+
+    for (std::size_t& place : order_)
+        if (place > index)
+            --place;
+
+    if (tracks_.empty()) {
+        place_.reset();
+
+        return true;
+    }
+
+    if (!standing.has_value()) {
+        place_ = 0;
+
+        return true;
+    }
+
+    // Taking out the one it stands at leaves it standing at whatever followed, which is now at
+    // the same place - unless that was the end of the list.
+    if (*standing == index) {
+        place_ = place_of(std::min(index, tracks_.size() - 1));
+
+        return true;
+    }
+
+    place_ = place_of(*standing > index ? *standing - 1 : *standing);
+
+    return true;
+}
+
 void Playlist::clear() noexcept
 {
     tracks_.clear();

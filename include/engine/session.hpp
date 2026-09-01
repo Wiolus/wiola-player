@@ -75,6 +75,18 @@ public:
     /// The same, backwards.
     bool previous_track();
 
+    /// Puts `tracks` at the end of the queue, leaving what is playing alone. With nothing
+    /// loaded, the first of them is read so that there is something to press play on.
+    void add(std::vector<std::filesystem::path> tracks);
+
+    /// Takes the track that was put at `index` out of the queue. What is playing keeps playing,
+    /// even when it is the one taken out: the queue says what comes next, not what is on.
+    bool remove(std::size_t index);
+
+    /// Empties the queue and ends playback. What was playing stays loaded, so it can be played
+    /// again without opening it afresh.
+    void clear();
+
     /// What is queued, and where in it playback stands. For showing a listener their list.
     [[nodiscard]] const Playlist& playlist() const noexcept;
 

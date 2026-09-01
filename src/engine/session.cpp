@@ -130,6 +130,29 @@ bool Session::previous_track()
     return true;
 }
 
+void Session::add(std::vector<std::filesystem::path> tracks)
+{
+    const bool was_empty{playlist_.empty()};
+
+    for (std::filesystem::path& track : tracks)
+        playlist_.add(std::move(track));
+
+    // Adding to an empty queue is the first thing a listener does, and they mean to play it.
+    if (was_empty && !playlist_.empty() && !loaded())
+        static_cast<void>(begin_reading(playlist_.current(), Waiting::install));
+}
+
+bool Session::remove(std::size_t index)
+{
+    return playlist_.remove(index);
+}
+
+void Session::clear()
+{
+    playlist_.clear();
+    stop();
+}
+
 const Playlist& Session::playlist() const noexcept
 {
     return playlist_;

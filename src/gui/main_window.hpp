@@ -39,6 +39,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace wiola::gui {
@@ -67,6 +68,18 @@ public:
 private:
     /// Asks for files and plays them, in the order they were chosen.
     void choose_tracks();
+
+    /// Asks a listener which files they mean, and answers with nothing when they say none.
+    [[nodiscard]] std::vector<std::filesystem::path> ask_for_tracks();
+
+    /// Asks for files and puts them at the end of the queue.
+    void add_tracks();
+
+    /// Takes whatever rows are picked out of the queue.
+    void remove_chosen();
+
+    /// Empties the queue.
+    void clear_queue();
 
     /// Plays the track the listener picked out of the queue.
     void play_chosen(std::size_t index);
@@ -129,8 +142,10 @@ private:
     /// What it has already said about playback going wrong, for the same reason.
     bool said_fault_{false};
 
-    /// The track the title names, so that a list moving on renames it.
+    /// The track the title names, and where in the queue it stood: a listener may queue the
+    /// same file twice, and moving from one of them to the other is still a new track.
     std::filesystem::path named_;
+    std::optional<std::size_t> named_place_;
 
     /// The file a run leaves things in.
     QSettings settings_;
@@ -144,6 +159,9 @@ private:
     QPushButton* stop_button_{nullptr};
     QPushButton* repeat_button_{nullptr};
     QPushButton* shuffle_button_{nullptr};
+    QPushButton* add_button_{nullptr};
+    QPushButton* remove_button_{nullptr};
+    QPushButton* clear_button_{nullptr};
     SeekBar* position_bar_{nullptr};
     PlaylistView* playlist_view_{nullptr};
     QSlider* volume_slider_{nullptr};

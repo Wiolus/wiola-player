@@ -404,6 +404,81 @@ TEST(Session, PlaysTheNextTrackAndTheOneBefore)
         [&fixture, &first] { return fixture.session.track() == first; }));
 }
 
+/// Adding is for the queue, not for what is on: a track playing keeps playing.
+TEST(Session, AddsToTheQueueWithoutDisturbingWhatIsPlaying)
+{
+    Fixture fixture;
+    fixture.consuming = false;
+
+    const std::filesystem::path first{wiola::testing::write_wav("wiola_session.wav")};
+    const std::filesystem::path added{wiola::testing::write_wav("wiola_session_added.wav")};
+
+    ASSERT_EQ(load_and_wait(fixture.session, first), OpenResult::opened);
+    ASSERT_TRUE(fixture.session.play_or_pause());
+
+    fixture.session.add({added});
+
+    EXPECT_EQ(fixture.session.playlist().tracks().size(), 2U);
+    EXPECT_EQ(fixture.session.track(), first);
+    EXPECT_EQ(fixture.session.state(), State::playing);
+}
+
+/// Adding to an empty queue is the first thing a listener does, and they mean to play it.
+TEST(Session, ReadsTheFirstTrackAddedToAnEmptyQueue)
+{
+    Fixture fixture;
+
+    const std::filesystem::path added{wiola::testing::write_wav("wiola_session.wav")};
+
+    fixture.session.add({added});
+
+    ASSERT_TRUE(poll_until(fixture.session, [&fixture] { return fixture.session.loaded(); }));
+    EXPECT_EQ(fixture.session.track(), added);
+    EXPECT_EQ(fixture.session.state(), State::idle);
+}
+
+/// The queue says what comes next, not what is on: taking out the track that is playing leaves
+/// it playing.
+TEST(Session, KeepsPlayingATrackTakenOutOfTheQueue)
+{
+    Fixture fixture;
+    fixture.consuming = false;
+
+    const std::filesystem::path first{wiola::testing::write_wav("wiola_session.wav")};
+    const std::filesystem::path next{wiola::testing::write_wav("wiola_session_next.wav")};
+
+    ASSERT_EQ(fixture.session.open({first, next}), OpenResult::loading);
+    ASSERT_TRUE(poll_until(fixture.session, [&fixture] { return fixture.session.loaded(); }));
+    ASSERT_TRUE(fixture.session.play_or_pause());
+
+    EXPECT_TRUE(fixture.session.remove(0));
+
+    EXPECT_EQ(fixture.session.playlist().tracks().size(), 1U);
+    EXPECT_EQ(fixture.session.track(), first);
+    EXPECT_EQ(fixture.session.state(), State::playing);
+    EXPECT_FALSE(fixture.session.remove(1));
+}
+
+TEST(Session, EmptiesTheQueueAndEndsPlayback)
+{
+    Fixture fixture;
+    fixture.consuming = false;
+
+    ASSERT_EQ(fixture.session.open({wiola::testing::write_wav("wiola_session.wav"),
+                  wiola::testing::write_wav("wiola_session_next.wav")}),
+        OpenResult::loading);
+    ASSERT_TRUE(poll_until(fixture.session, [&fixture] { return fixture.session.loaded(); }));
+    ASSERT_TRUE(fixture.session.play_or_pause());
+
+    fixture.session.clear();
+
+    EXPECT_TRUE(fixture.session.playlist().empty());
+    EXPECT_EQ(fixture.session.state(), State::stopped);
+
+    // What was playing is still loaded, so it can be played again without opening it afresh.
+    EXPECT_TRUE(fixture.session.loaded());
+}
+
 /// What a listener picking a track out of their queue asks for.
 TEST(Session, PlaysTheTrackItIsSentTo)
 {
