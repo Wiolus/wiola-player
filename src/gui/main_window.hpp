@@ -142,7 +142,9 @@ private:
     QPushButton* equalizer_button_{nullptr};
     QPushButton* boost_button_{nullptr};
     EqualizerPanel* equalizer_panel_{nullptr};
-    QLabel* time_label_{nullptr};
+    QLabel* track_label_{nullptr};
+    QLabel* elapsed_label_{nullptr};
+    QLabel* total_label_{nullptr};
     QLabel* status_label_{nullptr};
     QTimer* refresh_timer_{nullptr};
 };
