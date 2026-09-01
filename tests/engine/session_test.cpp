@@ -51,14 +51,33 @@ namespace units = wiola::units;
 /// on a later turn.
 OpenResult load_and_wait(Session& session, const std::filesystem::path& path)
 {
-    session.load(path);
+    session.open(path);
 
-    while (session.loading())
+    while (session.reading())
         std::this_thread::yield();
 
-    session.poll();
+    session.catch_up();
 
-    return session.last_result();
+    return session.open_result();
+}
+
+/// Turns the session over until `settled` says it has caught up, the way a window that draws
+/// does. Fails rather than hangs when it never does.
+template<typename Predicate>
+bool poll_until(Session& session, Predicate settled)
+{
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+
+    while (std::chrono::steady_clock::now() < deadline) {
+        session.catch_up();
+
+        if (settled())
+            return true;
+
+        std::this_thread::yield();
+    }
+
+    return settled();
 }
 
 /// A session that plays nowhere real, and counts the outputs it was asked to build.
@@ -95,7 +114,7 @@ TEST(Session, AnswersWhileNothingIsLoaded)
 {
     Fixture fixture;
 
-    EXPECT_FALSE(fixture.session.toggle());
+    EXPECT_FALSE(fixture.session.play_or_pause());
 
     fixture.session.stop();
     fixture.session.seek(units::Time{1.0});
@@ -125,73 +144,6 @@ TEST(Session, RefusesAFileItCannotRead)
         OpenResult::unreadable);
     EXPECT_FALSE(fixture.session.loaded());
     EXPECT_EQ(fixture.num_outputs, 0U);
-}
-
-/// What was playing goes when a file that cannot be read is opened, rather than playing on under
-/// a window that says something else is loaded.
-/// A file that will not open is no reason to silence the one that is playing: the listener still
-/// has the track they had, and is told what went wrong with the other.
-/// Reading ahead is for the track after this one: it is read and kept, and what is playing
-/// carries on until it is asked for.
-TEST(Session, KeepsATrackReadAheadUntilItIsAskedFor)
-{
-    Fixture fixture;
-    fixture.consuming = false;
-
-    const std::filesystem::path first{wiola::testing::write_wav("wiola_session.wav")};
-    const std::filesystem::path next{wiola::testing::write_wav("wiola_session_next.wav")};
-
-    ASSERT_EQ(load_and_wait(fixture.session, first), OpenResult::opened);
-    ASSERT_TRUE(fixture.session.toggle());
-
-    ASSERT_EQ(fixture.session.read_ahead(next), OpenResult::loading);
-
-    while (fixture.session.loading())
-        std::this_thread::yield();
-
-    fixture.session.poll();
-
-    EXPECT_TRUE(fixture.session.ready());
-    EXPECT_EQ(fixture.session.track(), first) << "reading ahead took over what was playing";
-    EXPECT_EQ(fixture.session.state(), State::playing);
-
-    EXPECT_TRUE(fixture.session.install());
-
-    EXPECT_FALSE(fixture.session.ready());
-    EXPECT_EQ(fixture.session.track(), next);
-    EXPECT_EQ(fixture.session.state(), State::idle) << "a track put on is loaded, not playing";
-}
-
-TEST(Session, InstallsNothingWhenNothingWasRead)
-{
-    Fixture fixture;
-
-    EXPECT_FALSE(fixture.session.ready());
-    EXPECT_FALSE(fixture.session.install());
-    EXPECT_FALSE(fixture.session.loaded());
-}
-
-/// A listener picking a file has said which track they meant, so one read ahead of them is
-/// dropped rather than played next.
-TEST(Session, DropsATrackReadAheadWhenAnotherIsPicked)
-{
-    Fixture fixture;
-
-    const std::filesystem::path ahead{wiola::testing::write_wav("wiola_session_ahead.wav")};
-    const std::filesystem::path picked{wiola::testing::write_wav("wiola_session.wav")};
-
-    ASSERT_EQ(fixture.session.read_ahead(ahead), OpenResult::loading);
-
-    while (fixture.session.loading())
-        std::this_thread::yield();
-
-    fixture.session.poll();
-    ASSERT_TRUE(fixture.session.ready());
-
-    ASSERT_EQ(load_and_wait(fixture.session, picked), OpenResult::opened);
-
-    EXPECT_FALSE(fixture.session.ready());
-    EXPECT_EQ(fixture.session.track(), picked);
 }
 
 TEST(Session, NamesNoTrackBeforeOneIsLoaded)
@@ -237,7 +189,7 @@ TEST(Session, KeepsWhatWasLoadedWhenTheNextFileFails)
 
     ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
         OpenResult::opened);
-    ASSERT_TRUE(fixture.session.toggle());
+    ASSERT_TRUE(fixture.session.play_or_pause());
     ASSERT_EQ(fixture.session.state(), State::playing);
 
     EXPECT_EQ(load_and_wait(fixture.session, std::filesystem::path{"no-such-track.wav"}),
@@ -259,44 +211,20 @@ TEST(Session, KeepsPlayingWhileTheNextFileIsRead)
 
     ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
         OpenResult::opened);
-    ASSERT_TRUE(fixture.session.toggle());
+    ASSERT_TRUE(fixture.session.play_or_pause());
 
-    EXPECT_EQ(fixture.session.load(wiola::testing::write_wav("wiola_other.wav")),
+    EXPECT_EQ(fixture.session.open(wiola::testing::write_wav("wiola_other.wav")),
         OpenResult::loading);
     EXPECT_EQ(fixture.session.state(), State::playing);
     EXPECT_TRUE(fixture.session.loaded());
 
-    while (fixture.session.loading())
+    while (fixture.session.reading())
         std::this_thread::yield();
 
-    fixture.session.poll();
+    fixture.session.catch_up();
 
-    EXPECT_EQ(fixture.session.last_result(), OpenResult::opened);
+    EXPECT_EQ(fixture.session.open_result(), OpenResult::opened);
     EXPECT_EQ(fixture.session.state(), State::idle) << "the new track is loaded, not playing";
-}
-
-/// What a device is pointed at is never a track that has been let go: putting a track on takes
-/// the last one away first, so an ordering slip is silence rather than a read of what is gone.
-TEST(Session, PlaysNothingWhileOneTrackGivesWayToTheNext)
-{
-    Fixture fixture;
-    fixture.consuming = false;
-
-    ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
-        OpenResult::opened);
-    ASSERT_TRUE(fixture.session.toggle());
-
-    ASSERT_EQ(fixture.session.read_ahead(wiola::testing::write_wav("wiola_session_next.wav")),
-        OpenResult::loading);
-
-    while (fixture.session.loading())
-        std::this_thread::yield();
-
-    fixture.session.poll();
-    ASSERT_TRUE(fixture.session.ready());
-
-    EXPECT_TRUE(fixture.session.install());
-    EXPECT_EQ(fixture.session.state(), State::idle);
 }
 
 /// A device is opened for a format, and a track in the same one plays through the device that is
@@ -336,14 +264,14 @@ TEST(Session, PlaysAndPauses)
     ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
         OpenResult::opened);
 
-    ASSERT_TRUE(fixture.session.toggle());
+    ASSERT_TRUE(fixture.session.play_or_pause());
     EXPECT_EQ(fixture.session.state(), State::playing);
     EXPECT_TRUE(fixture.session.playing());
 
-    ASSERT_TRUE(fixture.session.toggle());
+    ASSERT_TRUE(fixture.session.play_or_pause());
     EXPECT_EQ(fixture.session.state(), State::paused);
 
-    ASSERT_TRUE(fixture.session.toggle());
+    ASSERT_TRUE(fixture.session.play_or_pause());
     EXPECT_EQ(fixture.session.state(), State::playing);
 }
 
@@ -353,7 +281,7 @@ TEST(Session, StopsAtTheBeginning)
 
     ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
         OpenResult::opened);
-    ASSERT_TRUE(fixture.session.toggle());
+    ASSERT_TRUE(fixture.session.play_or_pause());
 
     fixture.session.seek(units::Time{1.0});
     fixture.session.stop();
@@ -390,3 +318,123 @@ TEST(Session, KeepsItsSettingsAcrossTracks)
 }
 
 } // namespace
+
+/// The point of a list: a track running out is the cue to play the next one.
+TEST(Session, PlaysTheNextTrackWhenOneEnds)
+{
+    Fixture fixture;
+
+    const std::filesystem::path first{wiola::testing::write_wav("wiola_session.wav")};
+    const std::filesystem::path next{wiola::testing::write_wav("wiola_session_next.wav")};
+
+    ASSERT_EQ(fixture.session.open({first, next}), OpenResult::loading);
+    ASSERT_TRUE(poll_until(fixture.session, [&fixture] { return fixture.session.loaded(); }));
+    ASSERT_TRUE(fixture.session.play_or_pause());
+
+    EXPECT_TRUE(poll_until(fixture.session, [&fixture, &next] {
+        return fixture.session.track() == next;
+    })) << "the next track was never played";
+    EXPECT_TRUE(poll_until(fixture.session, [&fixture] { return fixture.session.playing(); }));
+}
+
+/// The end of the list is the end of playback: it stays where it stopped.
+TEST(Session, StaysAtTheEndOfTheList)
+{
+    Fixture fixture;
+
+    const std::filesystem::path only{wiola::testing::write_wav("wiola_session.wav")};
+
+    ASSERT_EQ(load_and_wait(fixture.session, only), OpenResult::opened);
+    ASSERT_TRUE(fixture.session.play_or_pause());
+
+    ASSERT_TRUE(poll_until(fixture.session,
+        [&fixture] { return fixture.session.state() == State::ended; }));
+
+    fixture.session.catch_up();
+
+    EXPECT_FALSE(fixture.session.reading()) << "there was nowhere to go, and it went";
+    EXPECT_EQ(fixture.session.state(), State::ended);
+    EXPECT_EQ(fixture.session.track(), only);
+}
+
+/// A listener who pressed stop did not ask for the next track.
+TEST(Session, PlaysNothingNextWhenTheListenerStops)
+{
+    Fixture fixture;
+    fixture.consuming = false;
+
+    const std::filesystem::path first{wiola::testing::write_wav("wiola_session.wav")};
+    const std::filesystem::path next{wiola::testing::write_wav("wiola_session_next.wav")};
+
+    ASSERT_EQ(fixture.session.open({first, next}), OpenResult::loading);
+    ASSERT_TRUE(poll_until(fixture.session, [&fixture] { return fixture.session.loaded(); }));
+    ASSERT_TRUE(fixture.session.play_or_pause());
+
+    fixture.session.stop();
+    fixture.session.catch_up();
+
+    // Nothing was even begun: waiting to see whether a track arrives would pass whether or not
+    // one was on its way.
+    EXPECT_FALSE(fixture.session.reading())
+        << "a listener's stop was taken as a cue to read the next track";
+
+    ASSERT_TRUE(poll_until(fixture.session, [&fixture] { return !fixture.session.reading(); }));
+
+    EXPECT_EQ(fixture.session.track(), first);
+    EXPECT_EQ(fixture.session.state(), State::stopped);
+}
+
+TEST(Session, PlaysTheNextTrackAndTheOneBefore)
+{
+    Fixture fixture;
+    fixture.consuming = false;
+
+    const std::filesystem::path first{wiola::testing::write_wav("wiola_session.wav")};
+    const std::filesystem::path next{wiola::testing::write_wav("wiola_session_next.wav")};
+
+    ASSERT_EQ(fixture.session.open({first, next}), OpenResult::loading);
+    ASSERT_TRUE(poll_until(fixture.session, [&fixture] { return fixture.session.loaded(); }));
+
+    ASSERT_TRUE(fixture.session.next_track());
+    ASSERT_TRUE(poll_until(fixture.session,
+        [&fixture, &next] { return fixture.session.track() == next; }));
+
+    ASSERT_TRUE(fixture.session.previous_track());
+    EXPECT_TRUE(poll_until(fixture.session,
+        [&fixture, &first] { return fixture.session.track() == first; }));
+}
+
+TEST(Session, GoesNowhereBeyondTheEndsOfTheList)
+{
+    Fixture fixture;
+
+    ASSERT_EQ(load_and_wait(fixture.session, wiola::testing::write_wav("wiola_session.wav")),
+        OpenResult::opened);
+
+    EXPECT_FALSE(fixture.session.next_track());
+    EXPECT_FALSE(fixture.session.previous_track());
+}
+
+/// Skipping while a track plays plays the one skipped to; skipping while nothing does, does not.
+TEST(Session, KeepsPlayingOrNotWhenTheTrackChanges)
+{
+    Fixture fixture;
+    fixture.consuming = false;
+
+    const std::filesystem::path first{wiola::testing::write_wav("wiola_session.wav")};
+    const std::filesystem::path next{wiola::testing::write_wav("wiola_session_next.wav")};
+
+    ASSERT_EQ(fixture.session.open({first, next}), OpenResult::loading);
+    ASSERT_TRUE(poll_until(fixture.session, [&fixture] { return fixture.session.loaded(); }));
+    ASSERT_TRUE(fixture.session.play_or_pause());
+
+    ASSERT_TRUE(fixture.session.next_track());
+    EXPECT_TRUE(poll_until(fixture.session, [&fixture] { return fixture.session.playing(); }));
+
+    fixture.session.stop();
+    ASSERT_TRUE(fixture.session.previous_track());
+    ASSERT_TRUE(poll_until(fixture.session,
+        [&fixture, &first] { return fixture.session.track() == first; }));
+
+    EXPECT_FALSE(fixture.session.playing());
+}
