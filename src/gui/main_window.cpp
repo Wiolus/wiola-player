@@ -142,7 +142,7 @@ MainWindow::~MainWindow() = default;
 
 void MainWindow::load(const std::filesystem::path& path)
 {
-    said_ = session_.load(path);
+    said_ = session_.open(path);
 
     show_status(QString{"opening "} + QString::fromStdString(path.filename().string()) + "...");
     refresh();
@@ -150,9 +150,9 @@ void MainWindow::load(const std::filesystem::path& path)
 
 void MainWindow::take_up_load()
 {
-    session_.poll();
+    session_.catch_up();
 
-    const codec::OpenResult result{session_.last_result()};
+    const codec::OpenResult result{session_.open_result()};
 
     // Said once: a window that repeated itself every turn would overwrite whatever else it has
     // to say.
@@ -191,7 +191,7 @@ void MainWindow::toggle_playback()
     // Pausing cannot fail, so a refusal is always an output that would not open.
     const bool pausing{session_.state() == engine::Playback::State::playing};
 
-    show_status(session_.toggle() || pausing ? QString{} : QString{"no playback device"});
+    show_status(session_.play_or_pause() || pausing ? QString{} : QString{"no playback device"});
 }
 
 void MainWindow::show_equalizer()

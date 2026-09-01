@@ -36,6 +36,8 @@
 
 #include <memory>
 #include <optional>
+#include <random>
+#include <vector>
 
 #include <utility>
 
@@ -86,14 +88,74 @@ Session::Session(OutputFactory make_output)
 
 Session::~Session() = default;
 
-codec::OpenResult Session::load(const std::filesystem::path& path)
+codec::OpenResult Session::open(const std::filesystem::path& path)
 {
+    // One file is a list of one: everything that plays, plays from the list.
+    playlist_.set({path});
+
     return begin_reading(path, Waiting::install);
 }
 
-codec::OpenResult Session::read_ahead(const std::filesystem::path& path)
+codec::OpenResult Session::open(std::vector<std::filesystem::path> tracks)
 {
-    return begin_reading(path, Waiting::keep);
+    playlist_.set(std::move(tracks));
+
+    if (playlist_.empty())
+        return last_result_;
+
+    return begin_reading(playlist_.current(), Waiting::install);
+}
+
+bool Session::next_track()
+{
+    const bool was_playing{playing()};
+
+    if (!playlist_.next())
+        return false;
+
+    static_cast<void>(read_current_track(was_playing));
+
+    return true;
+}
+
+bool Session::previous_track()
+{
+    const bool was_playing{playing()};
+
+    if (!playlist_.previous())
+        return false;
+
+    static_cast<void>(read_current_track(was_playing));
+
+    return true;
+}
+
+void Session::set_repeat(Playlist::Repeat repeat) noexcept
+{
+    playlist_.set_repeat(repeat);
+}
+
+Playlist::Repeat Session::repeat() const noexcept
+{
+    return playlist_.repeat();
+}
+
+void Session::shuffle(bool on)
+{
+    if (!on) {
+        playlist_.unshuffle();
+
+        return;
+    }
+
+    std::random_device seeds;
+
+    playlist_.shuffle(seeds());
+}
+
+bool Session::shuffled() const noexcept
+{
+    return playlist_.shuffled();
 }
 
 codec::OpenResult Session::begin_reading(const std::filesystem::path& path, Waiting waiting)
@@ -110,7 +172,18 @@ codec::OpenResult Session::begin_reading(const std::filesystem::path& path, Wait
     return last_result_;
 }
 
-void Session::poll()
+codec::OpenResult Session::read_current_track(bool playing)
+{
+    return begin_reading(playlist_.current(), playing ? Waiting::play : Waiting::install);
+}
+
+void Session::catch_up()
+{
+    take_up_finished_read();
+    advance_if_ended();
+}
+
+void Session::take_up_finished_read()
 {
     std::optional<codec::Opened> opened{loader_->take()};
 
@@ -129,18 +202,37 @@ void Session::poll()
     ready_track_ = opening_;
     last_result_ = codec::OpenResult::opened;
 
-    if (waiting_ == Waiting::install)
-        static_cast<void>(install());
+    const bool play{waiting_ == Waiting::play};
+
+    if (install_read_track() && play)
+        static_cast<void>(play_or_pause());
 }
 
-bool Session::ready() const noexcept
+void Session::advance_if_ended()
+{
+    // A track that ran out is the cue to play the next. A listener who pressed stop is not, and
+    // neither is a device that went away.
+    if (state() != Playback::State::ended)
+        return;
+
+    // One already on its way is the same cue, answered.
+    if (reading() || read_waiting())
+        return;
+
+    if (!playlist_.next())
+        return;
+
+    static_cast<void>(read_current_track(true));
+}
+
+bool Session::read_waiting() const noexcept
 {
     return ready_ != nullptr;
 }
 
-bool Session::install()
+bool Session::install_read_track()
 {
-    if (!ready())
+    if (!read_waiting())
         return false;
 
     std::unique_ptr<codec::Decoder> source{std::move(ready_)};
@@ -172,12 +264,12 @@ bool Session::install()
     return true;
 }
 
-bool Session::loading() const noexcept
+bool Session::reading() const noexcept
 {
     return loader_->busy();
 }
 
-codec::OpenResult Session::last_result() const noexcept
+codec::OpenResult Session::open_result() const noexcept
 {
     return last_result_;
 }
@@ -192,7 +284,7 @@ bool Session::loaded() const noexcept
     return pipeline_ != nullptr;
 }
 
-bool Session::toggle()
+bool Session::play_or_pause()
 {
     if (!loaded())
         return false;

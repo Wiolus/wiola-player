@@ -29,11 +29,13 @@
 #include <codec/open.hpp>
 #include <core/macros.hpp>
 #include <engine/playback.hpp>
+#include <engine/playlist.hpp>
 #include <utils/units.hpp>
 
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <vector>
 
 namespace wiola::engine {
 
@@ -62,33 +64,40 @@ public:
 
     ~Session();
 
-    /// Begins loading `path`. Reading a file is not quick enough to wait for, so this returns
-    /// `loading` and whatever is playing keeps playing; `poll` is what finishes the job. A file
-    /// that will not open leaves the track that was playing alone, and says why through
-    /// `last_result`.
-    codec::OpenResult load(const std::filesystem::path& path);
+    /// Plays `tracks` in the order given, standing at the first of them and reading it. What
+    /// was in the list before is replaced.
+    codec::OpenResult open(std::vector<std::filesystem::path> tracks);
 
-    /// Reads `path` and keeps it, without disturbing what is playing: what has been read waits
-    /// for `install`. For reading the next track while this one is still going.
-    codec::OpenResult read_ahead(const std::filesystem::path& path);
+    /// Stands at the next track of the list and reads it, keeping whether something was playing.
+    /// False when there is nowhere to go.
+    bool next_track();
 
-    /// Takes up a finished load. For the thread that called `load`, as often as it likes: a
-    /// caller that draws should call it as it draws. What `load` asked for goes on at once; what
-    /// `read_ahead` asked for waits.
-    void poll();
+    /// The same, backwards.
+    bool previous_track();
 
-    /// Whether a track has been read and is waiting to go on.
-    [[nodiscard]] bool ready() const noexcept;
+    void set_repeat(Playlist::Repeat repeat) noexcept;
+    [[nodiscard]] Playlist::Repeat repeat() const noexcept;
 
-    /// Puts the track that was read in place of whatever is loaded, from its beginning and not
-    /// playing. False when nothing is waiting.
-    bool install();
+    /// Plays the list in an order drawn at random, or in the order it was given.
+    void shuffle(bool on);
+    [[nodiscard]] bool shuffled() const noexcept;
+
+    /// Begins reading `path` and makes it the whole of the list. Reading a file is not quick
+    /// enough to wait for, so this returns `loading` and whatever is playing keeps playing;
+    /// `catch_up` is what finishes the job. A file that will not open leaves the track that was
+    /// playing alone, and says why through `open_result`.
+    codec::OpenResult open(const std::filesystem::path& path);
+
+    /// Does whatever has fallen due since the last time: puts on a track that has finished
+    /// being read, and takes up the next one when the last has run out. For the thread that
+    /// opens tracks, as often as it likes - a caller that draws should call it as it draws.
+    void catch_up();
 
     /// Whether a file is still being read.
-    [[nodiscard]] bool loading() const noexcept;
+    [[nodiscard]] bool reading() const noexcept;
 
-    /// How the last load went, which is `loading` until one has finished.
-    [[nodiscard]] codec::OpenResult last_result() const noexcept;
+    /// How the last open went, which is `loading` until the file has been read.
+    [[nodiscard]] codec::OpenResult open_result() const noexcept;
 
     [[nodiscard]] bool loaded() const noexcept;
 
@@ -98,7 +107,7 @@ public:
 
     /// Starts, pauses or resumes, whichever playback is due. False when the output could not
     /// be opened, and when there is nothing loaded.
-    bool toggle();
+    bool play_or_pause();
 
     /// Ends playback and returns to the beginning of the track.
     void stop() noexcept;
@@ -124,12 +133,32 @@ private:
 
     /// What a finished read is for.
     enum class Waiting {
+        /// Put it on, and leave it as a track ready to be played.
         install,
-        keep,
+
+        /// Put it on and play it: what a track ending, or a listener skipping, asks for.
+        play,
     };
 
     /// Starts reading `path`, and says what is to be done with it once it has been read.
     codec::OpenResult begin_reading(const std::filesystem::path& path, Waiting waiting);
+
+    /// Puts on whatever has finished being read, and plays it if that is what it was read for.
+    void take_up_finished_read();
+
+    /// Reads whatever the list now stands at, playing it if something was playing.
+    codec::OpenResult read_current_track(bool playing);
+
+    /// Whether a track has been read and is waiting to go on.
+    [[nodiscard]] bool read_waiting() const noexcept;
+
+    /// Puts the track that was read in place of whatever is loaded, from its beginning and not
+    /// playing. False when nothing is waiting.
+    bool install_read_track();
+
+    /// Takes up the next track when one has run out. A listener who pressed stop, or a device
+    /// that went away, is not a cue to play anything.
+    void advance_if_ended();
 
     /// What a track is shaped by, and in what order: the bands first, then how loud, so that
     /// what a listener asks for last is the last thing done to the sound.
@@ -137,6 +166,7 @@ private:
     audio::Equalizer& equalizer_{chain_.add<audio::Equalizer>(audio::StreamSpec{})};
     audio::Volume& volume_{chain_.add<audio::Volume>()};
     std::unique_ptr<Loader> loader_;
+    Playlist playlist_;
 
     /// What is being read, and what was read: the second becomes the first once a file has
     /// opened and taken the place of whatever was playing.
