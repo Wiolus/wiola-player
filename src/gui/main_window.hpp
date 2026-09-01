@@ -33,6 +33,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QSlider>
+#include <QStyle>
 #include <QTimer>
 #include <QWidget>
 
@@ -80,6 +81,9 @@ private:
 
     /// Plays the list in the order it was given, or in one drawn at random.
     void set_shuffled(bool shuffled);
+
+    /// Puts `icon` on `button`, with `says` for whoever cannot read a picture.
+    void show_button(QPushButton& button, QStyle::StandardPixmap icon, const QString& says);
 
     /// Says which of the three repeats is on, and whether the order is shuffled.
     void show_list_buttons();
