@@ -36,6 +36,9 @@ inline constexpr int track_name_point_size_step{3};
 /// How wide the play button is drawn. Wider than the rest: it is the one that is pressed most.
 inline constexpr int play_button_width{90};
 
+/// How tall the queue is drawn before the window is resized. Enough to see a handful of tracks.
+inline constexpr int playlist_height{120};
+
 inline constexpr int seek_bar_height{12};
 
 /// How wide the line marking the played edge of the seek bar is.

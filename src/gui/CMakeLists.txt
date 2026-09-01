@@ -4,6 +4,7 @@ wiola_add_library(
         equalizer_control.cpp
         equalizer_panel.cpp
         main_window.cpp
+        playlist_view.cpp
         seek_bar.cpp
         volume_control.cpp
     LIBS wiola_codec wiola_engine
