@@ -64,6 +64,10 @@ public:
     [[nodiscard]] bool empty() const noexcept;
     [[nodiscard]] std::size_t size() const noexcept;
 
+    /// Every track, in the order they were given. Shuffling changes what plays next, not what
+    /// this says: a listener looking at their list wants to see the list they made.
+    [[nodiscard]] const std::vector<std::filesystem::path>& tracks() const noexcept;
+
     /// The track it stands at, or nothing when it stands nowhere.
     [[nodiscard]] const std::filesystem::path& current() const noexcept;
 

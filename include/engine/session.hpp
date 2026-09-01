@@ -75,6 +75,13 @@ public:
     /// The same, backwards.
     bool previous_track();
 
+    /// What is queued, and where in it playback stands. For showing a listener their list.
+    [[nodiscard]] const Playlist& playlist() const noexcept;
+
+    /// Plays the track that was put at `index`, keeping whether something was playing. False
+    /// when there is no such track.
+    bool play_track(std::size_t index);
+
     void set_repeat(Playlist::Repeat repeat) noexcept;
     [[nodiscard]] Playlist::Repeat repeat() const noexcept;
 

@@ -21,6 +21,7 @@
 #pragma once
 
 #include "equalizer_panel.hpp"
+#include "playlist_view.hpp"
 #include "seek_bar.hpp"
 #include "volume_control.hpp"
 
@@ -65,6 +66,9 @@ public:
 private:
     /// Asks for files and plays them, in the order they were chosen.
     void choose_tracks();
+
+    /// Plays the track the listener picked out of the queue.
+    void play_chosen(std::size_t index);
 
     /// Plays the track before or after this one in the list.
     void play_previous();
@@ -137,6 +141,7 @@ private:
     QPushButton* repeat_button_{nullptr};
     QPushButton* shuffle_button_{nullptr};
     SeekBar* position_bar_{nullptr};
+    PlaylistView* playlist_view_{nullptr};
     QSlider* volume_slider_{nullptr};
     QLabel* volume_value_{nullptr};
     QPushButton* equalizer_button_{nullptr};

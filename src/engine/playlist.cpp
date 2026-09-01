@@ -80,6 +80,11 @@ std::size_t Playlist::size() const noexcept
     return tracks_.size();
 }
 
+const std::vector<std::filesystem::path>& Playlist::tracks() const noexcept
+{
+    return tracks_;
+}
+
 const std::filesystem::path& Playlist::current() const noexcept
 {
     if (!place_.has_value())

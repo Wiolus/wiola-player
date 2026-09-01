@@ -130,6 +130,23 @@ bool Session::previous_track()
     return true;
 }
 
+const Playlist& Session::playlist() const noexcept
+{
+    return playlist_;
+}
+
+bool Session::play_track(std::size_t index)
+{
+    const bool was_playing{playing()};
+
+    if (!playlist_.go_to(index))
+        return false;
+
+    static_cast<void>(read_current_track(was_playing));
+
+    return true;
+}
+
 void Session::set_repeat(Playlist::Repeat repeat) noexcept
 {
     playlist_.set_repeat(repeat);

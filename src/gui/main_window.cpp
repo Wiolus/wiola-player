@@ -86,6 +86,7 @@ MainWindow::MainWindow()
     boost_button_ = new QPushButton{"+", this};
     volume_value_ = new QLabel{this};
     position_bar_ = new SeekBar{this};
+    playlist_view_ = new PlaylistView{this};
     track_label_ = new QLabel{this};
     elapsed_label_ = new QLabel{this};
     total_label_ = new QLabel{this};
@@ -153,6 +154,7 @@ MainWindow::MainWindow()
     layout->addLayout(times);
     layout->addLayout(transport);
     layout->addLayout(list);
+    layout->addWidget(playlist_view_);
 
     // Kept in the layout while it says nothing, so a message appearing does not resize the window.
     layout->addWidget(status_label_);
@@ -160,6 +162,7 @@ MainWindow::MainWindow()
     connect(open_button_, &QPushButton::clicked, this, &MainWindow::choose_tracks);
     connect(previous_button_, &QPushButton::clicked, this, &MainWindow::play_previous);
     connect(next_button_, &QPushButton::clicked, this, &MainWindow::play_next);
+    connect(playlist_view_, &PlaylistView::track_chosen, this, &MainWindow::play_chosen);
     connect(repeat_button_, &QPushButton::clicked, this, &MainWindow::cycle_repeat);
     connect(shuffle_button_, &QPushButton::toggled, this, &MainWindow::set_shuffled);
     connect(play_button_, &QPushButton::clicked, this, &MainWindow::toggle_playback);
@@ -211,6 +214,12 @@ void MainWindow::choose_tracks()
 
     // Whether the files can be read is said by playing them.
     open(std::move(tracks));
+}
+
+void MainWindow::play_chosen(std::size_t index)
+{
+    static_cast<void>(session_.play_track(index));
+    refresh();
 }
 
 void MainWindow::play_previous()
@@ -390,6 +399,7 @@ void MainWindow::refresh()
     next_button_->setEnabled(loaded());
 
     show_list_buttons();
+    playlist_view_->show_playlist(session_.playlist());
 
     if (!loaded()) {
         play_button_->setText("Play");

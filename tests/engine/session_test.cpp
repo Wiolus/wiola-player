@@ -404,6 +404,43 @@ TEST(Session, PlaysTheNextTrackAndTheOneBefore)
         [&fixture, &first] { return fixture.session.track() == first; }));
 }
 
+/// What a listener picking a track out of their queue asks for.
+TEST(Session, PlaysTheTrackItIsSentTo)
+{
+    Fixture fixture;
+    fixture.consuming = false;
+
+    const std::filesystem::path first{wiola::testing::write_wav("wiola_session.wav")};
+    const std::filesystem::path next{wiola::testing::write_wav("wiola_session_next.wav")};
+
+    ASSERT_EQ(fixture.session.open({first, next}), OpenResult::loading);
+    ASSERT_TRUE(poll_until(fixture.session, [&fixture] { return fixture.session.loaded(); }));
+
+    ASSERT_TRUE(fixture.session.play_track(1));
+    EXPECT_TRUE(poll_until(fixture.session,
+        [&fixture, &next] { return fixture.session.track() == next; }));
+
+    EXPECT_EQ(fixture.session.playlist().position(), 1U);
+    EXPECT_FALSE(fixture.session.play_track(2)) << "there is no third track to be sent to";
+}
+
+/// The queue is what was given, in the order it was given: shuffling changes what plays next,
+/// not the list a listener is looking at.
+TEST(Session, ShowsTheQueueInTheOrderItWasGiven)
+{
+    Fixture fixture;
+
+    const std::filesystem::path first{wiola::testing::write_wav("wiola_session.wav")};
+    const std::filesystem::path next{wiola::testing::write_wav("wiola_session_next.wav")};
+
+    ASSERT_EQ(fixture.session.open({first, next}), OpenResult::loading);
+    fixture.session.shuffle(true);
+
+    ASSERT_EQ(fixture.session.playlist().tracks().size(), 2U);
+    EXPECT_EQ(fixture.session.playlist().tracks().front(), first);
+    EXPECT_EQ(fixture.session.playlist().tracks().back(), next);
+}
+
 TEST(Session, GoesNowhereBeyondTheEndsOfTheList)
 {
     Fixture fixture;
