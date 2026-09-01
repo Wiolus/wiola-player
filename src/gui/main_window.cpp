@@ -73,11 +73,21 @@ MainWindow::MainWindow()
     setWindowTitle("Wiola Player");
 
     // Every widget is given this window as its parent, so Qt owns them and destroys them with it.
-    open_button_ = new QPushButton{"Open", this};
-    previous_button_ = new QPushButton{"<<", this};
-    play_button_ = new QPushButton{"Play", this};
-    next_button_ = new QPushButton{">>", this};
-    stop_button_ = new QPushButton{"Stop", this};
+    open_button_ = new QPushButton{this};
+    previous_button_ = new QPushButton{this};
+    play_button_ = new QPushButton{this};
+    next_button_ = new QPushButton{this};
+    stop_button_ = new QPushButton{this};
+
+    // Pictures for what a listener does, and words for what is set: the style draws these, so
+    // there is nothing to ship beside the program and they look native wherever it runs.
+    show_button(*open_button_, QStyle::SP_DirOpenIcon, "Open tracks");
+    show_button(*previous_button_, QStyle::SP_MediaSkipBackward, "Previous track");
+    show_button(*play_button_, QStyle::SP_MediaPlay, "Play");
+    show_button(*next_button_, QStyle::SP_MediaSkipForward, "Next track");
+    show_button(*stop_button_, QStyle::SP_MediaStop, "Stop");
+
+    play_button_->setFixedWidth(tuning::play_button_width);
     repeat_button_ = new QPushButton{"Repeat: off", this};
     shuffle_button_ = new QPushButton{"Shuffle", this};
 
@@ -116,9 +126,6 @@ MainWindow::MainWindow()
     title.setPointSize(title.pointSize() + tuning::track_name_point_size_step);
     title.setBold(true);
     track_label_->setFont(title);
-
-    // The one press that happens most, and the only one worth reaching for without looking.
-    play_button_->setMinimumWidth(tuning::play_button_width);
 
     total_label_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
@@ -259,6 +266,19 @@ void MainWindow::set_shuffled(bool shuffled)
 {
     session_.shuffle(shuffled);
     show_list_buttons();
+}
+
+void MainWindow::show_button(QPushButton& button, QStyle::StandardPixmap icon, const QString& says)
+{
+    button.setIcon(style()->standardIcon(icon));
+    button.setToolTip(says);
+
+    // The word is gone, so the tooltip is what a listener is told: it is also what a screen
+    // reader is left with.
+    button.setAccessibleName(says);
+
+    if (&button != play_button_)
+        button.setFixedWidth(tuning::icon_button_width);
 }
 
 void MainWindow::show_list_buttons()
@@ -402,7 +422,7 @@ void MainWindow::refresh()
     playlist_view_->show_playlist(session_.playlist());
 
     if (!loaded()) {
-        play_button_->setText("Play");
+        show_button(*play_button_, QStyle::SP_MediaPlay, "Play");
         track_label_->setText("no track");
         elapsed_label_->clear();
         total_label_->clear();
@@ -417,7 +437,11 @@ void MainWindow::refresh()
     const units::Time shown{
         position_bar_->dragging() ? total * position_bar_->fraction() : session_.time_played()};
 
-    play_button_->setText(session_.playing() ? "Pause" : "Play");
+    if (session_.playing())
+        show_button(*play_button_, QStyle::SP_MediaPause, "Pause");
+    else
+        show_button(*play_button_, QStyle::SP_MediaPlay, "Play");
+
     elapsed_label_->setText(as_clock(shown));
     total_label_->setText(as_clock(total));
 

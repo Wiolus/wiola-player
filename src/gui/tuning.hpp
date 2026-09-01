@@ -33,8 +33,10 @@ inline constexpr std::chrono::milliseconds engine_poll_interval{100};
 /// How much larger the name of what is playing is drawn than everything else, in points.
 inline constexpr int track_name_point_size_step{3};
 
-/// How wide the play button is drawn. Wider than the rest: it is the one that is pressed most.
-inline constexpr int play_button_width{90};
+/// How wide a button showing only an icon is drawn, and how wide the play button is: wider than
+/// its neighbours, since it is the one that is pressed most.
+inline constexpr int icon_button_width{44};
+inline constexpr int play_button_width{64};
 
 /// How tall the queue is drawn before the window is resized. Enough to see a handful of tracks.
 inline constexpr int playlist_height{120};
