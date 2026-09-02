@@ -1,3 +1,9 @@
+wiola_add_test(
+    codec_tags_test
+    SOURCES tags_test.cpp
+    LIBS wiola_codec
+    DATA "${PROJECT_SOURCE_DIR}/tests/codec/data"
+)
 set(fixtures "${CMAKE_CURRENT_SOURCE_DIR}/data")
 
 wiola_add_test(
