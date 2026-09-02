@@ -68,7 +68,6 @@ public:
     void clear() noexcept;
 
     [[nodiscard]] bool empty() const noexcept;
-    [[nodiscard]] std::size_t size() const noexcept;
 
     /// How many times what is queued has changed: tracks added or taken out, an order drawn, or
     /// something found out about a track. For a listener's window, which redraws many times a

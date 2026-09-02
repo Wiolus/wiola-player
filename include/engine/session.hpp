@@ -66,7 +66,10 @@ public:
     ~Session();
 
     /// Plays `tracks` in the order given, standing at the first of them and reading it. What
-    /// was in the list before is replaced.
+    /// was in the list before is replaced. Reading a file is not quick enough to wait for, so
+    /// this returns `loading` and whatever is playing keeps playing; `catch_up` is what finishes
+    /// the job. A file that will not open leaves the track that was playing alone, and says why
+    /// through `open_result`.
     codec::OpenResult open(std::vector<std::filesystem::path> tracks);
 
     /// Stands at the next track of the list and reads it, keeping whether something was playing.
@@ -101,12 +104,6 @@ public:
     /// Plays the list in an order drawn at random, or in the order it was given.
     void shuffle(bool on);
     [[nodiscard]] bool shuffled() const noexcept;
-
-    /// Begins reading `path` and makes it the whole of the list. Reading a file is not quick
-    /// enough to wait for, so this returns `loading` and whatever is playing keeps playing;
-    /// `catch_up` is what finishes the job. A file that will not open leaves the track that was
-    /// playing alone, and says why through `open_result`.
-    codec::OpenResult open(const std::filesystem::path& path);
 
     /// Does whatever has fallen due since the last time: puts on a track that has finished
     /// being read, and takes up the next one when the last has run out. For the thread that
@@ -189,7 +186,7 @@ private:
 
     /// What a track is shaped by, and in what order: the bands first, then how loud, so that
     /// what a listener asks for last is the last thing done to the sound.
-    audio::Chain chain_{audio::StreamSpec{}};
+    audio::Chain chain_;
     audio::Equalizer& equalizer_{chain_.add<audio::Equalizer>(audio::StreamSpec{})};
     audio::Volume& volume_{chain_.add<audio::Volume>()};
     std::unique_ptr<Loader> loader_;

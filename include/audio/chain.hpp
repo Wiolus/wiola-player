@@ -42,7 +42,7 @@ namespace wiola::audio {
  */
 class Chain {
 public:
-    explicit Chain(StreamSpec spec) noexcept;
+    Chain() noexcept = default;
 
     NO_COPY_SEMANTIC(Chain);
     NO_MOVE_SEMANTIC(Chain);
@@ -66,14 +66,11 @@ public:
     /// Retunes every step for a stream of `spec`. Between tracks, never during one.
     void configure(StreamSpec spec);
 
-    [[nodiscard]] StreamSpec spec() const noexcept;
-
     /// Runs every step over `samples`, in the order they were added, and puts back whatever a
     /// step lifted past what an output takes.
     void process(std::span<float> samples) noexcept;
 
 private:
-    StreamSpec spec_{};
     std::vector<std::unique_ptr<Stage>> stages_;
 };
 

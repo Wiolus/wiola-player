@@ -57,7 +57,7 @@ TEST(Playlist, StandsNowhereWhileItIsEmpty)
     const Playlist playlist;
 
     EXPECT_TRUE(playlist.empty());
-    EXPECT_EQ(playlist.size(), 0U);
+    EXPECT_EQ(playlist.tracks().size(), 0U);
     EXPECT_TRUE(path_of(playlist).empty());
     EXPECT_FALSE(playlist.position().has_value());
 }
@@ -77,7 +77,7 @@ TEST(Playlist, StandsAtTheFirstOfWhatItIsGiven)
 
     playlist.set(three());
 
-    EXPECT_EQ(playlist.size(), 3U);
+    EXPECT_EQ(playlist.tracks().size(), 3U);
     EXPECT_EQ(path_of(playlist), std::filesystem::path{"first.wav"});
     EXPECT_EQ(playlist.position(), 0U);
 }
@@ -89,7 +89,7 @@ TEST(Playlist, StandsAtTheFirstTrackAdded)
     playlist.add(Track::of(std::filesystem::path{"only.wav"}));
     playlist.add(Track::of(std::filesystem::path{"after.wav"}));
 
-    EXPECT_EQ(playlist.size(), 2U);
+    EXPECT_EQ(playlist.tracks().size(), 2U);
     EXPECT_EQ(path_of(playlist), std::filesystem::path{"only.wav"});
 }
 
@@ -273,7 +273,7 @@ TEST(Playlist, TakesWhatIsFoundOutAboutATrack)
     EXPECT_EQ(playlist.current().title, "Together Forever");
     EXPECT_EQ(playlist.current().artist, "Rick Astley");
     EXPECT_EQ(playlist.position(), 1U) << "saying what a track is moved the list";
-    EXPECT_EQ(playlist.size(), 3U);
+    EXPECT_EQ(playlist.tracks().size(), 3U);
 
     EXPECT_FALSE(playlist.describe(3, Track{}));
 }
@@ -317,7 +317,7 @@ TEST(Playlist, TakesATrackOut)
 
     EXPECT_TRUE(playlist.remove(1));
 
-    ASSERT_EQ(playlist.size(), 2U);
+    ASSERT_EQ(playlist.tracks().size(), 2U);
     EXPECT_EQ(playlist.tracks().front().path, std::filesystem::path{"first.wav"});
     EXPECT_EQ(playlist.tracks().back().path, std::filesystem::path{"third.wav"});
 
@@ -382,7 +382,7 @@ TEST(Playlist, KeepsAShuffledOrderWholeWhenATrackGoes)
     playlist.shuffle(3);
 
     ASSERT_TRUE(playlist.remove(1));
-    ASSERT_EQ(playlist.size(), 2U);
+    ASSERT_EQ(playlist.tracks().size(), 2U);
 
     playlist.set_repeat(Repeat::none);
 
