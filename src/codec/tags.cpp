@@ -26,7 +26,9 @@
 #include <tstringlist.h>
 #include <tvariant.h>
 
-#include <cstring>
+#include <audioproperties.h>
+
+#include <chrono>
 
 namespace wiola::codec {
 
@@ -63,9 +65,10 @@ void read_picture(Tags& tags, const TagLib::FileRef& file)
 
 Tags read_tags(const std::filesystem::path& path)
 {
-    // Opened for reading what it says about itself, never for reading the sound: a queue of a
-    // hundred tracks is a hundred of these.
-    const TagLib::FileRef file{path.c_str(), false};
+    // How long it runs is worth having and comes of the same open, but only as the header
+    // states it: the reading that works it out for a file whose header does not is the reading
+    // this is here to avoid.
+    const TagLib::FileRef file{path.c_str(), true, TagLib::AudioProperties::Fast};
 
     if (file.isNull() || file.tag() == nullptr)
         return {};
@@ -75,6 +78,9 @@ Tags read_tags(const std::filesystem::path& path)
     tags.title = as_utf8(file.tag()->title());
     tags.artist = as_utf8(file.tag()->artist());
     tags.album = as_utf8(file.tag()->album());
+
+    if (const TagLib::AudioProperties* properties = file.audioProperties())
+        tags.duration = units::Time{std::chrono::milliseconds{properties->lengthInMilliseconds()}};
 
     read_picture(tags, file);
 

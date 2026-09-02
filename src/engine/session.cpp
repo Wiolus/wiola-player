@@ -22,6 +22,7 @@
 
 #include "loader.hpp"
 #include "player.hpp"
+#include "tag_reader.hpp"
 
 #include "tuning.hpp"
 
@@ -83,6 +84,7 @@ Session::Session()
 Session::Session(OutputFactory make_output)
     // In the order they are declared, which is the order they are built in whatever this says.
     : loader_{std::make_unique<Loader>()}
+    , tags_{std::make_unique<TagReader>()}
     , make_output_{std::move(make_output)}
 {
 }
@@ -93,6 +95,7 @@ codec::OpenResult Session::open(const std::filesystem::path& path)
 {
     // One file is a list of one: everything that plays, plays from the list.
     playlist_.set({Track::of(path)});
+    begin_reading_tags({path});
 
     return begin_reading(path, Waiting::install);
 }
@@ -106,6 +109,7 @@ codec::OpenResult Session::open(std::vector<std::filesystem::path> tracks)
         queued.push_back(Track::of(std::move(track)));
 
     playlist_.set(std::move(queued));
+    begin_reading_tags(tracks);
 
     if (playlist_.empty())
         return last_result_;
@@ -140,6 +144,8 @@ bool Session::previous_track()
 void Session::add(std::vector<std::filesystem::path> tracks)
 {
     const bool was_empty{playlist_.empty()};
+
+    begin_reading_tags(tracks);
 
     for (std::filesystem::path& track : tracks)
         playlist_.add(Track::of(std::move(track)));
@@ -227,7 +233,37 @@ codec::OpenResult Session::read_current_track(bool playing)
 void Session::catch_up()
 {
     take_up_finished_read();
+    take_up_finished_tags();
     advance_if_ended();
+}
+
+void Session::begin_reading_tags(std::vector<std::filesystem::path> paths)
+{
+    tags_->start(std::move(paths));
+}
+
+void Session::take_up_finished_tags()
+{
+    for (const TagReader::Reading& reading : tags_->take()) {
+        const std::vector<Track>& queued{playlist_.tracks()};
+
+        // A file may be queued more than once, and what it says is true of every row it is in.
+        for (std::size_t index = 0; index < queued.size(); ++index) {
+            if (queued[index].path != reading.path)
+                continue;
+
+            Track told{queued[index]};
+
+            if (!reading.tags.title.empty())
+                told.title = reading.tags.title;
+
+            told.artist = reading.tags.artist;
+            told.album = reading.tags.album;
+            told.duration = reading.tags.duration;
+
+            static_cast<void>(playlist_.describe(index, std::move(told)));
+        }
+    }
 }
 
 void Session::take_up_finished_read()

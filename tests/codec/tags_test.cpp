@@ -20,6 +20,8 @@
 
 #include <codec/tags.hpp>
 
+#include <utils/units.hpp>
+
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -90,9 +92,16 @@ TEST(Tags, SaysNothingAboutAFileThatIsNotThere)
     EXPECT_TRUE(read_tags(std::filesystem::path{"no-such-track.mp3"}).empty());
 }
 
-TEST(Tags, SaysNothingAboutAFileWithNoneToSay)
+/// A file with no tags still says how long it runs, which its header states outright.
+TEST(Tags, SaysOnlyHowLongAFileWithNoTagsRuns)
 {
-    EXPECT_TRUE(read_tags(data() / "tone.wav").empty());
+    const wiola::codec::Tags tags{read_tags(data() / "tone.wav")};
+
+    EXPECT_TRUE(tags.title.empty());
+    EXPECT_TRUE(tags.artist.empty());
+    EXPECT_TRUE(tags.album.empty());
+    EXPECT_TRUE(tags.art.empty());
+    EXPECT_GT(tags.duration, wiola::units::Time{});
 }
 
 TEST(Tags, ReadsWhatAnMp3SaysAboutItself)

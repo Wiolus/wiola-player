@@ -8,4 +8,9 @@ wiola_add_test(
     LIBS wiola_codec wiola_engine
     DATA "${PROJECT_SOURCE_DIR}/tests/codec/data"
 )
-wiola_add_test(engine_session_test SOURCES session_test.cpp LIBS wiola_engine)
+wiola_add_test(
+    engine_session_test
+    SOURCES session_test.cpp
+    LIBS wiola_engine
+    DATA "${PROJECT_SOURCE_DIR}/tests/codec/data"
+)

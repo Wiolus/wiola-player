@@ -26,6 +26,8 @@
 #include <audio/stream_spec.hpp>
 #include <codec/open.hpp>
 #include <engine/session.hpp>
+
+#include <engine/track.hpp>
 #include <fakes/output.hpp>
 #include <utils/units.hpp>
 
@@ -477,6 +479,38 @@ TEST(Session, EmptiesTheQueueAndEndsPlayback)
 
     // What was playing is still loaded, so it can be played again without opening it afresh.
     EXPECT_TRUE(fixture.session.loaded());
+}
+
+/// A queue shows what its tracks say about themselves, which is read off the thread that queued
+/// them and taken up as it arrives.
+TEST(Session, TakesUpWhatQueuedTracksSayAboutThemselves)
+{
+    Fixture fixture;
+
+    const std::filesystem::path track{std::filesystem::path{WIOLA_TEST_DATA_DIR} / "tone.flac"};
+
+    ASSERT_EQ(fixture.session.open({track}), OpenResult::loading);
+
+    ASSERT_TRUE(poll_until(fixture.session, [&fixture] {
+        return fixture.session.playlist().tracks().front().duration != units::Time{};
+    })) << "how long the track runs was never found out";
+
+    const wiola::engine::Track& described{fixture.session.playlist().tracks().front()};
+
+    EXPECT_GT(described.duration, units::Time{});
+    EXPECT_FALSE(described.title.empty());
+}
+
+/// Until then it is a track with the file's own name, rather than a row waiting for something.
+TEST(Session, NamesAQueuedTrackAfterItsFileToBeginWith)
+{
+    Fixture fixture;
+
+    const std::filesystem::path track{wiola::testing::write_wav("wiola_session.wav")};
+
+    ASSERT_EQ(fixture.session.open({track}), OpenResult::loading);
+
+    EXPECT_EQ(fixture.session.playlist().tracks().front().title, track.filename().string());
 }
 
 /// What a listener picking a track out of their queue asks for.
