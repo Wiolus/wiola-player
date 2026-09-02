@@ -105,11 +105,13 @@ codec::OpenResult Session::open(std::vector<std::filesystem::path> tracks)
     std::vector<Track> queued;
     queued.reserve(tracks.size());
 
-    for (std::filesystem::path& track : tracks)
-        queued.push_back(Track::of(std::move(track)));
+    for (const std::filesystem::path& track : tracks)
+        queued.push_back(Track::of(track));
 
     playlist_.set(std::move(queued));
-    begin_reading_tags(tracks);
+
+    // The paths are still whole here: asking after handing them over would ask about nothing.
+    begin_reading_tags(std::move(tracks));
 
     if (playlist_.empty())
         return last_result_;
@@ -145,10 +147,11 @@ void Session::add(std::vector<std::filesystem::path> tracks)
 {
     const bool was_empty{playlist_.empty()};
 
-    begin_reading_tags(tracks);
+    for (const std::filesystem::path& track : tracks)
+        playlist_.add(Track::of(track));
 
-    for (std::filesystem::path& track : tracks)
-        playlist_.add(Track::of(std::move(track)));
+    // The paths are still whole here: asking after handing them over would ask about nothing.
+    begin_reading_tags(std::move(tracks));
 
     // Adding to an empty queue is the first thing a listener does, and they mean to play it.
     if (was_empty && !playlist_.empty() && !loaded())

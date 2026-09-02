@@ -41,6 +41,8 @@ const Track& nothing()
 
 void Playlist::set(std::vector<Track> tracks)
 {
+    ++revision_;
+
     tracks_ = std::move(tracks);
 
     order_.resize(tracks_.size());
@@ -52,6 +54,8 @@ void Playlist::set(std::vector<Track> tracks)
 
 void Playlist::add(Track track)
 {
+    ++revision_;
+
     tracks_.push_back(std::move(track));
 
     // A track added to a shuffled list goes at the end of the order rather than into the middle
@@ -66,6 +70,8 @@ bool Playlist::remove(std::size_t index)
 {
     if (index >= tracks_.size())
         return false;
+
+    ++revision_;
 
     const std::optional<std::size_t> standing{position()};
 
@@ -106,6 +112,8 @@ bool Playlist::remove(std::size_t index)
 
 void Playlist::clear() noexcept
 {
+    ++revision_;
+
     tracks_.clear();
     order_.clear();
     place_.reset();
@@ -115,6 +123,11 @@ void Playlist::clear() noexcept
 bool Playlist::empty() const noexcept
 {
     return tracks_.empty();
+}
+
+std::size_t Playlist::revision() const noexcept
+{
+    return revision_;
 }
 
 std::size_t Playlist::size() const noexcept
@@ -139,6 +152,8 @@ bool Playlist::describe(std::size_t index, Track track)
 {
     if (index >= tracks_.size())
         return false;
+
+    ++revision_;
 
     tracks_[index] = std::move(track);
 
@@ -219,6 +234,8 @@ Playlist::Repeat Playlist::repeat() const noexcept
 
 void Playlist::shuffle(std::uint_fast32_t seed)
 {
+    ++revision_;
+
     const std::optional<std::size_t> standing{position()};
 
     std::mt19937 random{seed};
@@ -233,6 +250,8 @@ void Playlist::shuffle(std::uint_fast32_t seed)
 
 void Playlist::unshuffle()
 {
+    ++revision_;
+
     const std::optional<std::size_t> standing{position()};
 
     std::iota(order_.begin(), order_.end(), std::size_t{0});

@@ -22,6 +22,10 @@
 
 #include <utils/units.hpp>
 
+#include <attachedpictureframe.h>
+#include <id3v2tag.h>
+#include <mpegfile.h>
+
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -125,4 +129,38 @@ TEST(Tags, SaysNothingAboutAFlacWithNothingInItsBlocks)
 
     // Whatever this file happens to carry, reading it must answer rather than fail.
     EXPECT_TRUE(tags.title.empty() || !tags.title.empty());
+}
+
+/// The picture a track carries is what the queue draws beside it, so it is worth knowing that
+/// one written into a file comes back out of it.
+TEST(Tags, ReadsThePictureATrackCarries)
+{
+    const std::filesystem::path track{
+        std::filesystem::temp_directory_path() / "wiola_with_cover.mp3"};
+
+    std::filesystem::copy_file(data() / "tone.mp3", track,
+        std::filesystem::copy_options::overwrite_existing);
+
+    // What a picture is made of does not matter here: what matters is that these bytes, and this
+    // kind, are what comes back.
+    const TagLib::ByteVector drawn{"\x89PNG\r\n\x1a\n and then some", 26};
+
+    {
+        TagLib::MPEG::File file{track.c_str()};
+        TagLib::ID3v2::AttachedPictureFrame* picture{new TagLib::ID3v2::AttachedPictureFrame};
+
+        picture->setMimeType("image/png");
+        picture->setType(TagLib::ID3v2::AttachedPictureFrame::FrontCover);
+        picture->setPicture(drawn);
+
+        ASSERT_NE(file.ID3v2Tag(true), nullptr);
+        file.ID3v2Tag(true)->addFrame(picture);
+        ASSERT_TRUE(file.save());
+    }
+
+    const wiola::codec::Tags tags{read_tags(track)};
+
+    EXPECT_EQ(tags.art_type, "image/png");
+    ASSERT_EQ(tags.art.size(), static_cast<std::size_t>(drawn.size()));
+    EXPECT_EQ(static_cast<unsigned char>(tags.art.front()), 0x89U);
 }

@@ -72,6 +72,7 @@ MainWindow::MainWindow()
     , equalizer_{session_.equalizer(), settings_}
 {
     setWindowTitle("Wiola Player");
+    setMinimumWidth(tuning::window_width);
 
     // Every widget is given this window as its parent, so Qt owns them and destroys them with it.
     open_button_ = new QPushButton{this};

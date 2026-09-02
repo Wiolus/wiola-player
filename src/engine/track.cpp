@@ -26,7 +26,7 @@ namespace wiola::engine {
 
 Track Track::of(std::filesystem::path path)
 {
-    std::string name{path.filename().string()};
+    std::string name{path.stem().string()};
 
     return Track{.path = std::move(path), .title = std::move(name)};
 }
