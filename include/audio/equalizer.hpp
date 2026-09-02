@@ -104,10 +104,6 @@ public:
     /// Applies the current settings to whole frames of `samples`, in place.
     void process(std::span<float> samples) noexcept override;
 
-    /// Whether the last `process` changed anything, and so could have lifted a sample past what
-    /// an output takes.
-    [[nodiscard]] bool shaping() const noexcept;
-
     /// Whether the bands it just applied could have lifted a sample past full scale.
     [[nodiscard]] bool lifted() const noexcept override;
 
