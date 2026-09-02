@@ -20,6 +20,7 @@
 
 #include "main_window.hpp"
 
+#include "clock.hpp"
 #include "tuning.hpp"
 
 #include <codec/decoder.hpp>
@@ -53,13 +54,6 @@ QString as_status(codec::OpenResult result)
     default:
         return QString{"cannot read that file"};
     }
-}
-
-QString as_clock(units::Time time)
-{
-    const auto total = static_cast<int>(time.get<units::Sec>());
-
-    return QString{"%1:%2"}.arg(total / 60).arg(total % 60, 2, 10, QChar{'0'});
 }
 
 } // namespace

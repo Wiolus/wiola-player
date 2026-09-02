@@ -194,14 +194,9 @@ void Equalizer::process(std::span<float> samples) noexcept
         ma_peak2_process_pcm_frames(&filter, samples.data(), samples.data(), num_frames);
 }
 
-bool Equalizer::shaping() const noexcept
-{
-    return bands_->applied;
-}
-
 bool Equalizer::lifted() const noexcept
 {
-    return shaping();
+    return bands_->applied;
 }
 
 float Equalizer::preamp() const noexcept

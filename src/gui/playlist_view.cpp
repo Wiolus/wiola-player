@@ -20,6 +20,7 @@
 
 #include "playlist_view.hpp"
 
+#include "clock.hpp"
 #include "tuning.hpp"
 
 #include <QFont>
@@ -61,17 +62,6 @@ public:
         QStyledItemDelegate::paint(painter, without, index);
     }
 };
-
-/// `time` as minutes and seconds, or nothing at all when it is not known.
-[[nodiscard]] QString as_clock(units::Time time)
-{
-    if (time == units::Time{})
-        return QString{};
-
-    const auto seconds = static_cast<int>(time.get<units::Sec>());
-
-    return QString{"%1:%2"}.arg(seconds / 60).arg(seconds % 60, 2, 10, QChar{'0'});
-}
 
 } // namespace
 
@@ -144,7 +134,11 @@ void PlaylistView::show_track(int at, const engine::Track& track, bool playing)
     setItem(at, Column::title, new QTableWidgetItem{QString::fromStdString(track.title)});
     setItem(at, Column::artist, new QTableWidgetItem{QString::fromStdString(track.artist)});
     setItem(at, Column::album, new QTableWidgetItem{QString::fromStdString(track.album)});
-    setItem(at, Column::length, new QTableWidgetItem{as_clock(track.duration)});
+
+    // A length that has not been read yet is left blank rather than shown as no time at all.
+    const QString length{track.duration == units::Time{} ? QString{} : as_clock(track.duration)};
+
+    setItem(at, Column::length, new QTableWidgetItem{length});
 
     if (!playing)
         return;
