@@ -143,7 +143,8 @@ TEST(Tags, ReadsThePictureATrackCarries)
 
     // What a picture is made of does not matter here: what matters is that these bytes, and this
     // kind, are what comes back.
-    const TagLib::ByteVector drawn{"\x89PNG\r\n\x1a\n and then some", 26};
+    constexpr char drawn_bytes[]{"\x89PNG\r\n\x1a\n and then some"};
+    const TagLib::ByteVector drawn{drawn_bytes, sizeof(drawn_bytes) - 1};
 
     {
         TagLib::MPEG::File file{track.c_str()};
