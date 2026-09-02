@@ -60,6 +60,10 @@ foreach(header IN LISTS wiola_taglib_headers)
     list(APPEND wiola_taglib_dirs "${wiola_taglib_dir}")
 endforeach()
 
+# Built into this program rather than beside it, which its headers have to be told: without this
+# they declare everything as coming from a library that is loaded, and nothing links on Windows.
+target_compile_definitions(tag INTERFACE TAGLIB_STATIC)
+
 list(REMOVE_DUPLICATES wiola_taglib_dirs)
 
 # Only for what is built here: taglib exports this target for installing, and a path into a build
