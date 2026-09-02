@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include <utils/units.hpp>
+
 #include <cstddef>
 #include <filesystem>
 #include <string>
@@ -44,9 +46,14 @@ struct Tags {
     std::vector<std::byte> art;
     std::string art_type;
 
+    /// How long the track runs, as the file's own header says. Zero when the header does not
+    /// say: working it out means reading the whole file, which is not worth a column.
+    units::Time duration;
+
     [[nodiscard]] bool empty() const noexcept
     {
-        return title.empty() && artist.empty() && album.empty() && art.empty();
+        return title.empty() && artist.empty() && album.empty() && art.empty() &&
+            duration == units::Time{};
     }
 };
 

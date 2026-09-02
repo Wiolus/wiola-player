@@ -40,6 +40,7 @@
 namespace wiola::engine {
 
 class Loader;
+class TagReader;
 
 /**
  * Builds what a track is played through, and keeps it built while it plays.
@@ -165,6 +166,13 @@ private:
     /// Puts on whatever has finished being read, and plays it if that is what it was read for.
     void take_up_finished_read();
 
+    /// Starts reading what `paths` say about themselves - their tags - which is taken up as it
+    /// comes back.
+    void begin_reading_tags(std::vector<std::filesystem::path> paths);
+
+    /// Puts what has been read about queued tracks into the queue.
+    void take_up_finished_tags();
+
     /// Reads whatever the list now stands at, playing it if something was playing.
     codec::OpenResult read_current_track(bool playing);
 
@@ -185,6 +193,7 @@ private:
     audio::Equalizer& equalizer_{chain_.add<audio::Equalizer>(audio::StreamSpec{})};
     audio::Volume& volume_{chain_.add<audio::Volume>()};
     std::unique_ptr<Loader> loader_;
+    std::unique_ptr<TagReader> tags_;
     Playlist playlist_;
 
     /// What is being read, and what was read: the second becomes the first once a file has

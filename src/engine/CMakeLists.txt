@@ -8,6 +8,7 @@ wiola_add_library(
         player.cpp
         playlist.cpp
         session.cpp
+        tag_reader.cpp
         track.cpp
     LIBS wiola_audio wiola_codec
 )
