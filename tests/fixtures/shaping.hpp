@@ -31,8 +31,7 @@ namespace wiola::testing {
 /// bands first, then how loud, so that what a listener asks for last is done last.
 struct Shaping {
     explicit Shaping(audio::StreamSpec spec, audio::BandLayout layout = {})
-        : chain{spec}
-        , equalizer{chain.add<audio::Equalizer>(spec, layout)}
+        : equalizer{chain.add<audio::Equalizer>(spec, layout)}
         , volume{chain.add<audio::Volume>()}
     {
     }

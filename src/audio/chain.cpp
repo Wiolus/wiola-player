@@ -25,22 +25,10 @@
 
 namespace wiola::audio {
 
-Chain::Chain(StreamSpec spec) noexcept
-    : spec_{spec}
-{
-}
-
 void Chain::configure(StreamSpec spec)
 {
-    spec_ = spec;
-
     for (const std::unique_ptr<Stage>& stage : stages_)
         stage->configure(spec);
-}
-
-StreamSpec Chain::spec() const noexcept
-{
-    return spec_;
 }
 
 void Chain::process(std::span<float> samples) noexcept

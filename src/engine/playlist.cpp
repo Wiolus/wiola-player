@@ -130,11 +130,6 @@ std::size_t Playlist::revision() const noexcept
     return revision_;
 }
 
-std::size_t Playlist::size() const noexcept
-{
-    return tracks_.size();
-}
-
 const std::vector<Track>& Playlist::tracks() const noexcept
 {
     return tracks_;

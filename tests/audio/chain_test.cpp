@@ -160,13 +160,6 @@ TEST(Chain, AcceptsNothingToDo)
     EXPECT_FLOAT_EQ(block[1], 0.5F);
 }
 
-TEST(Chain, KeepsTheFormatItWasGiven)
-{
-    const wiola::testing::Shaping shaping{stereo};
-
-    EXPECT_EQ(shaping.chain.spec(), stereo);
-}
-
 TEST(Chain, LaysOutOneBandPerOctave)
 {
     const wiola::testing::Shaping shaping{stereo};
@@ -236,7 +229,6 @@ TEST(Chain, TakesANewFormatWithoutForgettingTheSetting)
     shaping.chain.configure(StreamSpec{.sample_rate = 22050_Hz, .num_channels = 1});
 
     EXPECT_FLOAT_EQ(shaping.volume.gain(), 0.5F);
-    EXPECT_EQ(shaping.chain.spec().num_channels, 1u);
     EXPECT_EQ(shaping.equalizer.num_bands(), 9u);
 
     shaping.chain.configure(stereo);
@@ -246,13 +238,13 @@ TEST(Chain, TakesANewFormatWithoutForgettingTheSetting)
 
 namespace {
 
-/// Level of `chain`'s output for a sine at `tone`, in decibels against the sine's own level.
-double response_db(Chain& chain, Frequency tone)
+/// Level of `chain`'s output for a sine at `tone` in a stream of `spec`, in decibels against the
+/// sine's own level.
+double response_db(Chain& chain, StreamSpec spec, Frequency tone)
 {
     constexpr std::size_t num_blocks{40};
     constexpr std::size_t num_frames{512};
 
-    const StreamSpec spec{chain.spec()};
     wiola::testing::SineSource source{spec, tone, 0.5F};
     std::vector<float> block(spec.samples_per(wiola::audio::Frames{num_frames}));
 
@@ -301,8 +293,8 @@ TEST(Chain, LiftsABandAboveTheRest)
 
     shaping.equalizer.set_band_gain(5, 6.0F);
 
-    const double lifted{response_db(shaping.chain, shaping.equalizer.band_center(5))};
-    const double rest{response_db(shaping.chain, shaping.equalizer.band_center(0))};
+    const double lifted{response_db(shaping.chain, stereo, shaping.equalizer.band_center(5))};
+    const double rest{response_db(shaping.chain, stereo, shaping.equalizer.band_center(0))};
 
     EXPECT_NEAR(lifted, 0.0, 0.2);
     EXPECT_NEAR(lifted - rest, 6.0, 0.3);
@@ -314,7 +306,7 @@ TEST(Chain, CutsWhatABandIsSetTo)
 
     shaping.equalizer.set_band_gain(5, -6.0F);
 
-    EXPECT_NEAR(response_db(shaping.chain, shaping.equalizer.band_center(5)), -6.0, 0.2);
+    EXPECT_NEAR(response_db(shaping.chain, stereo, shaping.equalizer.band_center(5)), -6.0, 0.2);
 }
 
 /// A band reaches its neighbors, but by much less than it lifts its own center.
@@ -324,9 +316,9 @@ TEST(Chain, LeavesTheNextBandMostlyAlone)
 
     shaping.equalizer.set_band_gain(5, 6.0F);
 
-    const double lifted{response_db(shaping.chain, shaping.equalizer.band_center(5))};
-    const double neighbor{response_db(shaping.chain, shaping.equalizer.band_center(6))};
-    const double rest{response_db(shaping.chain, shaping.equalizer.band_center(0))};
+    const double lifted{response_db(shaping.chain, stereo, shaping.equalizer.band_center(5))};
+    const double neighbor{response_db(shaping.chain, stereo, shaping.equalizer.band_center(6))};
+    const double rest{response_db(shaping.chain, stereo, shaping.equalizer.band_center(0))};
 
     EXPECT_GT(neighbor, rest);
     EXPECT_LT(neighbor, lifted - 3.0);
@@ -370,8 +362,8 @@ TEST(Chain, RemembersGainsOfBandsAFormatDrops)
 
     shaping.chain.configure(stereo);
 
-    const double restored{response_db(shaping.chain, shaping.equalizer.band_center(9))};
-    const double rest{response_db(shaping.chain, shaping.equalizer.band_center(0))};
+    const double restored{response_db(shaping.chain, stereo, shaping.equalizer.band_center(9))};
+    const double rest{response_db(shaping.chain, stereo, shaping.equalizer.band_center(0))};
 
     EXPECT_NEAR(restored - rest, 6.0, 0.5);
 }
@@ -396,7 +388,8 @@ TEST(Chain, TakesTheRoomABoostNeeds)
     shaping.chain.process(block);
 
     EXPECT_FLOAT_EQ(shaping.equalizer.preamp(), -6.0F);
-    EXPECT_NEAR(response_db(shaping.chain, shaping.equalizer.band_center(5).hz() * 1_Hz), 0.0, 0.5);
+    EXPECT_NEAR(response_db(shaping.chain, stereo, shaping.equalizer.band_center(5).hz() * 1_Hz),
+        0.0, 0.5);
 }
 
 /// Only a lift needs room: cutting a band asks for none.

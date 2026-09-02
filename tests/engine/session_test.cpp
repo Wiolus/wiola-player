@@ -53,7 +53,7 @@ namespace units = wiola::units;
 /// on a later turn.
 OpenResult load_and_wait(Session& session, const std::filesystem::path& path)
 {
-    session.open(path);
+    session.open({path});
 
     while (session.reading())
         std::this_thread::yield();
@@ -215,7 +215,7 @@ TEST(Session, KeepsPlayingWhileTheNextFileIsRead)
         OpenResult::opened);
     ASSERT_TRUE(fixture.session.play_or_pause());
 
-    EXPECT_EQ(fixture.session.open(wiola::testing::write_wav("wiola_other.wav")),
+    EXPECT_EQ(fixture.session.open({wiola::testing::write_wav("wiola_other.wav")}),
         OpenResult::loading);
     EXPECT_EQ(fixture.session.state(), State::playing);
     EXPECT_TRUE(fixture.session.loaded());

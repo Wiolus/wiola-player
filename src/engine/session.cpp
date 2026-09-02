@@ -91,15 +91,6 @@ Session::Session(OutputFactory make_output)
 
 Session::~Session() = default;
 
-codec::OpenResult Session::open(const std::filesystem::path& path)
-{
-    // One file is a list of one: everything that plays, plays from the list.
-    playlist_.set({Track::of(path)});
-    begin_reading_tags({path});
-
-    return begin_reading(path, Waiting::install);
-}
-
 codec::OpenResult Session::open(std::vector<std::filesystem::path> tracks)
 {
     std::vector<Track> queued;
