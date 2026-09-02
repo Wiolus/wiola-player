@@ -70,6 +70,11 @@ public:
     [[nodiscard]] bool empty() const noexcept;
     [[nodiscard]] std::size_t size() const noexcept;
 
+    /// How many times what is queued has changed: tracks added or taken out, an order drawn, or
+    /// something found out about a track. For a listener's window, which redraws many times a
+    /// second and should not rebuild a list nobody has touched.
+    [[nodiscard]] std::size_t revision() const noexcept;
+
     /// Every track, in the order they were given. Shuffling changes what plays next, not what
     /// this says: a listener looking at their list wants to see the list they made.
     [[nodiscard]] const std::vector<Track>& tracks() const noexcept;
@@ -119,6 +124,10 @@ private:
 
     /// Where in `order_` it stands, or nothing when it stands nowhere.
     std::optional<std::size_t> place_;
+
+    /// Counted rather than compared: what changed is not worth working out, only that something
+    /// did.
+    std::size_t revision_{0};
 
     Repeat repeat_{Repeat::none};
     bool shuffled_{false};

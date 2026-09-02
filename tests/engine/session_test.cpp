@@ -425,6 +425,25 @@ TEST(Session, AddsToTheQueueWithoutDisturbingWhatIsPlaying)
     EXPECT_EQ(fixture.session.state(), State::playing);
 }
 
+/// What is added is read too, and every one of them.
+TEST(Session, TakesUpWhatEveryAddedTrackSays)
+{
+    Fixture fixture;
+
+    const std::vector<std::filesystem::path> both{std::filesystem::path{WIOLA_TEST_DATA_DIR} /
+            "tone.flac",
+        std::filesystem::path{WIOLA_TEST_DATA_DIR} / "tone.wav"};
+
+    fixture.session.add(both);
+
+    EXPECT_TRUE(poll_until(fixture.session, [&fixture] {
+        const std::vector<wiola::engine::Track>& queued{fixture.session.playlist().tracks()};
+
+        return queued.size() == 2 && queued.front().duration != units::Time{} &&
+            queued.back().duration != units::Time{};
+    })) << "a track that was added was never read";
+}
+
 /// Adding to an empty queue is the first thing a listener does, and they mean to play it.
 TEST(Session, ReadsTheFirstTrackAddedToAnEmptyQueue)
 {
@@ -501,6 +520,26 @@ TEST(Session, TakesUpWhatQueuedTracksSayAboutThemselves)
     EXPECT_FALSE(described.title.empty());
 }
 
+/// Every track of a list is read, not only the first: opening several is the one way a listener
+/// fills a queue in one go.
+TEST(Session, TakesUpWhatEveryTrackOfAnOpenedListSays)
+{
+    Fixture fixture;
+
+    const std::filesystem::path first{std::filesystem::path{WIOLA_TEST_DATA_DIR} / "tone.flac"};
+    const std::filesystem::path next{std::filesystem::path{WIOLA_TEST_DATA_DIR} / "tone.wav"};
+    const std::vector<std::filesystem::path> both{first, next};
+
+    ASSERT_EQ(fixture.session.open(both), OpenResult::loading);
+
+    ASSERT_TRUE(poll_until(fixture.session, [&fixture] {
+        const std::vector<wiola::engine::Track>& queued{fixture.session.playlist().tracks()};
+
+        return queued.size() == 2 && queued.front().duration != units::Time{} &&
+            queued.back().duration != units::Time{};
+    })) << "a track of the list was never read";
+}
+
 /// Until then it is a track with the file's own name, rather than a row waiting for something.
 TEST(Session, NamesAQueuedTrackAfterItsFileToBeginWith)
 {
@@ -510,7 +549,7 @@ TEST(Session, NamesAQueuedTrackAfterItsFileToBeginWith)
 
     ASSERT_EQ(fixture.session.open({track}), OpenResult::loading);
 
-    EXPECT_EQ(fixture.session.playlist().tracks().front().title, track.filename().string());
+    EXPECT_EQ(fixture.session.playlist().tracks().front().title, track.stem().string());
 }
 
 /// What a listener picking a track out of their queue asks for.

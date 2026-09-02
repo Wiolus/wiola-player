@@ -1,6 +1,7 @@
 wiola_add_library(
     wiola_gui
     SOURCES
+        cover_cache.cpp
         equalizer_control.cpp
         equalizer_panel.cpp
         main_window.cpp

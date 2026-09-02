@@ -49,7 +49,7 @@ struct Track {
     /// some only by being read through, which is not worth doing to fill in a column.
     units::Time duration;
 
-    /// The file's own name, for a track nothing else is known about.
+    /// The file's own name, without the extension, for a track nothing else is known about.
     [[nodiscard]] static Track of(std::filesystem::path path);
 };
 

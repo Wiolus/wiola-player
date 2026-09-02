@@ -20,24 +20,28 @@
 
 #pragma once
 
+#include "cover_cache.hpp"
+
 #include <engine/playlist.hpp>
 
 #include <QKeyEvent>
-#include <QListWidget>
+#include <QTableWidget>
 
 #include <cstddef>
+#include <optional>
 #include <vector>
 
 namespace wiola::gui {
 
 /**
- * The tracks that are queued, in the order they were given, with the one being played marked.
+ * The tracks that are queued: what each carries as a picture, what it is called, who it is by,
+ * what it is from and how long it runs, with the one being played marked.
  *
  * It is shown rather than kept: what is queued lives in the session, and this is redrawn from it
  * only when it has changed, so that a window refreshing ten times a second does not rebuild a
- * list nobody has touched.
+ * table nobody has touched.
  */
-class PlaylistView final : public QListWidget {
+class PlaylistView final : public QTableWidget {
     Q_OBJECT
 
 public:
@@ -46,8 +50,8 @@ public:
     /// Draws `playlist` if what it holds, or where it stands, has moved since the last time.
     void show_playlist(const engine::Playlist& playlist);
 
-    /// Which rows a listener has picked out, from the last towards the first: taking them out
-    /// in that order leaves the rows still to go where they were.
+    /// Which rows a listener has picked out, from the last towards the first: taking them out in
+    /// that order leaves the rows still to go where they were.
     [[nodiscard]] std::vector<std::size_t> chosen_rows() const;
 
 signals:
@@ -61,10 +65,14 @@ protected:
     void keyPressEvent(QKeyEvent* event) override;
 
 private:
+    /// Puts `track` in the row at `at`, picture and all, marked when it is the one playing.
+    void show_track(int at, const engine::Track& track, bool playing);
+
+    CoverCache covers_;
+
     /// What is drawn now, so that redrawing is only done when it would show something else.
-    std::size_t num_shown_{0};
-    std::size_t current_shown_{0};
-    bool anything_shown_{false};
+    std::optional<std::size_t> revision_shown_;
+    std::optional<std::size_t> current_shown_;
 };
 
 } // namespace wiola::gui

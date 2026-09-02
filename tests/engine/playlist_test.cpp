@@ -249,7 +249,7 @@ TEST(Playlist, NamesATrackAfterItsFileUntilItIsToldOtherwise)
 
     playlist.add(Track::of(std::filesystem::path{"/music/first.wav"}));
 
-    EXPECT_EQ(playlist.current().title, "first.wav");
+    EXPECT_EQ(playlist.current().title, "first") << "a name is not an extension";
     EXPECT_TRUE(playlist.current().artist.empty());
     EXPECT_EQ(playlist.current().duration, wiola::units::Time{});
 }
@@ -276,6 +276,38 @@ TEST(Playlist, TakesWhatIsFoundOutAboutATrack)
     EXPECT_EQ(playlist.size(), 3U);
 
     EXPECT_FALSE(playlist.describe(3, Track{}));
+}
+
+/// A window redrawing ten times a second needs to know that something changed without working
+/// out what.
+TEST(Playlist, CountsEveryChangeToWhatIsQueued)
+{
+    Playlist playlist;
+
+    const std::size_t empty{playlist.revision()};
+
+    playlist.set(three());
+    const std::size_t filled{playlist.revision()};
+    EXPECT_NE(filled, empty);
+
+    playlist.add(Track::of(std::filesystem::path{"fourth.wav"}));
+    const std::size_t added{playlist.revision()};
+    EXPECT_NE(added, filled);
+
+    ASSERT_TRUE(playlist.describe(0, Track::of(std::filesystem::path{"first.wav"})));
+    const std::size_t described{playlist.revision()};
+    EXPECT_NE(described, added) << "what was found out about a track went unnoticed";
+
+    ASSERT_TRUE(playlist.remove(0));
+    EXPECT_NE(playlist.revision(), described);
+
+    playlist.shuffle(11);
+    const std::size_t shuffled{playlist.revision()};
+    EXPECT_NE(shuffled, described);
+
+    // Standing somewhere else is not a change to what is queued.
+    ASSERT_TRUE(playlist.go_to(1));
+    EXPECT_EQ(playlist.revision(), shuffled);
 }
 
 TEST(Playlist, TakesATrackOut)

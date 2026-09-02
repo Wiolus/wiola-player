@@ -21,6 +21,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 
 namespace wiola::gui::tuning {
 
@@ -37,6 +38,34 @@ inline constexpr int track_name_point_size_step{3};
 /// its neighbours, since it is the one that is pressed most.
 inline constexpr int icon_button_width{44};
 inline constexpr int play_button_width{64};
+
+/// How many pixels a side a track's picture is drawn at in the queue. A row is a line of a list
+/// rather than a card, so the picture is what fits in a line and no more.
+inline constexpr int cover_size{20};
+
+/// How many pictures are read while drawing one turn. The rest are read on the turns after, so
+/// that scrolling a long queue never waits for a file.
+inline constexpr std::size_t covers_read_per_turn{4};
+
+/// How many pictures are kept before they are let go of. A queue longer than this is one whose
+/// far end is not being looked at.
+inline constexpr std::size_t covers_kept{512};
+
+/// How much taller than its picture a row of the queue is drawn.
+inline constexpr int row_padding{4};
+
+/// How wide the columns of the queue that do not stretch are drawn.
+inline constexpr int artist_column_width{120};
+inline constexpr int album_column_width{120};
+inline constexpr int length_column_width{60};
+
+/// How strongly the row of the track being played is tinted, out of 255. Enough to find at a
+/// glance, and far short of what a row a listener has picked out looks like.
+inline constexpr int playing_row_tint{40};
+
+/// How wide the window is drawn before it is resized: enough for every column of the queue, so
+/// that a length is not something a listener has to go looking for.
+inline constexpr int window_width{620};
 
 /// How tall the queue is drawn before the window is resized. Enough to see a handful of tracks.
 inline constexpr int playlist_height{120};
