@@ -41,8 +41,8 @@ std::filesystem::path fixture(const char* name)
     return std::filesystem::path{WIOLA_TEST_DATA_DIR} / name;
 }
 
-/// Reads a source to the end and reports how many samples it produced.
-std::size_t drain(wiola::audio::Source& source)
+/// Reads a decoder to the end and reports how many samples it produced.
+std::size_t drain(wiola::codec::Decoder& source)
 {
     std::array<float, 1024> block{};
     std::size_t total{0};

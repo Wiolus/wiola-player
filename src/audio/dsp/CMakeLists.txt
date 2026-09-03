@@ -1,13 +1,12 @@
-# Shaping needs no audio stack. The one thing holding miniaudio here is the equalizer's peaking
-# filter; a biquad of our own would leave this list empty.
+# Shaping needs no audio stack, and links nothing.
 wiola_add_library(
     wiola_audio_dsp
     SOURCES
+        biquad.cpp
         buffer_source.cpp
         chain.cpp
         equalizer.cpp
         relay.cpp
         shaped_source.cpp
         volume.cpp
-    LIBS miniaudio
 )

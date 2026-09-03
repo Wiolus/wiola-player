@@ -20,7 +20,6 @@
 
 #pragma once
 
-#include <audio/dsp/source.hpp>
 #include <core/macros.hpp>
 #include <pcm/stream_spec.hpp>
 
@@ -41,13 +40,22 @@ namespace wiola::codec {
  *
  * A subclass supplies one function, `decode`, and receives the counting, the clamping and the
  * end-of-stream question already answered.
+ *
+ * Reading a file blocks for as long as the file takes, so a decoder is not something a device
+ * may pull from. What is handed to an output is filled by a decoder on another thread, never the
+ * decoder itself.
  */
-class Decoder : public audio::Source {
+class Decoder {
 public:
-    /// Fills whole frames and returns how many samples were written. Short means end of file.
-    std::size_t render(std::span<float> output) override;
+    NO_COPY_SEMANTIC(Decoder);
+    NO_MOVE_SEMANTIC(Decoder);
 
-    [[nodiscard]] pcm::StreamSpec spec() const noexcept override { return spec_; }
+    virtual ~Decoder() = default;
+
+    /// Fills whole frames and returns how many samples were written. Short means end of file.
+    std::size_t render(std::span<float> output);
+
+    [[nodiscard]] pcm::StreamSpec spec() const noexcept { return spec_; }
 
     /// Total frames in the stream, and how many are still unread.
     [[nodiscard]] pcm::Frames num_frames() const noexcept { return num_frames_; }

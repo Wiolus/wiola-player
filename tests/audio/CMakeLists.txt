@@ -1,3 +1,4 @@
+wiola_add_test(audio_biquad_test SOURCES biquad_test.cpp LIBS wiola_audio_dsp)
 wiola_add_test(audio_relay_test SOURCES relay_test.cpp LIBS wiola_audio)
 wiola_add_test(audio_output_test SOURCES output_test.cpp)
 wiola_add_test(
