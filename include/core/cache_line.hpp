@@ -23,7 +23,7 @@
 #include <cstddef>
 #include <new>
 
-namespace wiola::hw {
+namespace wiola::core {
 
 // The standard constant is not always there: clang + libstdc++ has no
 // std::hardware_destructive_interference_size, hence the fallback.
@@ -36,4 +36,4 @@ inline constexpr std::size_t hardware_destructive_interference_size =
 inline constexpr std::size_t hardware_destructive_interference_size = 64; // x86-64, AArch64
 #endif
 
-} // namespace wiola::hw
+} // namespace wiola::core

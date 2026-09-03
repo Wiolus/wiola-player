@@ -61,17 +61,23 @@ int VolumeControl::restore()
 
     const int stored{settings_.value(position_key, tuning::full_volume).toInt(&numeric)};
 
-    set_position(numeric ? stored : tuning::full_volume);
+    apply_position(numeric ? stored : tuning::full_volume);
 
     return position_;
 }
 
 void VolumeControl::set_position(int percent)
 {
+    apply_position(percent);
+
+    settings_.setValue(position_key, position_);
+}
+
+void VolumeControl::apply_position(int percent)
+{
     position_ = std::clamp(percent, 0, max_position());
 
     volume_.set_gain(gain_of(position_));
-    settings_.setValue(position_key, position_);
 }
 
 void VolumeControl::set_boosted(bool boosted)

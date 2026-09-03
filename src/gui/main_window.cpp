@@ -75,13 +75,17 @@ MainWindow::MainWindow()
     next_button_ = new QPushButton{this};
     stop_button_ = new QPushButton{this};
 
+    play_icon_ = style()->standardIcon(QStyle::SP_MediaPlay);
+    pause_icon_ = style()->standardIcon(QStyle::SP_MediaPause);
+
     // Pictures for what a listener does, and words for what is set: the style draws these, so
     // there is nothing to ship beside the program and they look native wherever it runs.
     show_button(*open_button_, QStyle::SP_DirOpenIcon, "Open tracks");
     show_button(*previous_button_, QStyle::SP_MediaSkipBackward, "Previous track");
-    show_button(*play_button_, QStyle::SP_MediaPlay, "Play");
     show_button(*next_button_, QStyle::SP_MediaSkipForward, "Next track");
     show_button(*stop_button_, QStyle::SP_MediaStop, "Stop");
+
+    show_play_button(false);
 
     play_button_->setFixedWidth(tuning::play_button_width);
     repeat_button_ = new QPushButton{"Repeat: off", this};
@@ -202,6 +206,9 @@ MainWindow::MainWindow()
     if (const std::size_t gone{playlist_.restore()}; gone != 0)
         show_status(QString{"%1 queued track(s) are no longer where they were"}.arg(gone));
 
+    // What was put back settles both of these, without either button having been pressed.
+    show_list_buttons();
+
     refresh();
 }
 
@@ -218,6 +225,10 @@ void MainWindow::open(std::vector<std::filesystem::path> tracks)
 
     playlist_.save();
     show_status(QString{"opening "} + first + "...");
+
+    // A new list is an unshuffled one, whether or not the listener asked for that.
+    show_list_buttons();
+
     refresh();
 }
 
@@ -266,6 +277,10 @@ void MainWindow::clear_queue()
 {
     session_.clear();
     playlist_.save();
+
+    // Emptying the queue puts the order back as it was given, shuffle button and all.
+    show_list_buttons();
+
     refresh();
 }
 
@@ -323,8 +338,21 @@ void MainWindow::show_button(QPushButton& button, QStyle::StandardPixmap icon, c
     // reader is left with.
     button.setAccessibleName(says);
 
-    if (&button != play_button_)
-        button.setFixedWidth(tuning::icon_button_width);
+    button.setFixedWidth(tuning::icon_button_width);
+}
+
+void MainWindow::show_play_button(bool pausing)
+{
+    if (showing_pause_ == pausing)
+        return;
+
+    showing_pause_ = pausing;
+
+    const QString says{pausing ? "Pause" : "Play"};
+
+    play_button_->setIcon(pausing ? pause_icon_ : play_icon_);
+    play_button_->setToolTip(says);
+    play_button_->setAccessibleName(says);
 }
 
 void MainWindow::show_list_buttons()
@@ -468,11 +496,10 @@ void MainWindow::refresh()
     previous_button_->setEnabled(loaded());
     next_button_->setEnabled(loaded());
 
-    show_list_buttons();
     playlist_view_->show_playlist(session_.playlist());
 
     if (!loaded()) {
-        show_button(*play_button_, QStyle::SP_MediaPlay, "Play");
+        show_play_button(false);
         track_label_->setText("no track");
         elapsed_label_->clear();
         total_label_->clear();
@@ -487,10 +514,7 @@ void MainWindow::refresh()
     const units::Time shown{
         position_bar_->dragging() ? total * position_bar_->fraction() : session_.time_played()};
 
-    if (session_.playing())
-        show_button(*play_button_, QStyle::SP_MediaPause, "Pause");
-    else
-        show_button(*play_button_, QStyle::SP_MediaPlay, "Play");
+    show_play_button(session_.playing());
 
     elapsed_label_->setText(as_clock(shown));
     total_label_->setText(as_clock(total));

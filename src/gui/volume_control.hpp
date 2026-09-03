@@ -33,7 +33,8 @@ public:
     VolumeControl(audio::Volume& volume, QSettings& settings) noexcept;
 
     /// The position a previous run left, applied. Full volume when there is none, or when what is
-    /// stored is not a position.
+    /// stored is not a position. Nothing is written back, so a run that is only started and closed
+    /// leaves the file as it found it.
     int restore();
 
     void set_position(int percent);
@@ -49,6 +50,9 @@ public:
     [[nodiscard]] int max_position() const noexcept;
 
 private:
+    /// Applies `percent` without keeping it, for a position that came out of the file already.
+    void apply_position(int percent);
+
     audio::Volume& volume_;
     QSettings& settings_;
     int position_;

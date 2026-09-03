@@ -30,6 +30,7 @@
 #include <engine/session.hpp>
 #include <utils/units.hpp>
 
+#include <QIcon>
 #include <QLabel>
 #include <QPushButton>
 #include <QSettings>
@@ -99,7 +100,13 @@ private:
     /// Puts `icon` on `button`, with `says` for whoever cannot read a picture.
     void show_button(QPushButton& button, QStyle::StandardPixmap icon, const QString& says);
 
-    /// Says which of the three repeats is on, and whether the order is shuffled.
+    /// Shows the play button as pausing or as playing. Does nothing when it already shows that
+    /// one: a window refreshing ten times a second would otherwise ask the style for an icon it
+    /// is already wearing.
+    void show_play_button(bool pausing);
+
+    /// Says which of the three repeats is on, and whether the order is shuffled. Whatever changes
+    /// either must call this: refreshing no longer asks.
     void show_list_buttons();
 
     /// Starts playing, or resumes after a pause. The first press is what opens the device.
@@ -147,6 +154,14 @@ private:
     /// same file twice, and moving from one of them to the other is still a new track.
     std::filesystem::path named_;
     std::optional<std::size_t> named_place_;
+
+    /// The two faces of the play button, taken from the style once: asking it for one is a
+    /// lookup, and the button changes far less often than the window is drawn.
+    QIcon play_icon_;
+    QIcon pause_icon_;
+
+    /// Which of the two it is wearing, or nothing before it wears either.
+    std::optional<bool> showing_pause_;
 
     /// The file a run leaves things in.
     QSettings settings_;

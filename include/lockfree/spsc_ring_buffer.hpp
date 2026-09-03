@@ -189,11 +189,11 @@ private:
 
     // Each index shares a cache line only with the cache owned by the same thread, so the
     // producer and consumer never invalidate each other's line on their own bookkeeping.
-    alignas(hw::hardware_destructive_interference_size) std::atomic<std::size_t> write_{0};
+    alignas(core::hardware_destructive_interference_size) std::atomic<std::size_t> write_{0};
     std::size_t producer_read_cache_{0};
     std::atomic<std::size_t> discard_to_{0};
 
-    alignas(hw::hardware_destructive_interference_size) std::atomic<std::size_t> read_{0};
+    alignas(core::hardware_destructive_interference_size) std::atomic<std::size_t> read_{0};
     std::size_t consumer_write_cache_{0};
     std::size_t applied_discard_{0};
 };
