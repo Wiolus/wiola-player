@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <playlist_control.hpp>
+#include <gui/playlist_control.hpp>
 
 #include <engine/session.hpp>
 

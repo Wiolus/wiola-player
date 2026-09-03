@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <codec/open.hpp>
+#include <codec/decode/open.hpp>
 #include <core/macros.hpp>
 
 #include <condition_variable>

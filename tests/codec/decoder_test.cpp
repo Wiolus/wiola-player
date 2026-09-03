@@ -18,8 +18,8 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/source.hpp>
-#include <codec/open.hpp>
+#include <audio/dsp/source.hpp>
+#include <codec/decode/open.hpp>
 
 #include <gtest/gtest.h>
 

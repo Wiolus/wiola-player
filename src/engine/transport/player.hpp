@@ -22,11 +22,11 @@
 
 #include "decode_loop.hpp"
 #include "playhead.hpp"
-#include <audio/output.hpp>
+#include <audio/device/output.hpp>
 #include <audio/stream_spec.hpp>
-#include <codec/decoder.hpp>
+#include <codec/decode/decoder.hpp>
 #include <core/macros.hpp>
-#include <engine/playback.hpp>
+#include <engine/transport/playback.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 #include <utils/units.hpp>
 

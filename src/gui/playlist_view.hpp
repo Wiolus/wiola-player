@@ -22,7 +22,7 @@
 
 #include "cover_cache.hpp"
 
-#include <engine/playlist.hpp>
+#include <engine/queue/playlist.hpp>
 
 #include <QKeyEvent>
 #include <QTableWidget>

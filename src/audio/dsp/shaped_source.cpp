@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/shaped_source.hpp>
+#include <audio/dsp/shaped_source.hpp>
 
 namespace wiola::audio {
 

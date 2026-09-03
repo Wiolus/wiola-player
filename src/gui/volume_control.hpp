@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <audio/volume.hpp>
+#include <audio/dsp/volume.hpp>
 
 #include <QSettings>
 

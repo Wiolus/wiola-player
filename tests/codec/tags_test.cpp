@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <codec/tags.hpp>
+#include <codec/tags/tags.hpp>
 
 #include <utils/units.hpp>
 

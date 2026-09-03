@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <audio/stage.hpp>
+#include <audio/dsp/stage.hpp>
 #include <audio/stream_spec.hpp>
 
 #include <atomic>

@@ -18,8 +18,8 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/equalizer.hpp>
-#include <audio/tuning.hpp>
+#include <audio/dsp/equalizer.hpp>
+#include <audio/dsp/tuning.hpp>
 
 #include <miniaudio.h>
 

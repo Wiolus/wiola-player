@@ -13,7 +13,7 @@ build_dir=build-coverage
 # What the report covers, named rather than filtered. A header-only dependency is compiled into
 # our own translation units and instrumented with them, wherever it was found; naming what is
 # ours keeps everything else out.
-sources=(include src)
+sources=(src)
 
 if ! "$cxx" --version 2>/dev/null | grep -qi clang; then
     echo "$cxx is not clang; the instrumentation flags are LLVM's. Set CXX." >&2

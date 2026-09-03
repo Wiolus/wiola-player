@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <codec/decoder.hpp>
+#include <codec/decode/decoder.hpp>
 
 #include <filesystem>
 #include <memory>

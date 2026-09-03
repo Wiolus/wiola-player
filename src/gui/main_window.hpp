@@ -26,7 +26,7 @@
 #include "seek_bar.hpp"
 #include "volume_control.hpp"
 
-#include <codec/open.hpp>
+#include <codec/decode/open.hpp>
 #include <engine/session.hpp>
 #include <utils/units.hpp>
 

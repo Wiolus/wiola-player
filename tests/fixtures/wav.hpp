@@ -20,8 +20,8 @@
 
 #pragma once
 
-#include <codec/decoder.hpp>
-#include <codec/open.hpp>
+#include <codec/decode/decoder.hpp>
+#include <codec/decode/open.hpp>
 
 #include <atomic>
 #include <cmath>

@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/chain.hpp>
+#include <audio/dsp/chain.hpp>
 
 #include <algorithm>
 #include <memory>

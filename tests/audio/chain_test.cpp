@@ -18,9 +18,9 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/chain.hpp>
+#include <audio/dsp/chain.hpp>
 
-#include <audio/tuning.hpp>
+#include <audio/dsp/tuning.hpp>
 #include <fakes/tone.hpp>
 #include <fixtures/shaping.hpp>
 

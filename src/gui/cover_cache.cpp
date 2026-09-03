@@ -22,7 +22,7 @@
 
 #include "tuning.hpp"
 
-#include <codec/tags.hpp>
+#include <codec/tags/tags.hpp>
 
 #include <QStyle>
 

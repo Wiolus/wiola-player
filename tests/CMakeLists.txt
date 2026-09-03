@@ -19,12 +19,8 @@ function(wiola_add_test name)
         PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     )
 
-    # A test reaches its own layer's private headers the way that layer's sources do, and what
-    # the tests share among themselves.
-    target_include_directories(
-        ${name}
-        PRIVATE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/tests"
-    )
+    # What the tests share among themselves. The project's own headers arrive with wiola_core.
+    target_include_directories(${name} PRIVATE "${PROJECT_SOURCE_DIR}/tests")
 
     if(arg_DATA)
         target_compile_definitions(

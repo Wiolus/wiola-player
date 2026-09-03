@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <codec/decoder.hpp>
+#include <codec/decode/decoder.hpp>
 
 #include <algorithm>
 

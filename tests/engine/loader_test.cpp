@@ -22,7 +22,7 @@
 
 #include <fixtures/wav.hpp>
 
-#include <codec/open.hpp>
+#include <codec/decode/open.hpp>
 
 #include <gtest/gtest.h>
 

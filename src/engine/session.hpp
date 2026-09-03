@@ -20,16 +20,16 @@
 
 #pragma once
 
-#include <audio/chain.hpp>
-#include <audio/equalizer.hpp>
-#include <audio/output.hpp>
-#include <audio/source.hpp>
-#include <audio/volume.hpp>
-#include <codec/decoder.hpp>
-#include <codec/open.hpp>
+#include <audio/device/output.hpp>
+#include <audio/dsp/chain.hpp>
+#include <audio/dsp/equalizer.hpp>
+#include <audio/dsp/source.hpp>
+#include <audio/dsp/volume.hpp>
+#include <codec/decode/decoder.hpp>
+#include <codec/decode/open.hpp>
 #include <core/macros.hpp>
-#include <engine/playback.hpp>
-#include <engine/playlist.hpp>
+#include <engine/queue/playlist.hpp>
+#include <engine/transport/playback.hpp>
 #include <utils/units.hpp>
 
 #include <filesystem>
