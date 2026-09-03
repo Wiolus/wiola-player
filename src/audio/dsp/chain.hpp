@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include <audio/dsp/clip.hpp>
 #include <audio/dsp/stage.hpp>
 #include <core/macros.hpp>
 #include <pcm/stream_spec.hpp>
@@ -66,12 +67,16 @@ public:
     /// Retunes every step for a stream of `spec`. Between tracks, never during one.
     void configure(pcm::StreamSpec spec);
 
-    /// Runs every step over `samples`, in the order they were added, and puts back whatever a
-    /// step lifted past what an output takes.
+    /// Runs every step over `samples`, in the order they were added, and then holds them to what
+    /// an output takes.
     void process(std::span<float> samples) noexcept;
 
 private:
     std::vector<std::unique_ptr<Stage>> stages_;
+
+    /// Run after them all, whatever they are. A step that lifts is not asked whether it did:
+    /// the ceiling is the chain's to keep, not something each step reports.
+    Clip clip_;
 };
 
 } // namespace wiola::audio

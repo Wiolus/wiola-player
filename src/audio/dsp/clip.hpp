@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief What is done to samples between the buffer and the output.
+ * @brief The ceiling an output takes.
  * @author Roman Glaz
  * @copyright © 2026, <vokerlee@gmail.com>
  *
@@ -18,25 +18,23 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/dsp/chain.hpp>
+#pragma once
 
-#include <algorithm>
-#include <memory>
+#include <audio/dsp/stage.hpp>
+#include <pcm/stream_spec.hpp>
+
+#include <span>
 
 namespace wiola::audio {
 
-void Chain::configure(pcm::StreamSpec spec)
-{
-    for (const std::unique_ptr<Stage>& stage : stages_)
-        stage->configure(spec);
-}
+/// Holds every sample to what an output takes. Past full scale there is nothing to hear, so what
+/// reaches past it is flattened rather than wrapped.
+class Clip final : public Stage {
+public:
+    /// Nothing here follows the stream, so this is what it costs to say so.
+    void configure(pcm::StreamSpec spec) noexcept override;
 
-void Chain::process(std::span<float> samples) noexcept
-{
-    for (const std::unique_ptr<Stage>& stage : stages_)
-        stage->process(samples);
-
-    clip_.process(samples);
-}
+    void process(std::span<float> samples) noexcept override;
+};
 
 } // namespace wiola::audio

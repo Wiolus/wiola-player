@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief What is done to samples between the buffer and the output.
+ * @brief The ceiling an output takes.
  * @author Roman Glaz
  * @copyright © 2026, <vokerlee@gmail.com>
  *
@@ -18,25 +18,18 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/dsp/chain.hpp>
+#include <audio/dsp/clip.hpp>
 
 #include <algorithm>
-#include <memory>
 
 namespace wiola::audio {
 
-void Chain::configure(pcm::StreamSpec spec)
-{
-    for (const std::unique_ptr<Stage>& stage : stages_)
-        stage->configure(spec);
-}
+void Clip::configure(pcm::StreamSpec /*spec*/) noexcept { }
 
-void Chain::process(std::span<float> samples) noexcept
+void Clip::process(std::span<float> samples) noexcept
 {
-    for (const std::unique_ptr<Stage>& stage : stages_)
-        stage->process(samples);
-
-    clip_.process(samples);
+    for (float& sample : samples)
+        sample = std::clamp(sample, -1.0F, 1.0F);
 }
 
 } // namespace wiola::audio
