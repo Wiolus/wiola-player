@@ -20,8 +20,8 @@
 
 #pragma once
 
-#include <core/borrowed.hpp>
 #include <core/cache_line.hpp>
+#include <core/handle.hpp>
 #include <core/macros.hpp>
 
 #include <algorithm>
@@ -78,12 +78,8 @@ public:
      * reach what belongs to the thread that empties it: the two sides own an index each, and a
      * call from the wrong side corrupts the other's without any of it looking wrong.
      */
-    class Producer {
+    class Producer final : public core::Handle<SPSCRingBuffer> {
     public:
-        NO_COPY_SEMANTIC(Producer);
-        DEFAULT_MOVE_SEMANTIC(Producer);
-        ~Producer() = default;
-
         /// Returns the number of elements accepted, which may be short of `src`.
         std::size_t push(std::span<const T> src) noexcept;
 
@@ -109,24 +105,13 @@ public:
     private:
         friend class SPSCRingBuffer;
 
-        Producer() noexcept = default;
-
-        explicit Producer(SPSCRingBuffer& ring) noexcept
-            : ring_{ring}
-        {
-        }
-
-        core::Borrowed<SPSCRingBuffer> ring_;
+        using core::Handle<SPSCRingBuffer>::Handle;
     };
 
     /// The end that empties the buffer, for the one thread that does. Handed out for the same
     /// reason as the producer's.
-    class Consumer {
+    class Consumer final : public core::Handle<SPSCRingBuffer> {
     public:
-        NO_COPY_SEMANTIC(Consumer);
-        DEFAULT_MOVE_SEMANTIC(Consumer);
-        ~Consumer() = default;
-
         /// Returns the number of elements written into `dst`.
         std::size_t pop(std::span<T> dst) noexcept;
 
@@ -139,14 +124,7 @@ public:
     private:
         friend class SPSCRingBuffer;
 
-        Consumer() noexcept = default;
-
-        explicit Consumer(SPSCRingBuffer& ring) noexcept
-            : ring_{ring}
-        {
-        }
-
-        core::Borrowed<SPSCRingBuffer> ring_;
+        using core::Handle<SPSCRingBuffer>::Handle;
     };
 
     /// The two ends. One each per buffer, taken where the buffer is wired up: a second of
@@ -164,8 +142,8 @@ private:
     friend class Producer;
     friend class Consumer;
 
-    bool producer_taken_{false};
-    bool consumer_taken_{false};
+    core::Claimable producer_taken_;
+    core::Claimable consumer_taken_;
 
     std::size_t push(std::span<const T> src) noexcept;
     std::size_t pop(std::span<T> dst) noexcept;
@@ -215,86 +193,76 @@ SPSCRingBuffer<T>::SPSCRingBuffer(std::size_t minimum_capacity)
 template<RingElement T>
 std::size_t SPSCRingBuffer<T>::Producer::push(std::span<const T> src) noexcept
 {
-    return ring_ ? ring_->push(src) : 0;
+    return this->owner() ? this->owner()->push(src) : 0;
 }
 
 template<RingElement T>
 bool SPSCRingBuffer<T>::Producer::try_push(const T& value) noexcept
 {
-    return ring_ && ring_->try_push(value);
+    return this->owner() && this->owner()->try_push(value);
 }
 
 template<RingElement T>
 auto SPSCRingBuffer<T>::Producer::acquire_write() noexcept -> WriteRegion
 {
-    return ring_ ? ring_->acquire_write() : WriteRegion{};
+    return this->owner() ? this->owner()->acquire_write() : WriteRegion{};
 }
 
 template<RingElement T>
 void SPSCRingBuffer<T>::Producer::commit_write(std::size_t num_elements) noexcept
 {
-    if (ring_)
-        ring_->commit_write(num_elements);
+    if (this->owner())
+        this->owner()->commit_write(num_elements);
 }
 
 template<RingElement T>
 void SPSCRingBuffer<T>::Producer::mark_discard() noexcept
 {
-    if (ring_)
-        ring_->mark_discard();
+    if (this->owner())
+        this->owner()->mark_discard();
 }
 
 template<RingElement T>
 std::size_t SPSCRingBuffer<T>::Producer::space_approx() const noexcept
 {
-    return ring_ ? ring_->capacity() - ring_->size_approx() : 0;
+    return this->owner() ? this->owner()->capacity() - this->owner()->size_approx() : 0;
 }
 
 template<RingElement T>
 std::size_t SPSCRingBuffer<T>::Consumer::pop(std::span<T> dst) noexcept
 {
-    return ring_ ? ring_->pop(dst) : 0;
+    return this->owner() ? this->owner()->pop(dst) : 0;
 }
 
 template<RingElement T>
 std::optional<T> SPSCRingBuffer<T>::Consumer::try_pop() noexcept
 {
-    return ring_ ? ring_->try_pop() : std::nullopt;
+    return this->owner() ? this->owner()->try_pop() : std::nullopt;
 }
 
 template<RingElement T>
 auto SPSCRingBuffer<T>::Consumer::acquire_read() noexcept -> ReadRegion
 {
-    return ring_ ? ring_->acquire_read() : ReadRegion{};
+    return this->owner() ? this->owner()->acquire_read() : ReadRegion{};
 }
 
 template<RingElement T>
 void SPSCRingBuffer<T>::Consumer::commit_read(std::size_t num_elements) noexcept
 {
-    if (ring_)
-        ring_->commit_read(num_elements);
+    if (this->owner())
+        this->owner()->commit_read(num_elements);
 }
 
 template<RingElement T>
 auto SPSCRingBuffer<T>::producer() noexcept -> Producer
 {
-    if (producer_taken_)
-        return Producer{};
-
-    producer_taken_ = true;
-
-    return Producer{*this};
+    return producer_taken_.claim() ? Producer{*this} : Producer{};
 }
 
 template<RingElement T>
 auto SPSCRingBuffer<T>::consumer() noexcept -> Consumer
 {
-    if (consumer_taken_)
-        return Consumer{};
-
-    consumer_taken_ = true;
-
-    return Consumer{*this};
+    return consumer_taken_.claim() ? Consumer{*this} : Consumer{};
 }
 
 template<RingElement T>

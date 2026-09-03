@@ -22,7 +22,7 @@
 
 #include <pcm/stream_spec.hpp>
 
-#include <core/borrowed.hpp>
+#include <core/handle.hpp>
 #include <core/macros.hpp>
 
 #include <atomic>
@@ -56,13 +56,8 @@ public:
      * Moving it hands that work to another thread. What is moved from, and any applier taken
      * after the first, does nothing: it claims no seek and counts no push.
      */
-    class Applier {
+    class Applier final : public core::Handle<Playhead> {
     public:
-        NO_COPY_SEMANTIC(Applier);
-        DEFAULT_MOVE_SEMANTIC(Applier);
-
-        ~Applier() = default;
-
         /// Whether a seek has been asked for and not yet carried out.
         [[nodiscard]] bool seek_outstanding() const noexcept;
 
@@ -86,14 +81,7 @@ public:
     private:
         friend class Playhead;
 
-        Applier() noexcept = default;
-
-        explicit Applier(Playhead& head) noexcept
-            : head_{head}
-        {
-        }
-
-        core::Borrowed<Playhead> head_;
+        using Handle::Handle;
     };
 
     /// The end that carries seeks out. There is one: whoever takes it first does that work, and
@@ -119,7 +107,7 @@ private:
     void push(std::size_t num_samples) noexcept;
     [[nodiscard]] std::size_t num_pushed() const noexcept;
 
-    bool applier_taken_{false};
+    core::Claimable applier_taken_;
 
     std::atomic<std::size_t> seeks_requested_{0};
     std::atomic<std::size_t> seeks_applied_{0};
@@ -131,40 +119,35 @@ private:
 
 inline bool Playhead::Applier::seek_outstanding() const noexcept
 {
-    return head_ && head_->seek_outstanding();
+    return owner() && owner()->seek_outstanding();
 }
 
 inline Playhead::Claim Playhead::Applier::claim() const noexcept
 {
-    return head_ ? head_->claim() : Claim{};
+    return owner() ? owner()->claim() : Claim{};
 }
 
 inline void Playhead::Applier::begin_at(pcm::Frames frame_index, pcm::Frames frames_played,
     const Claim& claim) noexcept
 {
-    if (head_)
-        head_->begin_at(frame_index, frames_played, claim);
+    if (owner())
+        owner()->begin_at(frame_index, frames_played, claim);
 }
 
 inline void Playhead::Applier::push(std::size_t num_samples) noexcept
 {
-    if (head_)
-        head_->push(num_samples);
+    if (owner())
+        owner()->push(num_samples);
 }
 
 inline std::size_t Playhead::Applier::num_pushed() const noexcept
 {
-    return head_ ? head_->num_pushed() : 0;
+    return owner() ? owner()->num_pushed() : 0;
 }
 
 inline Playhead::Applier Playhead::applier() noexcept
 {
-    if (applier_taken_)
-        return Applier{};
-
-    applier_taken_ = true;
-
-    return Applier{*this};
+    return applier_taken_.claim() ? Applier{*this} : Applier{};
 }
 
 } // namespace wiola::engine
