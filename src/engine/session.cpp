@@ -87,6 +87,10 @@ Session::Session(OutputFactory make_output)
     , tags_{std::make_unique<TagReader>()}
     , make_output_{std::move(make_output)}
 {
+    // The bands first, then how loud, so that what a listener asks for last is the last thing
+    // done to the sound.
+    chain_.add(equalizer_);
+    chain_.add(volume_);
 }
 
 Session::~Session() = default;

@@ -184,11 +184,12 @@ private:
     /// that went away, is not a cue to play anything.
     void advance_if_ended();
 
-    /// What a track is shaped by, and in what order: the bands first, then how loud, so that
-    /// what a listener asks for last is the last thing done to the sound.
+    /// What a track is shaped by. Declared before the chain that runs them, so the chain is let
+    /// go while the steps it points at are still there. Which order they run in is settled where
+    /// they are put into the chain, not here.
+    audio::Equalizer equalizer_{pcm::StreamSpec{}};
+    audio::Volume volume_;
     audio::Chain chain_;
-    audio::Equalizer& equalizer_{chain_.add<audio::Equalizer>(pcm::StreamSpec{})};
-    audio::Volume& volume_{chain_.add<audio::Volume>()};
     std::unique_ptr<Loader> loader_;
     std::unique_ptr<TagReader> tags_;
     Playlist playlist_;

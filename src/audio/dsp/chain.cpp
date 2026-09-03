@@ -20,20 +20,22 @@
 
 #include <audio/dsp/chain.hpp>
 
-#include <algorithm>
-#include <memory>
-
 namespace wiola::audio {
+
+void Chain::add(Stage& stage)
+{
+    stages_.push_back(&stage);
+}
 
 void Chain::configure(pcm::StreamSpec spec)
 {
-    for (const std::unique_ptr<Stage>& stage : stages_)
+    for (Stage* stage : stages_)
         stage->configure(spec);
 }
 
 void Chain::process(std::span<float> samples) noexcept
 {
-    for (const std::unique_ptr<Stage>& stage : stages_)
+    for (Stage* stage : stages_)
         stage->process(samples);
 
     clip_.process(samples);

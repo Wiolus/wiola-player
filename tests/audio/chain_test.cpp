@@ -97,12 +97,15 @@ TEST(Chain, LeavesSamplesAloneWithNoSteps)
 
 TEST(Chain, RunsStepsInTheOrderTheyWereAdded)
 {
-    Chain chain;
     std::vector<std::string> ran;
+    Marking first{ran, "first", 1.0F};
+    Marking second{ran, "second", 1.0F};
+    Marking third{ran, "third", 1.0F};
 
-    chain.add<Marking>(ran, "first", 1.0F);
-    chain.add<Marking>(ran, "second", 1.0F);
-    chain.add<Marking>(ran, "third", 1.0F);
+    Chain chain;
+    chain.add(first);
+    chain.add(second);
+    chain.add(third);
 
     auto buffer{samples()};
     chain.process(buffer);
@@ -112,11 +115,13 @@ TEST(Chain, RunsStepsInTheOrderTheyWereAdded)
 
 TEST(Chain, RunsEveryStepOverTheSamples)
 {
-    Chain chain;
     std::vector<std::string> ran;
+    Marking first{ran, "half", 0.5F};
+    Marking second{ran, "half again", 0.5F};
 
-    chain.add<Marking>(ran, "half", 0.5F);
-    chain.add<Marking>(ran, "half again", 0.5F);
+    Chain chain;
+    chain.add(first);
+    chain.add(second);
 
     std::array block{0.8F, 0.4F};
     chain.process(block);
@@ -127,11 +132,13 @@ TEST(Chain, RunsEveryStepOverTheSamples)
 
 TEST(Chain, TellsEveryStepAboutTheFormat)
 {
-    Chain chain;
     std::vector<std::string> ran;
+    Marking first{ran, "first", 1.0F};
+    Marking second{ran, "second", 1.0F};
 
-    auto& first{chain.add<Marking>(ran, "first", 1.0F)};
-    auto& second{chain.add<Marking>(ran, "second", 1.0F)};
+    Chain chain;
+    chain.add(first);
+    chain.add(second);
 
     chain.configure(stereo);
 
@@ -146,10 +153,11 @@ TEST(Chain, TellsEveryStepAboutTheFormat)
 /// an output takes.
 TEST(Chain, HoldsTheCeilingWhateverTheStepsDid)
 {
-    Chain chain;
     std::vector<std::string> ran;
+    Marking loud{ran, "loud", 4.0F};
 
-    chain.add<Marking>(ran, "loud", 4.0F);
+    Chain chain;
+    chain.add(loud);
 
     std::array block{0.8F, -0.8F, 0.1F};
     chain.process(block);
@@ -174,10 +182,11 @@ TEST(Chain, HoldsTheCeilingOnWhatArrivedPastIt)
 
 TEST(Chain, AcceptsNothingToDo)
 {
-    Chain chain;
     std::vector<std::string> ran;
+    Marking half{ran, "half", 0.5F};
 
-    chain.add<Marking>(ran, "half", 0.5F);
+    Chain chain;
+    chain.add(half);
     chain.process(std::span<float>{});
 
     // Nothing to do is not something to recover from: what comes after is shaped as it would
