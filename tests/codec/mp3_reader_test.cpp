@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <codec/mp3_reader.hpp>
+#include <codec/decode/mp3_reader.hpp>
 
 #include <audio/stream_spec.hpp>
 

@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <engine/player.hpp>
+#include <engine/transport/player.hpp>
 
 #include <fixtures/rig.hpp>
 #include <fixtures/wav.hpp>

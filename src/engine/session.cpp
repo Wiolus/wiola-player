@@ -20,9 +20,9 @@
 
 #include <engine/session.hpp>
 
-#include "loader.hpp"
-#include "player.hpp"
-#include "tag_reader.hpp"
+#include <engine/load/loader.hpp>
+#include <engine/load/tag_reader.hpp>
+#include <engine/transport/player.hpp>
 
 #include "tuning.hpp"
 
