@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <engine/loader.hpp>
+#include <engine/load/loader.hpp>
 
 #include <fixtures/wav.hpp>
 

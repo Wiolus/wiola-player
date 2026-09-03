@@ -20,7 +20,7 @@
 
 #include "decode_loop.hpp"
 
-#include "tuning.hpp"
+#include <engine/tuning.hpp>
 
 #include <audio/stream_spec.hpp>
 

@@ -1,12 +1,4 @@
-wiola_add_library(
-    wiola_audio
-    SOURCES
-        buffer_source.cpp
-        chain.cpp
-        device.cpp
-        equalizer.cpp
-        relay.cpp
-        shaped_source.cpp
-        volume.cpp
-    LIBS miniaudio
-)
+add_subdirectory(device)
+add_subdirectory(dsp)
+
+wiola_add_module(wiola_audio LIBS wiola_audio_device wiola_audio_dsp)

@@ -19,7 +19,7 @@
  */
 
 #include <audio/stream_spec.hpp>
-#include <engine/playhead.hpp>
+#include <engine/transport/playhead.hpp>
 
 #include <gtest/gtest.h>
 
