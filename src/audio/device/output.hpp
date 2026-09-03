@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <core/borrowed.hpp>
+#include <core/handle.hpp>
 #include <core/macros.hpp>
 #include <pcm/stream_spec.hpp>
 
@@ -48,17 +48,15 @@ public:
      * outlives the tracks played through it, and each of them drives it in turn. Taking and
      * giving back are for whoever owns the device, never for the thread that plays.
      */
-    class Control {
+    class Control final : public core::Handle<Output> {
     public:
-        NO_COPY_SEMANTIC(Control);
-
         Control(Control&& other) noexcept = default;
 
         Control& operator=(Control&& other) noexcept
         {
             if (this != &other) {
                 release();
-                output_ = std::move(other.output_);
+                Handle::operator=(std::move(other));
             }
 
             return *this;
@@ -76,23 +74,16 @@ public:
     private:
         friend class Output;
 
-        Control() noexcept = default;
-
-        explicit Control(Output& output) noexcept
-            : output_{output}
-        {
-        }
+        using Handle::Handle;
 
         /// Gives back whatever it holds, and holds nothing afterwards.
         void release() noexcept
         {
-            if (output_)
-                output_->control_taken_ = false;
+            if (owner())
+                owner()->control_taken_.release();
 
-            output_ = core::Borrowed<Output>{};
+            clear();
         }
-
-        core::Borrowed<Output> output_;
     };
 
     NO_COPY_SEMANTIC(Output);
@@ -120,28 +111,23 @@ private:
     [[nodiscard]] virtual bool start() noexcept = 0;
     virtual void stop() noexcept = 0;
 
-    bool control_taken_{false};
+    core::Claimable control_taken_;
 };
 
 inline bool Output::Control::start() noexcept
 {
-    return output_ && output_->start();
+    return owner() && owner()->start();
 }
 
 inline void Output::Control::stop() noexcept
 {
-    if (output_)
-        output_->stop();
+    if (owner())
+        owner()->stop();
 }
 
 inline Output::Control Output::control() noexcept
 {
-    if (control_taken_)
-        return Control{};
-
-    control_taken_ = true;
-
-    return Control{*this};
+    return control_taken_.claim() ? Control{*this} : Control{};
 }
 
 } // namespace wiola::audio
