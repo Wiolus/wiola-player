@@ -31,14 +31,17 @@ namespace wiola::testing {
 /// bands first, then how loud, so that what a listener asks for last is done last.
 struct Shaping {
     explicit Shaping(pcm::StreamSpec spec, audio::BandLayout layout = {})
-        : equalizer{chain.add<audio::Equalizer>(spec, layout)}
-        , volume{chain.add<audio::Volume>()}
+        : equalizer{spec, layout}
     {
+        chain.add(equalizer);
+        chain.add(volume);
     }
 
+    /// Declared before the chain that runs them, so the chain is let go while the steps it
+    /// points at are still there.
+    audio::Equalizer equalizer;
+    audio::Volume volume;
     audio::Chain chain;
-    audio::Equalizer& equalizer;
-    audio::Volume& volume;
 };
 
 } // namespace wiola::testing

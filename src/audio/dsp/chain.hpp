@@ -25,9 +25,7 @@
 #include <core/macros.hpp>
 #include <pcm/stream_spec.hpp>
 
-#include <memory>
 #include <span>
-#include <utility>
 #include <vector>
 
 namespace wiola::audio {
@@ -50,19 +48,9 @@ public:
 
     ~Chain() = default;
 
-    /// Builds a step of type `T` from `args` and puts it at the end, where it will run last.
-    /// Answers with the step itself, so whoever composed the chain can still reach the one it
-    /// has something to ask of. Not the playing thread's.
-    template<typename T, typename... Args>
-    T& add(Args&&... args)
-    {
-        auto stage = std::make_unique<T>(std::forward<Args>(args)...);
-        T& added{*stage};
-
-        stages_.push_back(std::move(stage));
-
-        return added;
-    }
+    /// Puts `stage` at the end, where it will run last. The chain does not own it: whoever holds
+    /// the step keeps it, and keeps it for longer than the chain. Not the playing thread's.
+    void add(Stage& stage);
 
     /// Retunes every step for a stream of `spec`. Between tracks, never during one.
     void configure(pcm::StreamSpec spec);
@@ -72,7 +60,7 @@ public:
     void process(std::span<float> samples) noexcept;
 
 private:
-    std::vector<std::unique_ptr<Stage>> stages_;
+    std::vector<Stage*> stages_;
 
     /// Run after them all, whatever they are. A step that lifts is not asked whether it did:
     /// the ceiling is the chain's to keep, not something each step reports.
