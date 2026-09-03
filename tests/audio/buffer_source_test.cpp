@@ -18,8 +18,8 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/buffer_source.hpp>
-#include <audio/source.hpp>
+#include <audio/dsp/buffer_source.hpp>
+#include <audio/dsp/source.hpp>
 #include <audio/stream_spec.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 #include <utils/units.hpp>

@@ -22,7 +22,7 @@
 
 #include "tuning.hpp"
 
-#include <audio/tuning.hpp>
+#include <audio/dsp/tuning.hpp>
 #include <utils/units.hpp>
 
 #include <QVBoxLayout>

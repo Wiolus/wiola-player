@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <codec/open.hpp>
+#include <codec/decode/open.hpp>
 
 #include "flac_reader.hpp"
 #include "format.hpp"

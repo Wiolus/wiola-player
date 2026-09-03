@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <codec/tags.hpp>
+#include <codec/tags/tags.hpp>
 #include <core/macros.hpp>
 
 #include <condition_variable>

@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/buffer_source.hpp>
+#include <audio/dsp/buffer_source.hpp>
 
 #include <utility>
 

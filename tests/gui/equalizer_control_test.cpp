@@ -18,9 +18,9 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/equalizer.hpp>
+#include <audio/dsp/equalizer.hpp>
+#include <audio/dsp/tuning.hpp>
 #include <audio/stream_spec.hpp>
-#include <audio/tuning.hpp>
 #include <gui/equalizer_control.hpp>
 #include <utils/units.hpp>
 

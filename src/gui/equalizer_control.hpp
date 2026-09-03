@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <audio/equalizer.hpp>
+#include <audio/dsp/equalizer.hpp>
 #include <utils/units.hpp>
 
 #include <QSettings>

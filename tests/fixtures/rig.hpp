@@ -20,8 +20,8 @@
 
 #pragma once
 
-#include <audio/buffer_source.hpp>
-#include <codec/decoder.hpp>
+#include <audio/dsp/buffer_source.hpp>
+#include <codec/decode/decoder.hpp>
 #include <engine/transport/player.hpp>
 #include <fakes/output.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>

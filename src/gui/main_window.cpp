@@ -23,8 +23,8 @@
 #include "clock.hpp"
 #include "tuning.hpp"
 
-#include <codec/decoder.hpp>
-#include <codec/open.hpp>
+#include <codec/decode/decoder.hpp>
+#include <codec/decode/open.hpp>
 
 #include <QFileDialog>
 #include <QFont>

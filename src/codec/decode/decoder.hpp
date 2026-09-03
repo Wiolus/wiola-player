@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <audio/source.hpp>
+#include <audio/dsp/source.hpp>
 #include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
 

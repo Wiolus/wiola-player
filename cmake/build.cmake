@@ -95,11 +95,12 @@ configure_file(
     @ONLY
 )
 
-# Where the project's public headers are, the written ones and the generated one alike.
+# Where the project's headers are. Each sits beside its own sources, so an include names the
+# subsystem it comes from. The generated one has a root of its own.
 add_library(wiola_core INTERFACE)
 target_include_directories(
     wiola_core
-    INTERFACE "${PROJECT_SOURCE_DIR}/include" "${PROJECT_BINARY_DIR}/generated"
+    INTERFACE "${PROJECT_SOURCE_DIR}/src" "${PROJECT_BINARY_DIR}/generated"
 )
 
 # Adds a library built the way this project builds them: it can see the public headers, and it is
@@ -114,10 +115,6 @@ function(wiola_add_library name)
         PUBLIC wiola_core
         PRIVATE wiola_coverage wiola_sanitizer wiola_warnings ${arg_LIBS}
     )
-
-    # A subsystem's own headers sit beside its sources, so one folder over is named rather than
-    # reached for with a relative path.
-    target_include_directories(${name} PRIVATE "${PROJECT_SOURCE_DIR}/src")
 endfunction()
 
 # Groups the libraries a module was split into, so that whatever depends on the module names the

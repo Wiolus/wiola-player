@@ -19,7 +19,7 @@
  */
 
 #include <cli/cli.hpp>
-#include <main_window.hpp>
+#include <gui/main_window.hpp>
 
 #include <QApplication>
 

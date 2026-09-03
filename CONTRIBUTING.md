@@ -120,7 +120,7 @@ optimized code no longer sits on the lines it was written on and the counts stop
 source. The script needs clang, takes the one in `CXX` if that is set, and looks the profile tools
 up by the compiler's version, since a profile is not read by another.
 
-The report covers `include/` and `src/`, and nothing else can enter it. A header-only dependency
+The report covers `src/`, and nothing else can enter it. A header-only dependency
 is compiled into our translation units and instrumented with them, so leaving it out is a matter
 of naming what is ours rather than of filtering out what is not. The player is measured beside
 the tests, so the GUI reads 0 until there are GUI tests. Line by line, open

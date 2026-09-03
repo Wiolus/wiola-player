@@ -21,7 +21,7 @@
 #include <gui/tuning.hpp>
 #include <gui/volume_control.hpp>
 
-#include <audio/volume.hpp>
+#include <audio/dsp/volume.hpp>
 
 #include <QSettings>
 #include <QString>

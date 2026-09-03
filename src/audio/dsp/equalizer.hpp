@@ -20,9 +20,9 @@
 
 #pragma once
 
-#include <audio/stage.hpp>
+#include <audio/dsp/stage.hpp>
+#include <audio/dsp/tuning.hpp>
 #include <audio/stream_spec.hpp>
-#include <audio/tuning.hpp>
 #include <core/macros.hpp>
 #include <utils/units.hpp>
 

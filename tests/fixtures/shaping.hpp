@@ -20,10 +20,10 @@
 
 #pragma once
 
-#include <audio/chain.hpp>
-#include <audio/equalizer.hpp>
+#include <audio/dsp/chain.hpp>
+#include <audio/dsp/equalizer.hpp>
+#include <audio/dsp/volume.hpp>
 #include <audio/stream_spec.hpp>
-#include <audio/volume.hpp>
 
 namespace wiola::testing {
 

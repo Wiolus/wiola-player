@@ -23,7 +23,7 @@
 #include "format.hpp"
 
 #include <audio/stream_spec.hpp>
-#include <codec/decoder.hpp>
+#include <codec/decode/decoder.hpp>
 
 #include <cstddef>
 #include <filesystem>

@@ -18,10 +18,10 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/chain.hpp>
+#include <audio/dsp/chain.hpp>
 
-#include <audio/shaped_source.hpp>
-#include <audio/source.hpp>
+#include <audio/dsp/shaped_source.hpp>
+#include <audio/dsp/source.hpp>
 #include <audio/stream_spec.hpp>
 #include <fixtures/shaping.hpp>
 #include <utils/units.hpp>

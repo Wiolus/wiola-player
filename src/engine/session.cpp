@@ -26,13 +26,13 @@
 
 #include "tuning.hpp"
 
-#include <audio/buffer_source.hpp>
-#include <audio/device.hpp>
-#include <audio/relay.hpp>
-#include <audio/shaped_source.hpp>
+#include <audio/device/device.hpp>
+#include <audio/dsp/buffer_source.hpp>
+#include <audio/dsp/relay.hpp>
+#include <audio/dsp/shaped_source.hpp>
 #include <audio/stream_spec.hpp>
-#include <codec/decoder.hpp>
-#include <codec/open.hpp>
+#include <codec/decode/decoder.hpp>
+#include <codec/decode/open.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 
 #include <memory>

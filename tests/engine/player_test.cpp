@@ -23,12 +23,12 @@
 #include <fixtures/rig.hpp>
 #include <fixtures/wav.hpp>
 
-#include <audio/buffer_source.hpp>
-#include <audio/chain.hpp>
-#include <audio/output.hpp>
+#include <audio/device/output.hpp>
+#include <audio/dsp/buffer_source.hpp>
+#include <audio/dsp/chain.hpp>
 #include <audio/stream_spec.hpp>
-#include <codec/decoder.hpp>
-#include <codec/open.hpp>
+#include <codec/decode/decoder.hpp>
+#include <codec/decode/open.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
 
 #include <fakes/output.hpp>

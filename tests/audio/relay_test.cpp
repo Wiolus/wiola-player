@@ -18,9 +18,9 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/relay.hpp>
+#include <audio/dsp/relay.hpp>
 
-#include <audio/source.hpp>
+#include <audio/dsp/source.hpp>
 #include <audio/stream_spec.hpp>
 #include <utils/units.hpp>
 

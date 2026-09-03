@@ -18,7 +18,7 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/output.hpp>
+#include <audio/device/output.hpp>
 
 #include <fakes/output.hpp>
 

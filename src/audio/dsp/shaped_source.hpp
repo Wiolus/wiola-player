@@ -20,8 +20,8 @@
 
 #pragma once
 
-#include <audio/chain.hpp>
-#include <audio/source.hpp>
+#include <audio/dsp/chain.hpp>
+#include <audio/dsp/source.hpp>
 #include <audio/stream_spec.hpp>
 
 #include <cstddef>

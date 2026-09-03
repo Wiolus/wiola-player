@@ -20,14 +20,14 @@
 
 #include <fixtures/wav.hpp>
 
-#include <audio/output.hpp>
+#include <audio/device/output.hpp>
 
-#include <audio/source.hpp>
+#include <audio/dsp/source.hpp>
 #include <audio/stream_spec.hpp>
-#include <codec/open.hpp>
+#include <codec/decode/open.hpp>
 #include <engine/session.hpp>
 
-#include <engine/track.hpp>
+#include <engine/queue/track.hpp>
 #include <fakes/output.hpp>
 #include <utils/units.hpp>
 
