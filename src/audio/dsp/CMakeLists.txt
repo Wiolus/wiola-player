@@ -5,6 +5,7 @@ wiola_add_library(
         biquad.cpp
         buffer_source.cpp
         chain.cpp
+        clip.cpp
         equalizer.cpp
         relay.cpp
         shaped_source.cpp

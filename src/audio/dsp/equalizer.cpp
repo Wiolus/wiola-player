@@ -45,9 +45,6 @@ struct Equalizer::Bands {
     /// change a sample.
     float preamp{1.0F};
     bool shaping{false};
-
-    /// Whether the last `process` did.
-    bool applied{false};
 };
 
 namespace {
@@ -162,20 +159,13 @@ void Equalizer::process(std::span<float> samples) noexcept
     if (bands_->changed.exchange(false, std::memory_order_acquire))
         retune();
 
-    bands_->applied = bands_->shaping && bands_->enabled.load(std::memory_order_relaxed);
-
-    if (!bands_->applied)
+    if (!bands_->shaping || !bands_->enabled.load(std::memory_order_relaxed))
         return;
 
     apply_gain(samples, bands_->preamp);
 
     for (Biquad& filter : bands_->filters)
         filter.process(samples);
-}
-
-bool Equalizer::lifted() const noexcept
-{
-    return bands_->applied;
 }
 
 float Equalizer::preamp() const noexcept

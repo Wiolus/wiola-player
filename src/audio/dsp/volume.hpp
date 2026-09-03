@@ -42,9 +42,6 @@ public:
 
     void process(std::span<float> samples) noexcept override;
 
-    /// Whether the last gain asked for more than arrived.
-    [[nodiscard]] bool lifted() const noexcept override;
-
 private:
     std::atomic<float> gain_{1.0F};
 };

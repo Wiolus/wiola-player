@@ -49,11 +49,6 @@ public:
 
     /// Shapes `samples` in place.
     virtual void process(std::span<float> samples) noexcept = 0;
-
-    /// Whether what it just did could have lifted a sample past what an output takes. Asked
-    /// after the fact, since only a step that has run knows: the chain has to put back what a
-    /// lift reached past, and only a lift makes that worth doing.
-    [[nodiscard]] virtual bool lifted() const noexcept = 0;
 };
 
 } // namespace wiola::audio
