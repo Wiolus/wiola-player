@@ -19,9 +19,9 @@
  */
 
 #include <audio/dsp/equalizer.hpp>
-#include <audio/dsp/tuning.hpp>
 
-#include <miniaudio.h>
+#include <audio/dsp/biquad.hpp>
+#include <audio/dsp/tuning.hpp>
 
 #include <algorithm>
 #include <atomic>
@@ -36,8 +36,7 @@ namespace wiola::audio {
 /// a format that cannot carry one does not lose its setting.
 struct Equalizer::Bands {
     std::vector<std::atomic<float>> gains;
-    std::vector<ma_peak2> filters;
-    std::vector<std::vector<unsigned char>> states;
+    std::vector<Biquad> filters;
     std::atomic<float> preamp_db{0.0F};
     std::atomic<bool> enabled{true};
     std::atomic<bool> changed{false};
@@ -65,14 +64,6 @@ void apply_gain(std::span<float> samples, float gain) noexcept
         sample *= gain;
 }
 
-ma_peak2_config band_config(pcm::StreamSpec spec, double quality, units::Frequency center,
-    float gain_db) noexcept
-{
-    return ma_peak2_config_init(ma_format_f32, static_cast<ma_uint32>(spec.num_channels),
-        static_cast<ma_uint32>(spec.sample_rate.get<units::Hz>()), static_cast<double>(gain_db),
-        quality, center.get<units::Hz>());
-}
-
 } // namespace
 
 Equalizer::Equalizer(pcm::StreamSpec spec, BandLayout layout)
@@ -97,24 +88,13 @@ void Equalizer::configure(pcm::StreamSpec spec)
     while (num_bands_ < layout_.count && layout_.center(num_bands_) <= highest)
         ++num_bands_;
 
-    bands_->filters.assign(num_bands_, ma_peak2{});
-    bands_->states.clear();
+    bands_->filters.clear();
+    bands_->filters.resize(num_bands_);
 
-    for (std::size_t i = 0; i < num_bands_; ++i) {
-        const ma_peak2_config config{band_config(spec_, layout_.quality, band_center(i), 0.0F)};
-        std::size_t size{0};
-
-        ma_peak2_get_heap_size(&config, &size);
-        bands_->states.emplace_back(std::max<std::size_t>(size, 1));
-
-        // A band that will not initialize ends the row, since the ones above it were built for a
-        // format this one has just refused.
-        if (ma_peak2_init_preallocated(&config, bands_->states.back().data(),
-                &bands_->filters[i]) != MA_SUCCESS) {
-            num_bands_ = i;
-            break;
-        }
-    }
+    for (std::size_t i = 0; i < num_bands_; ++i)
+        bands_->filters[i].configure(BiquadCoefficients::peaking(spec_, band_center(i),
+                                         layout_.quality, 0.0),
+            spec_.num_channels);
 
     retune();
 }
@@ -127,9 +107,10 @@ void Equalizer::retune() noexcept
 
     for (std::size_t i = 0; i < num_bands_; ++i) {
         const float gain{band_gain(i)};
-        const ma_peak2_config config{band_config(spec_, layout_.quality, band_center(i), gain)};
 
-        ma_peak2_reinit(&config, &bands_->filters[i]);
+        // Kept, not rebuilt: the sound carries on through a gain the listener has just moved.
+        bands_->filters[i].retune(BiquadCoefficients::peaking(spec_, band_center(i),
+            layout_.quality, gain));
 
         lifted = std::max(lifted, gain);
         bands_->shaping = bands_->shaping || gain != 0.0F;
@@ -188,10 +169,8 @@ void Equalizer::process(std::span<float> samples) noexcept
 
     apply_gain(samples, bands_->preamp);
 
-    const auto num_frames = static_cast<ma_uint64>(spec_.frames_per(samples.size()).count());
-
-    for (ma_peak2& filter : bands_->filters)
-        ma_peak2_process_pcm_frames(&filter, samples.data(), samples.data(), num_frames);
+    for (Biquad& filter : bands_->filters)
+        filter.process(samples);
 }
 
 bool Equalizer::lifted() const noexcept
