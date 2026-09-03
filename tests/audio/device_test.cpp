@@ -20,8 +20,8 @@
 
 #include <audio/device/device.hpp>
 #include <audio/dsp/source.hpp>
-#include <audio/stream_spec.hpp>
 #include <fakes/tone.hpp>
+#include <pcm/stream_spec.hpp>
 #include <utils/units.hpp>
 
 #include <gtest/gtest.h>
@@ -40,7 +40,7 @@ using wiola::audio::DeviceState;
 using wiola::testing::SineSource;
 using namespace wiola::units;
 using wiola::audio::Source;
-using wiola::audio::StreamSpec;
+using wiola::pcm::StreamSpec;
 
 constexpr StreamSpec stereo{.sample_rate = 48_kHz, .num_channels = 2};
 
@@ -55,7 +55,7 @@ public:
 
     std::size_t render(std::span<float> interleaved) override
     {
-        const wiola::audio::Frames num_frames{static_cast<std::size_t>(
+        const wiola::pcm::Frames num_frames{static_cast<std::size_t>(
             static_cast<double>(spec_.frames_per(interleaved.size()).count()) * fill_fraction_
         )};
         const std::size_t num_rendered{spec_.samples_per(num_frames)};
@@ -128,7 +128,7 @@ TEST(Device, AsksItsSourceForFramesWhileRunning)
 
     EXPECT_FALSE(device.running());
     EXPECT_GT(source.num_asked(), 0u);
-    EXPECT_GT(device.frames_played(), wiola::audio::Frames{});
+    EXPECT_GT(device.frames_played(), wiola::pcm::Frames{});
     EXPECT_EQ(device.num_underruns(), 0u);
 }
 

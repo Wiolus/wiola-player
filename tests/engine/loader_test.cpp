@@ -65,7 +65,7 @@ TEST(Loader, OpensAFileAndHandsItOver)
     ASSERT_TRUE(opened.has_value());
     EXPECT_EQ(opened->result, OpenResult::opened);
     ASSERT_NE(opened->decoder, nullptr);
-    EXPECT_GT(opened->decoder->num_frames(), wiola::audio::Frames{});
+    EXPECT_GT(opened->decoder->num_frames(), wiola::pcm::Frames{});
 }
 
 TEST(Loader, SaysWhyAFileWouldNotOpen)

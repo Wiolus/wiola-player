@@ -37,7 +37,7 @@ std::size_t ShapedSource::render(std::span<float> interleaved)
     return num_rendered;
 }
 
-StreamSpec ShapedSource::spec() const noexcept
+pcm::StreamSpec ShapedSource::spec() const noexcept
 {
     return source_.spec();
 }

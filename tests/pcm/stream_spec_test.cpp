@@ -18,15 +18,15 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/stream_spec.hpp>
+#include <pcm/stream_spec.hpp>
 #include <utils/units.hpp>
 
 #include <gtest/gtest.h>
 
 namespace {
 
-using wiola::audio::Frames;
-using wiola::audio::StreamSpec;
+using wiola::pcm::Frames;
+using wiola::pcm::StreamSpec;
 using namespace wiola::units;
 
 TEST(StreamSpec, DefaultsToStereoAt48kHz)

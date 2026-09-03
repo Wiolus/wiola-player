@@ -73,7 +73,7 @@ bool Device::start() noexcept
     config.pUserData = this;
     config.dataCallback = [](ma_device* handle, void* output, const void*, ma_uint32 num_frames) {
         auto* device = static_cast<Device*>(handle->pUserData);
-        const std::size_t num_samples{device->spec_.samples_per(Frames{num_frames})};
+        const std::size_t num_samples{device->spec_.samples_per(pcm::Frames{num_frames})};
         device->render(std::span<float>{static_cast<float*>(output), num_samples});
     };
 
@@ -109,9 +109,9 @@ bool Device::running() const noexcept
     return state() == DeviceState::running;
 }
 
-Frames Device::frames_played() const noexcept
+pcm::Frames Device::frames_played() const noexcept
 {
-    return Frames{frames_played_.load(std::memory_order_relaxed)};
+    return pcm::Frames{frames_played_.load(std::memory_order_relaxed)};
 }
 
 std::size_t Device::num_underruns() const noexcept
@@ -119,7 +119,7 @@ std::size_t Device::num_underruns() const noexcept
     return num_underruns_.load(std::memory_order_relaxed);
 }
 
-StreamSpec Device::spec() const noexcept
+pcm::StreamSpec Device::spec() const noexcept
 {
     return spec_;
 }

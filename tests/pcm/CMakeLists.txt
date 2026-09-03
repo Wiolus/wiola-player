@@ -1,0 +1,1 @@
+wiola_add_test(pcm_stream_spec_test SOURCES stream_spec_test.cpp)

@@ -23,14 +23,14 @@
 #include <audio/dsp/chain.hpp>
 #include <audio/dsp/equalizer.hpp>
 #include <audio/dsp/volume.hpp>
-#include <audio/stream_spec.hpp>
+#include <pcm/stream_spec.hpp>
 
 namespace wiola::testing {
 
 /// The steps a session puts a track through, in the same order, with each of them to hand: the
 /// bands first, then how loud, so that what a listener asks for last is done last.
 struct Shaping {
-    explicit Shaping(audio::StreamSpec spec, audio::BandLayout layout = {})
+    explicit Shaping(pcm::StreamSpec spec, audio::BandLayout layout = {})
         : equalizer{chain.add<audio::Equalizer>(spec, layout)}
         , volume{chain.add<audio::Volume>()}
     {

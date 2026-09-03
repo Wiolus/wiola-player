@@ -21,7 +21,7 @@
 #include <audio/dsp/relay.hpp>
 
 #include <audio/dsp/source.hpp>
-#include <audio/stream_spec.hpp>
+#include <pcm/stream_spec.hpp>
 #include <utils/units.hpp>
 
 #include <gtest/gtest.h>
@@ -36,7 +36,7 @@ namespace {
 using namespace wiola::units::literals;
 using wiola::audio::Relay;
 using wiola::audio::Source;
-using wiola::audio::StreamSpec;
+using wiola::pcm::StreamSpec;
 
 constexpr StreamSpec stereo{.sample_rate = 48_kHz, .num_channels = 2};
 

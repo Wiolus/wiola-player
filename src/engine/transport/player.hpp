@@ -23,11 +23,11 @@
 #include "decode_loop.hpp"
 #include "playhead.hpp"
 #include <audio/device/output.hpp>
-#include <audio/stream_spec.hpp>
 #include <codec/decode/decoder.hpp>
 #include <core/macros.hpp>
 #include <engine/transport/playback.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
+#include <pcm/stream_spec.hpp>
 #include <utils/units.hpp>
 
 #include <memory>
@@ -114,8 +114,8 @@ private:
 
     /// The source's own, taken once. What a track is does not change while it is loaded, and
     /// asking the source would mean reaching into what the loop below owns.
-    audio::StreamSpec spec_;
-    audio::Frames num_frames_;
+    pcm::StreamSpec spec_;
+    pcm::Frames num_frames_;
 
     /// The audio path, whole. Nothing above this line can reach into it.
     DecodeLoop loop_;

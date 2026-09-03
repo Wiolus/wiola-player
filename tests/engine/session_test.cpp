@@ -23,9 +23,9 @@
 #include <audio/device/output.hpp>
 
 #include <audio/dsp/source.hpp>
-#include <audio/stream_spec.hpp>
 #include <codec/decode/open.hpp>
 #include <engine/session.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <engine/queue/track.hpp>
 #include <fakes/output.hpp>
@@ -43,8 +43,8 @@
 namespace {
 
 using namespace std::chrono_literals;
-using wiola::audio::Frames;
 using wiola::codec::OpenResult;
+using wiola::pcm::Frames;
 using State = wiola::engine::Playback::State;
 using wiola::engine::Session;
 namespace units = wiola::units;

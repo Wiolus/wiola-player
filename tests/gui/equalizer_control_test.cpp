@@ -20,8 +20,8 @@
 
 #include <audio/dsp/equalizer.hpp>
 #include <audio/dsp/tuning.hpp>
-#include <audio/stream_spec.hpp>
 #include <gui/equalizer_control.hpp>
+#include <pcm/stream_spec.hpp>
 #include <utils/units.hpp>
 
 #include <QSettings>
@@ -37,7 +37,7 @@ namespace {
 using namespace wiola::units::literals;
 using Control = wiola::gui::EqualizerControl;
 using wiola::audio::Equalizer;
-using wiola::audio::StreamSpec;
+using wiola::pcm::StreamSpec;
 
 constexpr StreamSpec stereo{.sample_rate = 48_kHz, .num_channels = 2};
 

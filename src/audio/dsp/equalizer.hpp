@@ -22,8 +22,8 @@
 
 #include <audio/dsp/stage.hpp>
 #include <audio/dsp/tuning.hpp>
-#include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
+#include <pcm/stream_spec.hpp>
 #include <utils/units.hpp>
 
 #include <cstddef>
@@ -64,7 +64,7 @@ struct BandLayout {
  */
 class Equalizer final : public Stage {
 public:
-    explicit Equalizer(StreamSpec spec, BandLayout layout = {});
+    explicit Equalizer(pcm::StreamSpec spec, BandLayout layout = {});
 
     NO_COPY_SEMANTIC(Equalizer);
     NO_MOVE_SEMANTIC(Equalizer);
@@ -73,7 +73,7 @@ public:
 
     /// Takes the format the samples are in. Settings are kept. Not to be called while the output
     /// is running: it rebuilds what `process` reads.
-    void configure(StreamSpec spec) override;
+    void configure(pcm::StreamSpec spec) override;
 
     /// Where the bands sit, whether or not the format can carry them all. A gain is kept for
     /// every one it names.
@@ -113,7 +113,7 @@ private:
     /// Gives every band the coefficients its gain now asks for.
     void retune() noexcept;
 
-    StreamSpec spec_{};
+    pcm::StreamSpec spec_{};
     BandLayout layout_{};
     std::size_t num_bands_{0};
     std::unique_ptr<Bands> bands_;

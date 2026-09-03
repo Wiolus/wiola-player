@@ -19,8 +19,8 @@
  */
 
 #include <audio/dsp/source.hpp>
-#include <audio/stream_spec.hpp>
 #include <fakes/tone.hpp>
+#include <pcm/stream_spec.hpp>
 #include <utils/units.hpp>
 
 #include <gtest/gtest.h>
@@ -36,7 +36,7 @@ namespace {
 
 using wiola::testing::SineSource;
 using namespace wiola::units;
-using wiola::audio::StreamSpec;
+using wiola::pcm::StreamSpec;
 
 constexpr StreamSpec stereo{.sample_rate = 48_kHz, .num_channels = 2};
 constexpr StreamSpec mono{.sample_rate = 44100_Hz, .num_channels = 1};

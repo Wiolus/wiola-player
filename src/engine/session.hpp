@@ -187,7 +187,7 @@ private:
     /// What a track is shaped by, and in what order: the bands first, then how loud, so that
     /// what a listener asks for last is the last thing done to the sound.
     audio::Chain chain_;
-    audio::Equalizer& equalizer_{chain_.add<audio::Equalizer>(audio::StreamSpec{})};
+    audio::Equalizer& equalizer_{chain_.add<audio::Equalizer>(pcm::StreamSpec{})};
     audio::Volume& volume_{chain_.add<audio::Volume>()};
     std::unique_ptr<Loader> loader_;
     std::unique_ptr<TagReader> tags_;

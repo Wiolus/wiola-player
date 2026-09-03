@@ -21,7 +21,7 @@
 #pragma once
 
 #include <audio/dsp/stage.hpp>
-#include <audio/stream_spec.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <atomic>
 #include <span>
@@ -38,7 +38,7 @@ public:
     [[nodiscard]] float gain() const noexcept;
 
     /// Nothing here follows the stream, so this is what it costs to say so.
-    void configure(StreamSpec spec) noexcept override;
+    void configure(pcm::StreamSpec spec) noexcept override;
 
     void process(std::span<float> samples) noexcept override;
 

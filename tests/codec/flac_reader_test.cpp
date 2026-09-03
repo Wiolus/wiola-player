@@ -20,7 +20,7 @@
 
 #include <codec/decode/flac_reader.hpp>
 
-#include <audio/stream_spec.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <gtest/gtest.h>
 
@@ -29,10 +29,10 @@
 #include <filesystem>
 #include <vector>
 
-using wiola::audio::Frames;
 using wiola::codec::FlacReader;
+using wiola::pcm::Frames;
 
-using wiola::audio::Frames;
+using wiola::pcm::Frames;
 
 namespace {
 

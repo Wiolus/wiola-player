@@ -20,8 +20,8 @@
 
 #include <audio/dsp/buffer_source.hpp>
 #include <audio/dsp/source.hpp>
-#include <audio/stream_spec.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
+#include <pcm/stream_spec.hpp>
 #include <utils/units.hpp>
 
 #include <gtest/gtest.h>
@@ -36,8 +36,8 @@ namespace {
 using wiola::audio::BufferSource;
 using namespace wiola::units;
 using wiola::audio::Source;
-using wiola::audio::StreamSpec;
 using wiola::lockfree::SPSCRingBuffer;
+using wiola::pcm::StreamSpec;
 
 constexpr StreamSpec stereo{.sample_rate = 48_kHz, .num_channels = 2};
 

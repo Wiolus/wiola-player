@@ -22,8 +22,8 @@
 
 #include "format.hpp"
 
-#include <audio/stream_spec.hpp>
 #include <codec/decode/decoder.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <cstddef>
 #include <filesystem>
@@ -52,12 +52,12 @@ public:
 private:
     struct Handle;
 
-    WavReader(audio::StreamSpec spec, audio::Frames num_frames,
+    WavReader(pcm::StreamSpec spec, pcm::Frames num_frames,
         std::unique_ptr<Handle> handle) noexcept;
 
-    std::size_t decode(std::span<float> output, audio::Frames num_frames) override;
+    std::size_t decode(std::span<float> output, pcm::Frames num_frames) override;
 
-    bool seek_frame(audio::Frames frame_index) override;
+    bool seek_frame(pcm::Frames frame_index) override;
 
     std::unique_ptr<Handle> handle_;
 };
