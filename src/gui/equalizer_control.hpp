@@ -35,7 +35,8 @@ class EqualizerControl {
 public:
     EqualizerControl(audio::Equalizer& equalizer, QSettings& settings) noexcept;
 
-    /// Applies what a previous run left, for every band the layout names.
+    /// Applies what a previous run left, for every band the layout names. Nothing is written
+    /// back, so a run that is only started and closed leaves the file as it found it.
     void restore();
 
     void set_enabled(bool enabled);

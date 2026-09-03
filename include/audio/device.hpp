@@ -67,8 +67,9 @@ public:
     /// Whether the callback is being called. Shorthand for `state() == DeviceState::running`.
     [[nodiscard]] bool running() const noexcept override;
 
-    /// Frames handed to the output since the last reset. This is what has been heard; a decoder's
-    /// own position runs ahead of it by whatever the buffer is holding.
+    /// Frames of the source handed to the output since the last reset. Silence filled in on an
+    /// underrun is not among them; a decoder's own position runs ahead of this by whatever the
+    /// buffer is holding.
     [[nodiscard]] Frames frames_played() const noexcept override;
 
     /// Callbacks that found the buffer short and had to emit silence.

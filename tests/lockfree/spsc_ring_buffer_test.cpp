@@ -36,7 +36,7 @@
 namespace {
 
 using namespace std::chrono_literals;
-using wiola::hw::hardware_destructive_interference_size;
+using wiola::core::hardware_destructive_interference_size;
 
 /// How long a threaded test waits for the other side before giving up, so a buffer that stops
 /// carrying anything fails rather than hangs.

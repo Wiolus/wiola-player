@@ -54,6 +54,8 @@ void Device::render(std::span<float> output) noexcept
     frames_played_.fetch_add(spec_.frames_per(num_rendered).count(), std::memory_order_relaxed);
 
     if (num_rendered < output.size()) {
+        // Heard, but not counted above: the count follows the track rather than the clock, so a
+        // starved source leaves the position where it was instead of running past it.
         std::ranges::fill(output.subspan(num_rendered), 0.0F);
         num_underruns_.fetch_add(1, std::memory_order_relaxed);
     }

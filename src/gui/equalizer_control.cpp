@@ -53,12 +53,13 @@ EqualizerControl::EqualizerControl(audio::Equalizer& equalizer, QSettings& setti
 
 void EqualizerControl::restore()
 {
-    set_enabled(settings_.value(enabled_key, true).toBool());
+    // Applied straight to the equalizer: what came out of the file does not need putting back.
+    equalizer_.set_enabled(settings_.value(enabled_key, true).toBool());
 
     // Every band the layout names, not only those this format can carry: a band left out now is
     // still set for the track that can.
     for (std::size_t index = 0; index < equalizer_.layout().count; ++index)
-        set_band_gain(index, stored_db(settings_, band_key(index), 0.0F));
+        equalizer_.set_band_gain(index, stored_db(settings_, band_key(index), 0.0F));
 }
 
 void EqualizerControl::set_enabled(bool enabled)

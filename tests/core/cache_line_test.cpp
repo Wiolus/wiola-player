@@ -29,7 +29,7 @@
 
 namespace {
 
-using wiola::hw::hardware_destructive_interference_size;
+using wiola::core::hardware_destructive_interference_size;
 
 TEST(CacheLine, IsAPowerOfTwo)
 {

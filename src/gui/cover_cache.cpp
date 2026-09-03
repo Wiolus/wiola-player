@@ -26,6 +26,9 @@
 
 #include <QStyle>
 
+#include <algorithm>
+#include <utility>
+
 namespace wiola::gui {
 
 CoverCache::CoverCache(const QWidget& styled, int size)
@@ -57,10 +60,10 @@ const QPixmap& CoverCache::cover_of(const std::filesystem::path& path)
 
     ++read_this_turn_;
 
-    // Kept from growing without end: a queue longer than this is one whose far end is not being
-    // looked at.
+    // Kept from growing without end. Half of them go rather than all: dropping the lot would
+    // leave a queue longer than this reading every cover it holds again each time it filled.
     if (covers_.size() >= tuning::covers_kept)
-        covers_.clear();
+        forget_oldest(std::max<std::size_t>(tuning::covers_kept / 2, 1));
 
     const codec::Tags tags{codec::read_tags(path)};
     QPixmap art;
@@ -69,11 +72,23 @@ const QPixmap& CoverCache::cover_of(const std::filesystem::path& path)
         art.loadFromData(reinterpret_cast<const uchar*>(tags.art.data()),
             static_cast<unsigned int>(tags.art.size()));
 
-    covers_.emplace(key,
-        art.isNull() ? stub_
-                     : art.scaled(size_, size_, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    QPixmap cover{art.isNull()
+            ? stub_
+            : art.scaled(size_, size_, Qt::KeepAspectRatio, Qt::SmoothTransformation)};
 
-    return covers_[key];
+    const auto held = covers_.emplace(key, std::move(cover)).first;
+
+    order_.push_back(key);
+
+    return held->second;
+}
+
+void CoverCache::forget_oldest(std::size_t count)
+{
+    for (std::size_t gone = 0; gone < count && !order_.empty(); ++gone) {
+        covers_.erase(order_.front());
+        order_.pop_front();
+    }
 }
 
 } // namespace wiola::gui

@@ -107,7 +107,9 @@ public:
 
     [[nodiscard]] virtual bool running() const noexcept = 0;
 
-    /// Frames played, which is what has been heard.
+    /// Frames of the source that have been played. Silence emitted because the source had nothing
+    /// to give does not count: this measures material, not elapsed time, so a position taken from
+    /// it stands still while a source is starved instead of running on without it.
     [[nodiscard]] virtual Frames frames_played() const noexcept = 0;
 
 protected:

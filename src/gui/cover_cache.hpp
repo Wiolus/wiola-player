@@ -24,6 +24,7 @@
 #include <QWidget>
 
 #include <cstddef>
+#include <deque>
 #include <filesystem>
 #include <map>
 #include <string>
@@ -54,10 +55,16 @@ public:
     [[nodiscard]] bool ran_out() const noexcept { return ran_out_; }
 
 private:
+    /// Forgets the `count` covers read longest ago.
+    void forget_oldest(std::size_t count);
+
     QPixmap stub_;
     int size_;
 
     std::map<std::string, QPixmap> covers_;
+
+    /// What is held, in the order it was read, so that the oldest are the ones to go.
+    std::deque<std::string> order_;
     std::size_t read_this_turn_{0};
     bool ran_out_{false};
 };
