@@ -37,7 +37,7 @@ namespace {
 
 using wiola::audio::BandLayout;
 using wiola::audio::Chain;
-using wiola::audio::StreamSpec;
+using wiola::pcm::StreamSpec;
 using namespace wiola::units;
 
 constexpr StreamSpec stereo{.sample_rate = 48_kHz, .num_channels = 2};
@@ -246,7 +246,7 @@ double response_db(Chain& chain, StreamSpec spec, Frequency tone)
     constexpr std::size_t num_frames{512};
 
     wiola::testing::SineSource source{spec, tone, 0.5F};
-    std::vector<float> block(spec.samples_per(wiola::audio::Frames{num_frames}));
+    std::vector<float> block(spec.samples_per(wiola::pcm::Frames{num_frames}));
 
     double energy{0.0};
     double reference{0.0};
@@ -448,7 +448,7 @@ TEST(Chain, KeepsBoostedSamplesInRange)
 {
     wiola::testing::Shaping shaping{stereo};
     wiola::testing::SineSource source{stereo, 1_kHz, 0.95F};
-    std::vector<float> block(stereo.samples_per(wiola::audio::Frames{512}));
+    std::vector<float> block(stereo.samples_per(wiola::pcm::Frames{512}));
 
     shaping.equalizer.set_band_gain(5, 12.0F);
 

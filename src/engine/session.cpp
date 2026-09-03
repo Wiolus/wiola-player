@@ -30,10 +30,10 @@
 #include <audio/dsp/buffer_source.hpp>
 #include <audio/dsp/relay.hpp>
 #include <audio/dsp/shaped_source.hpp>
-#include <audio/stream_spec.hpp>
 #include <codec/decode/decoder.hpp>
 #include <codec/decode/open.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <memory>
 #include <optional>
@@ -62,7 +62,7 @@ struct Session::Pipeline {
 /// Built for a format and kept for as long as tracks come in it, so that a track change is a
 /// device stopping and starting rather than one closing and another opening.
 struct Session::Out {
-    Out(audio::StreamSpec spec, audio::Chain& chain, const OutputFactory& make_output)
+    Out(pcm::StreamSpec spec, audio::Chain& chain, const OutputFactory& make_output)
         : spec{spec}
         , relay{spec}
         , shaped{relay, chain}
@@ -70,7 +70,7 @@ struct Session::Out {
     {
     }
 
-    audio::StreamSpec spec;
+    pcm::StreamSpec spec;
     audio::Relay relay;
     audio::ShapedSource shaped;
     std::unique_ptr<audio::Output> output;
@@ -313,7 +313,7 @@ bool Session::install_read_track()
         return false;
 
     std::unique_ptr<codec::Decoder> source{std::move(ready_)};
-    const audio::StreamSpec spec{source->spec()};
+    const pcm::StreamSpec spec{source->spec()};
 
     // Nothing to play, before there is nothing to play from: a device asking after this hears
     // silence rather than reading a track that has been let go. The player's end stops the device

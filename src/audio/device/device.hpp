@@ -22,8 +22,8 @@
 
 #include <audio/device/output.hpp>
 #include <audio/dsp/source.hpp>
-#include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <atomic>
 #include <cstddef>
@@ -70,12 +70,12 @@ public:
     /// Frames of the source handed to the output since the last reset. Silence filled in on an
     /// underrun is not among them; a decoder's own position runs ahead of this by whatever the
     /// buffer is holding.
-    [[nodiscard]] Frames frames_played() const noexcept override;
+    [[nodiscard]] pcm::Frames frames_played() const noexcept override;
 
     /// Callbacks that found the buffer short and had to emit silence.
     [[nodiscard]] std::size_t num_underruns() const noexcept;
 
-    [[nodiscard]] StreamSpec spec() const noexcept;
+    [[nodiscard]] pcm::StreamSpec spec() const noexcept;
 
 private:
     /// Driving it is the control's; these are what it drives.
@@ -86,7 +86,7 @@ private:
 
     void render(std::span<float> output) noexcept;
 
-    StreamSpec spec_{};
+    pcm::StreamSpec spec_{};
     Source& source_;
     std::atomic<std::size_t> num_underruns_{0};
     std::atomic<std::size_t> frames_played_{0};

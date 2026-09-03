@@ -24,7 +24,7 @@
 
 #include <cstddef>
 
-namespace wiola::audio {
+namespace wiola::pcm {
 
 /// A count of frames. Samples are counted plainly, being the length of a span; a frame is what
 /// gets mistaken for one.
@@ -108,4 +108,4 @@ struct StreamSpec {
     friend constexpr bool operator==(const StreamSpec&, const StreamSpec&) = default;
 };
 
-} // namespace wiola::audio
+} // namespace wiola::pcm

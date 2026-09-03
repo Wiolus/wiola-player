@@ -21,8 +21,8 @@
 #pragma once
 
 #include <audio/dsp/source.hpp>
-#include <audio/stream_spec.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <cstddef>
 #include <span>
@@ -32,14 +32,14 @@ namespace wiola::audio {
 /// What a ring buffer holds. Short whenever whoever fills it has not kept up.
 class BufferSource final : public Source {
 public:
-    BufferSource(StreamSpec spec, lockfree::SPSCRingBuffer<float>::Consumer buffer) noexcept;
+    BufferSource(pcm::StreamSpec spec, lockfree::SPSCRingBuffer<float>::Consumer buffer) noexcept;
 
     std::size_t render(std::span<float> interleaved) override;
 
-    [[nodiscard]] StreamSpec spec() const noexcept override;
+    [[nodiscard]] pcm::StreamSpec spec() const noexcept override;
 
 private:
-    StreamSpec spec_;
+    pcm::StreamSpec spec_;
     lockfree::SPSCRingBuffer<float>::Consumer buffer_;
 };
 

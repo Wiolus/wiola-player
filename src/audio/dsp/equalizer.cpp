@@ -65,7 +65,7 @@ void apply_gain(std::span<float> samples, float gain) noexcept
         sample *= gain;
 }
 
-ma_peak2_config band_config(StreamSpec spec, double quality, units::Frequency center,
+ma_peak2_config band_config(pcm::StreamSpec spec, double quality, units::Frequency center,
     float gain_db) noexcept
 {
     return ma_peak2_config_init(ma_format_f32, static_cast<ma_uint32>(spec.num_channels),
@@ -75,7 +75,7 @@ ma_peak2_config band_config(StreamSpec spec, double quality, units::Frequency ce
 
 } // namespace
 
-Equalizer::Equalizer(StreamSpec spec, BandLayout layout)
+Equalizer::Equalizer(pcm::StreamSpec spec, BandLayout layout)
     : layout_{layout}
     , bands_{std::make_unique<Bands>()}
 {
@@ -86,7 +86,7 @@ Equalizer::Equalizer(StreamSpec spec, BandLayout layout)
 
 Equalizer::~Equalizer() = default;
 
-void Equalizer::configure(StreamSpec spec)
+void Equalizer::configure(pcm::StreamSpec spec)
 {
     spec_ = spec;
     num_bands_ = 0;

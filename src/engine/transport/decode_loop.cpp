@@ -22,7 +22,7 @@
 
 #include <engine/tuning.hpp>
 
-#include <audio/stream_spec.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <algorithm>
 #include <array>
@@ -51,8 +51,8 @@ bool DecodeLoop::begin(bool rewind)
     // instead of being thrown away: a listener who moves the slider before pressing play means
     // to begin there.
     const Playhead::Claim claim{applier_.claim()};
-    const audio::Frames start_frame{
-        claim.outstanding ? std::min(claim.target, source_->num_frames()) : audio::Frames{}};
+    const pcm::Frames start_frame{
+        claim.outstanding ? std::min(claim.target, source_->num_frames()) : pcm::Frames{}};
 
     // A source that has never played is already at the beginning with nothing buffered.
     if (rewind || claim.outstanding) {

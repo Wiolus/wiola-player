@@ -21,8 +21,8 @@
 #pragma once
 
 #include <audio/dsp/source.hpp>
-#include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <cstddef>
 #include <span>
@@ -47,25 +47,25 @@ public:
     /// Fills whole frames and returns how many samples were written. Short means end of file.
     std::size_t render(std::span<float> output) override;
 
-    [[nodiscard]] audio::StreamSpec spec() const noexcept override { return spec_; }
+    [[nodiscard]] pcm::StreamSpec spec() const noexcept override { return spec_; }
 
     /// Total frames in the stream, and how many are still unread.
-    [[nodiscard]] audio::Frames num_frames() const noexcept { return num_frames_; }
+    [[nodiscard]] pcm::Frames num_frames() const noexcept { return num_frames_; }
 
-    [[nodiscard]] audio::Frames num_frames_left() const noexcept
+    [[nodiscard]] pcm::Frames num_frames_left() const noexcept
     {
         return num_frames_ - num_frames_read_;
     }
 
-    [[nodiscard]] bool exhausted() const noexcept { return num_frames_left() == audio::Frames{}; }
+    [[nodiscard]] bool exhausted() const noexcept { return num_frames_left() == pcm::Frames{}; }
 
     /// Moves so that the next render starts at `frame_index`, counted from the beginning of the
     /// stream. Seeking to `num_frames()` leaves nothing to read. False when the stream will not
     /// move, in which case the position is where it was.
-    bool seek(audio::Frames frame_index);
+    bool seek(pcm::Frames frame_index);
 
 protected:
-    Decoder(audio::StreamSpec spec, audio::Frames num_frames) noexcept
+    Decoder(pcm::StreamSpec spec, pcm::Frames num_frames) noexcept
         : spec_{spec}
         , num_frames_{num_frames}
     {
@@ -73,15 +73,15 @@ protected:
 
     /// Writes at most `num_frames` whole frames into `output`, and returns how many it wrote.
     /// Never asked for more frames than remain, nor for more than `output` can hold.
-    virtual std::size_t decode(std::span<float> output, audio::Frames num_frames) = 0;
+    virtual std::size_t decode(std::span<float> output, pcm::Frames num_frames) = 0;
 
     /// Moves the stream itself to `frame_index`. Never asked for a frame past the end.
-    virtual bool seek_frame(audio::Frames frame_index) = 0;
+    virtual bool seek_frame(pcm::Frames frame_index) = 0;
 
 private:
-    audio::StreamSpec spec_;
-    audio::Frames num_frames_;
-    audio::Frames num_frames_read_{};
+    pcm::StreamSpec spec_;
+    pcm::Frames num_frames_;
+    pcm::Frames num_frames_read_{};
 };
 
 } // namespace wiola::codec

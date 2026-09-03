@@ -20,9 +20,9 @@
 
 #pragma once
 
-#include <audio/stream_spec.hpp>
 #include <core/borrowed.hpp>
 #include <core/macros.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <utility>
 
@@ -110,7 +110,7 @@ public:
     /// Frames of the source that have been played. Silence emitted because the source had nothing
     /// to give does not count: this measures material, not elapsed time, so a position taken from
     /// it stands still while a source is starved instead of running on without it.
-    [[nodiscard]] virtual Frames frames_played() const noexcept = 0;
+    [[nodiscard]] virtual pcm::Frames frames_played() const noexcept = 0;
 
 protected:
     Output() = default;

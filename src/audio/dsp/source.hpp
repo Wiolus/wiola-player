@@ -20,8 +20,8 @@
 
 #pragma once
 
-#include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <cstddef>
 #include <span>
@@ -40,7 +40,7 @@ public:
     virtual std::size_t render(std::span<float> interleaved) = 0;
 
     /// The format the frames are in. Fixed for the source's lifetime.
-    [[nodiscard]] virtual StreamSpec spec() const noexcept = 0;
+    [[nodiscard]] virtual pcm::StreamSpec spec() const noexcept = 0;
 
 protected:
     Source() = default;

@@ -21,7 +21,7 @@
 #pragma once
 
 #include <audio/dsp/source.hpp>
-#include <audio/stream_spec.hpp>
+#include <pcm/stream_spec.hpp>
 #include <utils/units.hpp>
 
 #include <cmath>
@@ -34,16 +34,16 @@ namespace wiola::testing {
 /// Generates a constant-frequency sine, the same signal on every channel.
 class SineSource final : public audio::Source {
 public:
-    SineSource(audio::StreamSpec spec, units::Frequency frequency, float amplitude = 0.2F) noexcept;
+    SineSource(pcm::StreamSpec spec, units::Frequency frequency, float amplitude = 0.2F) noexcept;
 
     /// Writes whole frames only: channels alternate within a frame, never one array per channel
     /// as a planar layout would. A partial trailing frame is left untouched. Returns how many
     /// samples were written, which for a tone is every whole frame the span holds.
     std::size_t render(std::span<float> interleaved) noexcept override;
-    [[nodiscard]] audio::StreamSpec spec() const noexcept override;
+    [[nodiscard]] pcm::StreamSpec spec() const noexcept override;
 
 private:
-    const audio::StreamSpec spec_{};
+    const pcm::StreamSpec spec_{};
     double phase_{0.0};
     double phase_step_;
     float amplitude_;
@@ -51,7 +51,7 @@ private:
 
 inline constexpr double two_pi{2.0 * std::numbers::pi};
 
-inline SineSource::SineSource(audio::StreamSpec spec, units::Frequency frequency,
+inline SineSource::SineSource(pcm::StreamSpec spec, units::Frequency frequency,
     float amplitude) noexcept
     : spec_{spec}
     , phase_step_{two_pi * (frequency / spec.sample_rate)}
@@ -81,7 +81,7 @@ inline std::size_t SineSource::render(std::span<float> interleaved) noexcept
     return num_written;
 }
 
-inline audio::StreamSpec SineSource::spec() const noexcept
+inline pcm::StreamSpec SineSource::spec() const noexcept
 {
     return spec_;
 }

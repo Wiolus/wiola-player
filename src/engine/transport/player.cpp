@@ -20,7 +20,7 @@
 
 #include "player.hpp"
 
-#include <audio/stream_spec.hpp>
+#include <pcm/stream_spec.hpp>
 #include <utils/units.hpp>
 
 #include <algorithm>
@@ -74,7 +74,7 @@ void Player::seek(units::Time position) noexcept
 {
     const double frames{spec_.sample_rate * std::max(position, units::Time{})};
 
-    head_.request_seek(audio::Frames{static_cast<std::size_t>(frames)});
+    head_.request_seek(pcm::Frames{static_cast<std::size_t>(frames)});
 }
 
 bool Player::pause() noexcept

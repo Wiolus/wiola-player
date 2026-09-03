@@ -22,7 +22,7 @@
 
 #include <audio/dsp/chain.hpp>
 #include <audio/dsp/source.hpp>
-#include <audio/stream_spec.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <cstddef>
 #include <span>
@@ -36,7 +36,7 @@ public:
 
     std::size_t render(std::span<float> interleaved) override;
 
-    [[nodiscard]] StreamSpec spec() const noexcept override;
+    [[nodiscard]] pcm::StreamSpec spec() const noexcept override;
 
 private:
     Source& source_;

@@ -22,7 +22,7 @@
 
 namespace wiola::engine {
 
-void Playhead::request_seek(audio::Frames frame_index) noexcept
+void Playhead::request_seek(pcm::Frames frame_index) noexcept
 {
     seek_target_.store(frame_index.count(), std::memory_order_relaxed);
     seeks_requested_.fetch_add(1, std::memory_order_release);
@@ -40,12 +40,12 @@ Playhead::Claim Playhead::claim() const noexcept
 
     return Claim{
         .requested = requested,
-        .target = audio::Frames{seek_target_.load(std::memory_order_relaxed)},
+        .target = pcm::Frames{seek_target_.load(std::memory_order_relaxed)},
         .outstanding = requested != seeks_applied_.load(std::memory_order_relaxed),
     };
 }
 
-void Playhead::begin_at(audio::Frames frame_index, audio::Frames frames_played,
+void Playhead::begin_at(pcm::Frames frame_index, pcm::Frames frames_played,
     const Claim& claim) noexcept
 {
     base_.store(frame_index.count(), std::memory_order_relaxed);
@@ -67,22 +67,22 @@ std::size_t Playhead::num_pushed() const noexcept
     return num_pushed_;
 }
 
-audio::Frames Playhead::position(audio::Frames frames_played) const noexcept
+pcm::Frames Playhead::position(pcm::Frames frames_played) const noexcept
 {
     while (true) {
         // Read before the counts, never after: a place asked for is stored before the count that
         // describes it, so a target read afterwards may belong to a request this read has not
         // counted. Reporting that one is reporting a place playback has not been sent to yet,
         // and the next read - which does count it - then falls back behind it.
-        const audio::Frames target{seek_target_.load(std::memory_order_acquire)};
+        const pcm::Frames target{seek_target_.load(std::memory_order_acquire)};
         const std::size_t applied{seeks_applied_.load(std::memory_order_acquire)};
 
         // A place asked for is where playback is until it is reached.
         if (seeks_requested_.load(std::memory_order_acquire) != applied)
             return target;
 
-        const audio::Frames base{base_.load(std::memory_order_acquire)};
-        const audio::Frames at_begin{frames_at_begin_.load(std::memory_order_acquire)};
+        const pcm::Frames base{base_.load(std::memory_order_acquire)};
+        const pcm::Frames at_begin{frames_at_begin_.load(std::memory_order_acquire)};
 
         // A seek carried out while those two were being read leaves them from either side of it,
         // so the read is taken again rather than reported. The writer settles within one seek, so

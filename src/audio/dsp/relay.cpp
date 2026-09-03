@@ -22,7 +22,7 @@
 
 namespace wiola::audio {
 
-Relay::Relay(StreamSpec spec) noexcept
+Relay::Relay(pcm::StreamSpec spec) noexcept
     : spec_{spec}
 {
 }
@@ -49,7 +49,7 @@ std::size_t Relay::render(std::span<float> interleaved)
     return source != nullptr ? source->render(interleaved) : 0;
 }
 
-StreamSpec Relay::spec() const noexcept
+pcm::StreamSpec Relay::spec() const noexcept
 {
     return spec_;
 }

@@ -39,7 +39,7 @@ float Volume::gain() const noexcept
     return gain_.load(std::memory_order_relaxed);
 }
 
-void Volume::configure(StreamSpec /*spec*/) noexcept { }
+void Volume::configure(pcm::StreamSpec /*spec*/) noexcept { }
 
 bool Volume::lifted() const noexcept
 {

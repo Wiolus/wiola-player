@@ -24,7 +24,7 @@
 
 namespace wiola::audio {
 
-BufferSource::BufferSource(StreamSpec spec,
+BufferSource::BufferSource(pcm::StreamSpec spec,
     lockfree::SPSCRingBuffer<float>::Consumer buffer) noexcept
     : spec_{spec}
     , buffer_{std::move(buffer)}
@@ -36,7 +36,7 @@ std::size_t BufferSource::render(std::span<float> interleaved)
     return buffer_.pop(interleaved);
 }
 
-StreamSpec BufferSource::spec() const noexcept
+pcm::StreamSpec BufferSource::spec() const noexcept
 {
     return spec_;
 }

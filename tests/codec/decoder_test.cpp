@@ -32,7 +32,7 @@
 
 using wiola::codec::Decoder;
 
-using wiola::audio::Frames;
+using wiola::pcm::Frames;
 
 namespace {
 

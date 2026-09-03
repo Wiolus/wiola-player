@@ -25,7 +25,7 @@
 
 namespace wiola::audio {
 
-void Chain::configure(StreamSpec spec)
+void Chain::configure(pcm::StreamSpec spec)
 {
     for (const std::unique_ptr<Stage>& stage : stages_)
         stage->configure(spec);

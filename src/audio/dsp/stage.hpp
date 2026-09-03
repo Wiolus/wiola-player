@@ -20,8 +20,8 @@
 
 #pragma once
 
-#include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <span>
 
@@ -45,7 +45,7 @@ public:
 
     /// Retunes for a stream of `spec`, which a new track may have changed. Not the playing
     /// thread's: a chain configures between tracks, never during one.
-    virtual void configure(StreamSpec spec) = 0;
+    virtual void configure(pcm::StreamSpec spec) = 0;
 
     /// Shapes `samples` in place.
     virtual void process(std::span<float> samples) noexcept = 0;

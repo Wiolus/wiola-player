@@ -22,7 +22,7 @@
 
 #include <audio/device/output.hpp>
 #include <audio/dsp/source.hpp>
-#include <audio/stream_spec.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <algorithm>
 #include <array>
@@ -69,7 +69,7 @@ public:
     }
 
     /// Says that `num_frames` more have been heard. For an output that pulls nothing.
-    void play(audio::Frames num_frames) noexcept { frames_.fetch_add(num_frames.count()); }
+    void play(pcm::Frames num_frames) noexcept { frames_.fetch_add(num_frames.count()); }
 
     /// Every start from here on fails, the way a device that has gone away does.
     void refuse_starts() noexcept { refusing_.store(true); }
@@ -93,9 +93,9 @@ public:
 
     [[nodiscard]] bool running() const noexcept override { return running_.load(); }
 
-    [[nodiscard]] audio::Frames frames_played() const noexcept override
+    [[nodiscard]] pcm::Frames frames_played() const noexcept override
     {
-        return audio::Frames{frames_.load()};
+        return pcm::Frames{frames_.load()};
     }
 
 private:
@@ -132,7 +132,7 @@ private:
 
     void pull()
     {
-        const audio::StreamSpec spec{source_->spec()};
+        const pcm::StreamSpec spec{source_->spec()};
         std::array<float, 512> block{};
 
         while (running_.load()) {

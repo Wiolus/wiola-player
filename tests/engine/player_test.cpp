@@ -26,10 +26,10 @@
 #include <audio/device/output.hpp>
 #include <audio/dsp/buffer_source.hpp>
 #include <audio/dsp/chain.hpp>
-#include <audio/stream_spec.hpp>
 #include <codec/decode/decoder.hpp>
 #include <codec/decode/open.hpp>
 #include <lockfree/spsc_ring_buffer.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <fakes/output.hpp>
 
@@ -55,8 +55,8 @@ namespace {
 using namespace std::chrono_literals;
 using namespace wiola::units::literals;
 using wiola::audio::Chain;
-using wiola::audio::StreamSpec;
 using wiola::engine::Player;
+using wiola::pcm::StreamSpec;
 using wiola::testing::Rig;
 using State = wiola::engine::Playback::State;
 namespace units = wiola::units;
@@ -328,7 +328,7 @@ TEST(Player, StartsWhereASeekAskedForBeforeIt)
     auto source = wiola::testing::open_fixture();
     ASSERT_NE(source, nullptr);
 
-    const wiola::audio::Frames total{source->num_frames()};
+    const wiola::pcm::Frames total{source->num_frames()};
     const wiola::codec::Decoder* begun{source.get()};
     Rig rig{std::move(source)};
     Player& player{rig.player};
@@ -344,7 +344,7 @@ TEST(Player, StartsWhereASeekAskedForBeforeIt)
     player.wait();
 
     // Beginning a second into the source left the decoder with only the rest of it to read.
-    EXPECT_LT(begun->num_frames_left(), wiola::audio::Frames{total.count() / 2});
+    EXPECT_LT(begun->num_frames_left(), wiola::pcm::Frames{total.count() / 2});
 }
 
 TEST(Player, KeepsASeekAskedForAfterStopping)
@@ -374,21 +374,21 @@ class SlowSource final : public wiola::codec::Decoder {
 public:
     SlowSource()
         : Decoder{
-              wiola::audio::StreamSpec{units::Frequency{44100.0}, 2},
-              wiola::audio::Frames{44100 * 4}
+              wiola::pcm::StreamSpec{units::Frequency{44100.0}, 2},
+              wiola::pcm::Frames{44100 * 4}
     }
     {
     }
 
 protected:
-    std::size_t decode(std::span<float> output, wiola::audio::Frames num_frames) override
+    std::size_t decode(std::span<float> output, wiola::pcm::Frames num_frames) override
     {
         std::fill_n(output.begin(), num_frames.count() * 2, 0.0F);
 
         return num_frames.count();
     }
 
-    bool seek_frame(wiola::audio::Frames /*frame_index*/) override
+    bool seek_frame(wiola::pcm::Frames /*frame_index*/) override
     {
         std::this_thread::sleep_for(200ms);
 
@@ -402,8 +402,8 @@ class ShortSource final : public wiola::codec::Decoder {
 public:
     ShortSource()
         : Decoder{
-              wiola::audio::StreamSpec{units::Frequency{44100.0}, 2},
-              wiola::audio::Frames{4410}
+              wiola::pcm::StreamSpec{units::Frequency{44100.0}, 2},
+              wiola::pcm::Frames{4410}
     }
     {
     }
@@ -411,14 +411,14 @@ public:
     [[nodiscard]] int num_seeks() const noexcept { return num_seeks_.load(); }
 
 protected:
-    std::size_t decode(std::span<float> output, wiola::audio::Frames num_frames) override
+    std::size_t decode(std::span<float> output, wiola::pcm::Frames num_frames) override
     {
         std::fill_n(output.begin(), num_frames.count() * 2, 0.0F);
 
         return num_frames.count();
     }
 
-    bool seek_frame(wiola::audio::Frames /*frame_index*/) override
+    bool seek_frame(wiola::pcm::Frames /*frame_index*/) override
     {
         num_seeks_.fetch_add(1);
 
@@ -558,7 +558,7 @@ TEST(Player, FollowsTheOutputRatherThanTheDecoder)
     ASSERT_TRUE(player.start());
     EXPECT_EQ(player.time_played().get<units::Sec>(), 0.0);
 
-    output.play(wiola::audio::Frames{
+    output.play(wiola::pcm::Frames{
         static_cast<std::size_t>(spec.sample_rate.get<units::Hz>()) / 2});
 
     EXPECT_NEAR(player.time_played().get<units::Sec>(), 0.5, 1e-6);

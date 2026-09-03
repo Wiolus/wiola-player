@@ -48,7 +48,7 @@ using Callbacks =
 
 } // namespace
 
-FlacReader::FlacReader(audio::StreamSpec spec, audio::Frames num_frames,
+FlacReader::FlacReader(pcm::StreamSpec spec, pcm::Frames num_frames,
     std::unique_ptr<Handle> handle) noexcept
     : Decoder{spec, num_frames}
     , handle_{std::move(handle)}
@@ -73,22 +73,22 @@ std::unique_ptr<FlacReader> FlacReader::open(const std::filesystem::path& path)
 
     const drflac* flac{handle->flac};
 
-    const audio::StreamSpec spec{.sample_rate = units::Frequency{flac->sampleRate},
+    const pcm::StreamSpec spec{.sample_rate = units::Frequency{flac->sampleRate},
         .num_channels = flac->channels};
     const auto num_frames = static_cast<std::size_t>(flac->totalPCMFrameCount);
 
     return std::unique_ptr<FlacReader>{
-        new FlacReader{spec, audio::Frames{num_frames}, std::move(handle)}
+        new FlacReader{spec, pcm::Frames{num_frames}, std::move(handle)}
     };
 }
 
-std::size_t FlacReader::decode(std::span<float> output, audio::Frames num_frames)
+std::size_t FlacReader::decode(std::span<float> output, pcm::Frames num_frames)
 {
     return static_cast<std::size_t>(drflac_read_pcm_frames_f32(handle_->flac, num_frames.count(),
         output.data()));
 }
 
-bool FlacReader::seek_frame(audio::Frames frame_index)
+bool FlacReader::seek_frame(pcm::Frames frame_index)
 {
     return drflac_seek_to_pcm_frame(handle_->flac, frame_index.count()) == DRFLAC_TRUE;
 }

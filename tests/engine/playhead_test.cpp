@@ -18,8 +18,8 @@
  * along with Wiola. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <audio/stream_spec.hpp>
 #include <engine/transport/playhead.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <gtest/gtest.h>
 
@@ -32,8 +32,8 @@
 namespace {
 
 using namespace std::chrono_literals;
-using wiola::audio::Frames;
 using wiola::engine::Playhead;
+using wiola::pcm::Frames;
 
 /// How long a threaded test waits before giving up, so a playhead that stops settling fails
 /// rather than hangs.

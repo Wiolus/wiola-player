@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include <audio/stream_spec.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <core/borrowed.hpp>
 #include <core/macros.hpp>
@@ -41,7 +41,7 @@ public:
     /// A seek to carry out, read as one so that a request arriving after it stays outstanding.
     struct Claim {
         std::size_t requested{0};
-        audio::Frames target{};
+        pcm::Frames target{};
         bool outstanding{false};
     };
 
@@ -74,7 +74,7 @@ public:
         /// measured from afterwards - the output's own count is never wound back, since the
         /// thread that plays it is the only one that may write it. What was counted before no
         /// longer applies.
-        void begin_at(audio::Frames frame_index, audio::Frames frames_played,
+        void begin_at(pcm::Frames frame_index, pcm::Frames frames_played,
             const Claim& claim) noexcept;
 
         /// Counts `num_samples` more as handed to the output.
@@ -101,22 +101,21 @@ public:
     [[nodiscard]] Applier applier() noexcept;
 
     /// Asks for playback to move to `frame_index`. Any thread: this only says where to go.
-    void request_seek(audio::Frames frame_index) noexcept;
+    void request_seek(pcm::Frames frame_index) noexcept;
 
     /// Whether a seek has been asked for and not yet carried out. Any thread.
     [[nodiscard]] bool seek_outstanding() const noexcept;
 
     /// Where playback is, given what the output says it has played. Any thread, and read as one
     /// so that a reader never pairs a place with a count from before playback began there.
-    [[nodiscard]] audio::Frames position(audio::Frames frames_played) const noexcept;
+    [[nodiscard]] pcm::Frames position(pcm::Frames frames_played) const noexcept;
 
 private:
     friend class Applier;
 
     /// Carrying seeks out is the applier's, above. Called only from there.
     [[nodiscard]] Claim claim() const noexcept;
-    void begin_at(audio::Frames frame_index, audio::Frames frames_played,
-        const Claim& claim) noexcept;
+    void begin_at(pcm::Frames frame_index, pcm::Frames frames_played, const Claim& claim) noexcept;
     void push(std::size_t num_samples) noexcept;
     [[nodiscard]] std::size_t num_pushed() const noexcept;
 
@@ -140,7 +139,7 @@ inline Playhead::Claim Playhead::Applier::claim() const noexcept
     return head_ ? head_->claim() : Claim{};
 }
 
-inline void Playhead::Applier::begin_at(audio::Frames frame_index, audio::Frames frames_played,
+inline void Playhead::Applier::begin_at(pcm::Frames frame_index, pcm::Frames frames_played,
     const Claim& claim) noexcept
 {
     if (head_)

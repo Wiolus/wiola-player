@@ -21,8 +21,8 @@
 #pragma once
 
 #include <audio/dsp/stage.hpp>
-#include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <memory>
 #include <span>
@@ -64,7 +64,7 @@ public:
     }
 
     /// Retunes every step for a stream of `spec`. Between tracks, never during one.
-    void configure(StreamSpec spec);
+    void configure(pcm::StreamSpec spec);
 
     /// Runs every step over `samples`, in the order they were added, and puts back whatever a
     /// step lifted past what an output takes.

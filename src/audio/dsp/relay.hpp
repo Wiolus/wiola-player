@@ -21,8 +21,8 @@
 #pragma once
 
 #include <audio/dsp/source.hpp>
-#include <audio/stream_spec.hpp>
 #include <core/macros.hpp>
+#include <pcm/stream_spec.hpp>
 
 #include <atomic>
 #include <cstddef>
@@ -44,7 +44,7 @@ namespace wiola::audio {
  */
 class Relay final : public Source {
 public:
-    explicit Relay(StreamSpec spec) noexcept;
+    explicit Relay(pcm::StreamSpec spec) noexcept;
 
     NO_COPY_SEMANTIC(Relay);
     NO_MOVE_SEMANTIC(Relay);
@@ -65,10 +65,10 @@ public:
     /// short answer with.
     std::size_t render(std::span<float> interleaved) override;
 
-    [[nodiscard]] StreamSpec spec() const noexcept override;
+    [[nodiscard]] pcm::StreamSpec spec() const noexcept override;
 
 private:
-    const StreamSpec spec_;
+    const pcm::StreamSpec spec_;
     std::atomic<Source*> source_{nullptr};
 };
 
